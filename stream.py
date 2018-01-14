@@ -452,12 +452,14 @@ def th_worker():
         if  TQ.empty():
             pass
         else:
+            print("===worker受信===")
             data = {}
             status = TQ.get() #キューからトゥートを取り出すよー！
             content = content_cleanser(status['content'])
             acct = status["account"]["acct"]
             id = status["id"]
             g_vis = status["visibility"]
+            print(id,acct,content,g_vis)
             data["content"] = content
             data["acct"] = acct
             data["id"] = id
@@ -477,13 +479,11 @@ def th_worker2():
             if  TQ2.empty():
                 pass
             else:
-                print("===worker2受信===")
                 data = TQ2.get() #キューからトゥートを取り出すよー！
                 content = data['content']
                 id = data["id"]
                 acct = data["acct"]
                 g_vis = data["g_vis"]
-                print(id,acct,content,g_vis)
                 if re.compile("(連想|れんそう)([サさ]ー[ビび][スす])[：:]").search(content):
                     rensou_game(content=content, acct=acct, id=id, g_vis=g_vis)
                     sleep(cm.get_coolingtime())
@@ -494,10 +494,10 @@ def th_worker2():
                     supauza(content=content, acct=acct, id=id, g_vis=g_vis)
                     sleep(cm.get_coolingtime())
                 elif re.compile("([ぼボ][とト][るル][メめ]ー[るル])([サさ]ー[ビび][スす])[：:]").search(content):
-                    bottlemail_service(stacontent=content, acct=acct, id=id, g_vis=g_vistus)
+                    bottlemail_service(content=content, acct=acct, id=id, g_vis=g_vis)
                     sleep(cm.get_coolingtime())
                 elif re.compile("(きょう|今日)の.?(料理|りょうり)|[ご御夕昼朝][食飯][食た]べ[よるた]|(腹|はら)[へ減]った|お(腹|なか)すいた|(何|なに)[食た]べよ").search(content):
-                    recipe_service(stacontent=content, acct=acct, id=id, g_vis=g_vistus)
+                    recipe_service(content=content, acct=acct, id=id, g_vis=g_vis)
                     sleep(cm.get_coolingtime())
                 elif len(content) > 100:
                     print('★要約対象：',content)
@@ -614,7 +614,7 @@ def th_bottlemail_sending():
                 sendlist = bm.drifting()
                 for id,acct,msg in sendlist:
                     sleep(INTERVAL*5)
-                    spoiler = ":@" + acct + ":からボトルメッセージ届いたよー！"
+                    spoiler = ":@" + acct + ": から🍾ボトルメッセージ💌届いたよー！"
                     con = sqlite3.connect(STATUSES_DB_PATH)
                     c = con.cursor()
                     c.execute( r"select acct from statuses where (date = ?) and time >= ? and time <= ? and acct <> ?", [ymd,hh0000,hh9999,BOT_ID] )
@@ -626,6 +626,7 @@ def th_bottlemail_sending():
                     random_acct = random.sample(acct_list,1)[0]
                     print(random_acct)
                     toots = "@" + random_acct + " @" + acct + " :@" + acct + ":＜「" + msg + "」"
+                    toots +=  "\n※ボトルメールサービス：＜メッセージ＞　であなたも送れるよー！試してみてね！"
                     toots +=  "\n#ボトルメールサービス #きりぼっと"
                     toot(toots, "direct", None, spoiler)
                     bm.sended(id, random_acct)
