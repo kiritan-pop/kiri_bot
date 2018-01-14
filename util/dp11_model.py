@@ -38,15 +38,15 @@ for (line,tag) in zip(lines,tags):
 # min_count=1:最低1回出現した単語を学習に使用する
 # 学習モデル=DBOW（デフォルトはdm=1:学習モデル=DM）
 model = Doc2Vec(documents=training_docs,
-                size=300,
+                size=200,
                 window=5,
-                alpha=0.0025,
-                min_alpha=.0001,
-                min_count=8,
-                sample=1e-6,
-                workers=12,
-                iter=600,
-                negative=5,
+                #alpha=0.0025,
+                #min_alpha=.0001,
+                min_count=3,
+                sample=1e-5,
+                workers=11,
+                iter=30,
+                #negative=5,
                 hs=1,
                 dm=1)
 model.save(sys.argv[3])
