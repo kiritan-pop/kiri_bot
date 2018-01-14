@@ -190,7 +190,8 @@ def content_cleanser(content):
         rtext = unicodedata.normalize("NFKC", tmp.text)
         rtext = rtext.replace(r"([^:])@",r"\1")
         rtext = rtext.replace("#","")
-        rtext = re.sub(r'([^。|^？|^！|^\?|^!])___R___', r'\1。\n', rtext)
+        rtext = re.sub(r'^___R___', '', rtext)
+        #rtext = re.sub(r'([^。|^？|^！|^\?|^!])___R___', r'\1。\n', rtext)
         rtext = re.sub(r'___R___', r'\n', rtext)
         if hashtag != "":
             return rtext + " #" + hashtag
@@ -501,7 +502,7 @@ def th_worker2():
                     sleep(cm.get_coolingtime())
                 elif len(content) > 100:
                     print('★要約対象：',content)
-                    content = re.sub(r"(.+){3,}",r"\1",content, flags=(re.DOTALL))
+                    content = re.sub(r"(.)\1{3,}",r"\1",content, flags=(re.DOTALL))
                     gen_txt = Toot_summary.summarize(pat1.sub("",pat2.sub("",content)),limit=10,lmtpcs=1, m=1, f=4)
                     if is_japanese(gen_txt):
                         if len(gen_txt) > 5:
@@ -670,15 +671,20 @@ def th_timer_tooter2():
                     if len(content) == 0:
                         pass
                     else:
-                        seedtxt = content
-                        if len(seedtxt)>30:
+                        seeds.append(content)
+                        #seedtxt = content
+                        #if len(seedtxt)>30:
+                        if len(seeds)>5:
                             break
                 con.close()
+                seeds.reverse()
+                seedtxt = "".join(seeds)
                 print('seedtxt:',seedtxt)
-                gen_txt = seedtxt + lstmgentxt(seedtxt)
+                gen_txt = lstmgentxt(seedtxt)
                 gen_txt = '@' + acct + ' :@' + acct + ':\n' + gen_txt
                 gen_txt +=  "\n#きりつぶやき #きりぼっと"
-                toot(gen_txt, "public", id if id > 0 else None, 'きりぼっとによる補足')
+                #toot(gen_txt, "public", id if id > 0 else None, 'きりぼっとによる補足')
+                toot(gen_txt, "public", None, None)
                 sleep(60)
             except:
                 with open('error.log', 'a') as f:
