@@ -6,6 +6,13 @@ import numpy as np
 import re
 from argparse import ArgumentParser
 
+f = open(".emoji", 'r')
+eos_list = list(f.read())
+f.close()
+#eos_list.extend(["!","♡","♪","、","。","\.","？","\?","！","\n","w","ｗ","」","）","「","（","＊","　"])
+#eos_list.extend(["!","♡","♪","、","。","\.","？","\?","！","\n","w","ｗ","＊","　"])
+eos_list.extend(["!","♡","♪","。","？","?","！","\n","w","ｗ","＊","*",",","　",":",";","：","；","…","・・・","〜"])
+eos_list.extend(["♥","★","☆","■","□","◆","◇","▲","△","▼","▽","●","○"])
 
 def parser():
     usage = 'Usage:python3 b_summary.py [-t <FILE.txt>] [--help]'\
@@ -26,7 +33,7 @@ def mecab_senter(text):
     sentence = []
     for word in words:
         sentence.append(word)
-        if word in  ["!","♡","♪","、","。","\.","？","\?","！","\n","w","ｗ","」","）","「","（","＊","　"]:
+        if word in  eos_list:
             sentences.append(sentence)
             sentence = []
 
@@ -78,6 +85,7 @@ def summarize(text, limit=50, lmtpcs=5, **options):
         3: Binary function (BF)
         4: Inverse entropy
     """
+    text = re.sub(r'焦がしにんにくのマー油と葱油が香るザ★チャーハン600g','炒飯',text)
     sentences = mecab_senter(text)
     freqdict = get_freqdict(sentences)
     if options["m"] == 0:

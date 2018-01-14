@@ -22,7 +22,7 @@ class PrepareChain(object):
     END = u"__END_SENTENCE__"
 
     DB_PATH = "db/"
-    DB_SCHEMA_PATH = "schema.sql"
+    DB_SCHEMA_PATH = "PrepareChain.sql"
 
     def __init__(self, db, text):
         u"""
@@ -159,98 +159,20 @@ class PrepareChain(object):
         @param triplet_freqs 3つ組とその出現回数の辞書 key: 3つ組（タプル） val: 出現回数
         """
         for triplet in triplet_freqs:
-#            print ' '.join(triplet), "\t", triplet_freqs[triplet]
             print (' '.join(triplet), "\t", triplet_freqs[triplet])
-
-
-class TestFunctions(unittest.TestCase):
-    u"""
-    テスト用クラス
-    """
-
-    def setUp(self):
-        u"""
-        テストが実行される前に実行される
-        """
-        self.text = u"こんにちは。　今日は、楽しい運動会です。hello world.我輩は猫である\n  名前はまだない。我輩は犬である\r\n名前は決まってるよ"
-        self.chain = PrepareChain(self.text)
-
-    def test_make_triplet_freqs(self):
-        u"""
-        全体のテスト
-        """
-        triplet_freqs = self.chain.make_triplet_freqs()
-        answer = {(u"__BEGIN_SENTENCE__", u"今日", u"は"): 1, (u"今日", u"は", u"、"): 1, (u"は", u"、", u"楽しい"): 1, (u"、", u"楽しい", u"運動会"): 1, (u"楽しい", u"運動会", u"です"): 1, (u"運動会", u"です", u"。"): 1, (u"です", u"。", u"__END_SENTENCE__"): 1, (u"__BEGIN_SENTENCE__", u"hello", u"world"): 1, (u"hello", u"world", u"."): 1, (u"world", u".", u"__END_SENTENCE__"): 1, (u"__BEGIN_SENTENCE__", u"我輩", u"は"): 2, (u"我輩", u"は", u"猫"): 1, (u"は", u"猫", u"で"): 1, (u"猫", u"で", u"ある"): 1, (u"で", u"ある", u"__END_SENTENCE__"): 2, (u"__BEGIN_SENTENCE__", u"名前", u"は"): 2, (u"名前", u"は", u"まだ"): 1, (u"は", u"まだ", u"ない"): 1, (u"まだ", u"ない", u"。"): 1, (u"ない", u"。", u"__END_SENTENCE__"): 1, (u"我輩", u"は", u"犬"): 1, (u"は", u"犬", u"で"): 1, (u"犬", u"で", u"ある"): 1, (u"名前", u"は", u"決まっ"): 1, (u"は", u"決まっ", u"てる"): 1, (u"決まっ", u"てる", u"よ"): 1, (u"てる", u"よ", u"__END_SENTENCE__"): 1}
-        self.assertEqual(triplet_freqs, answer)
-
-    def test_divide(self):
-        u"""
-        一文ずつに分割するテスト
-        """
-        sentences = self.chain._divide(self.text)
-        answer = [u"こんにちは。", u"今日は、楽しい運動会です。", u"hello world.", u"我輩は猫である", u"名前はまだない。", u"我輩は犬である", u"名前は決まってるよ"]
-        self.assertEqual(sentences.sort(), answer.sort())
-
-    def test_morphological_analysis(self):
-        u"""
-        形態素解析用のテスト
-        """
-        sentence = u"今日は、楽しい運動会です。"
-        morphemes = self.chain._morphological_analysis(sentence)
-        answer = [u"今日", u"は", u"、", u"楽しい", u"運動会", u"です", u"。"]
-        self.assertEqual(morphemes.sort(), answer.sort())
-
-    def test_make_triplet(self):
-        u"""
-        形態素毎に3つ組にしてその出現回数を数えるテスト
-        """
-        morphemes = [u"今日", u"は", u"、", u"楽しい", u"運動会", u"です", u"。"]
-        triplet_freqs = self.chain._make_triplet(morphemes)
-        answer = {(u"__BEGIN_SENTENCE__", u"今日", u"は"): 1, (u"今日", u"は", u"、"): 1, (u"は", u"、", u"楽しい"): 1, (u"、", u"楽しい", u"運動会"): 1, (u"楽しい", u"運動会", u"です"): 1, (u"運動会", u"です", u"。"): 1, (u"です", u"。", u"__END_SENTENCE__"): 1}
-        self.assertEqual(triplet_freqs, answer)
-
-    def test_make_triplet_too_short(self):
-        u"""
-        形態素毎に3つ組にしてその出現回数を数えるテスト
-        ただし、形態素が少なすぎる場合
-        """
-        morphemes = [u"こんにちは", u"。"]
-        triplet_freqs = self.chain._make_triplet(morphemes)
-        answer = {}
-        self.assertEqual(triplet_freqs, answer)
-
-    def test_make_triplet_3morphemes(self):
-        u"""
-        形態素毎に3つ組にしてその出現回数を数えるテスト
-        ただし、形態素がちょうど3つの場合
-        """
-        morphemes = [u"hello", u"world", u"."]
-        triplet_freqs = self.chain._make_triplet(morphemes)
-        answer = {(u"__BEGIN_SENTENCE__", u"hello", u"world"): 1, (u"hello", u"world", u"."): 1, (u"world", u".", u"__END_SENTENCE__"): 1}
-        self.assertEqual(triplet_freqs, answer)
-
-    def tearDown(self):
-        u"""
-        テストが実行された後に実行される
-        """
-        pass
-
 
 if __name__ == '__main__':
     # unittest.main()
-
     param = sys.argv
-    if (len(param) != 2):
-        print ("Usage: $ python " + param[0] + " sample.txt")
+    if (len(param) != 3):
+        print ("Usage: $ python " + param[0] + " sample.txt   <db name>")
         quit()
-
 
     f = open(param[1])
     text = f.read()
     f.close()
 
-    # print (text)
 
-    chain = PrepareChain(text)
+    chain = PrepareChain(param[2],text)
     triplet_freqs = chain.make_triplet_freqs()
     chain.save(triplet_freqs, True)

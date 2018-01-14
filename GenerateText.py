@@ -24,10 +24,10 @@ class GenerateText(object):
         # 指定の数だけ作成する
         for i in range(self.n):
             text = self._generate_sentence(con,switch)
-            generated_text += text
+            generated_text += text  + "\n"
         # DBクローズ
         con.close()
-        return generated_text
+        return generated_text[0:-1]
 
     def _generate_sentence(self, con, switch):
         # 生成文章のリスト
@@ -59,7 +59,7 @@ class GenerateText(object):
             else:
                 result += "。"
         else:
-            result = "".join(morphemes[:-1]) + "\n"
+            result = "".join(morphemes[:-1])
         return result
 
     def _get_chain_from_DB(self, con, prefixes):
@@ -107,16 +107,10 @@ class GenerateText(object):
 
 if __name__ == '__main__':
     param = sys.argv
-    if (len(param) != 2):
+    if (len(param) != 3):
         print ("Usage: $ python " + param[0] + " number")
         quit()
 
     generator = GenerateText(int(param[1]))
-    gen_txt = generator.generate("sousi")
-    print (gen_txt)
-
-    gen_txt = generator.generate("poke")
-    print (gen_txt)
-
-    gen_txt = generator.generate("kiritan")
+    gen_txt = generator.generate(param[2])
     print (gen_txt)
