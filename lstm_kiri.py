@@ -3,7 +3,7 @@
 from keras.models import Sequential,load_model
 import numpy as np
 import random,json
-import sys,io,re
+import sys,io,re,gc
 import MeCab
 from time import sleep
 import unicodedata
@@ -15,16 +15,13 @@ session = tf.Session(config=config)
 tensorflow_backend.set_session(session)
 
 model_path = 'db/tootmodel10.h5'
-print('******* lstm load model %s*******' %model_path)
-model = load_model(model_path)
 
 #いろいろなパラメータ
 batch_size = 256     #大きくすると精度が上がるけど、モデル更新が遅くなるよー！
-bunkatu = 100       #インプットファイルを分割！メモリ足りないので
 maxlen = 30         #
 step = 3            #
-epochs = 50         #トレーニングの回数
-diver = 0.4         #ダイバーシティ：大きくすると想起の幅が大きくなるっぽいー！
+epochs = 30         #トレーニングの回数
+diver = 0.1         #ダイバーシティ：大きくすると想起の幅が大きくなるっぽいー！
 
 #tagger = MeCab.Tagger('-Owakati -d /usr/lib/mecab/dic/mecab-ipadic-neologd -u dic/name.dic,dic/id.dic,dic/nicodic.dic')
 pat3 = re.compile(r'^\n')
@@ -78,8 +75,13 @@ class Lstm_kiri():
                   epochs=epochs)
         ### save
         model.save(model_path)
+        del model
+        gc.collect()
+
 
     def gentxt(self, text):
+        print('******* lstm load model %s*******' %model_path)
+        model = load_model(model_path)
         generated = ''
         sentence = text[-maxlen:]
         #print('input text= %s ' %text)
@@ -100,8 +102,10 @@ class Lstm_kiri():
             if generated.count('\n') > 3:
                 break
 
-        rtn_text = '。'.join(generated.split('\n')) + '。'
+        rtn_text = '\n。'.join(generated.split('\n')) + '。'
         rtn_text = re.sub(r'。+','。',rtn_text)
+        del model
+        gc.collect()
         return rtn_text
 
 if __name__ == '__main__':

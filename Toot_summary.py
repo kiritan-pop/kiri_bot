@@ -12,7 +12,7 @@ f.close()
 #eos_list.extend(["!","♡","♪","、","。","\.","？","\?","！","\n","w","ｗ","」","）","「","（","＊","　"])
 #eos_list.extend(["!","♡","♪","、","。","\.","？","\?","！","\n","w","ｗ","＊","　"])
 eos_list.extend(["!","♡","♪","。","？","?","！","\n","w","ｗ","＊","*",",","　",":",";","：","；","…","・・・","〜"])
-eos_list.extend(["♥","★","☆","■","□","◆","◇","▲","△","▼","▽","●","○"])
+eos_list.extend(["♥","★","☆","■","□","◆","◇","▲","△","▼","▽","●","○","」","(_)"])
 
 def parser():
     usage = 'Usage:python3 b_summary.py [-t <FILE.txt>] [--help]'\
@@ -28,7 +28,7 @@ def parser():
 m = mc.Tagger('-Owakati -d /usr/lib/mecab/dic/mecab-ipadic-neologd -u ./dic/name.dic,./dic/id.dic,./dic/nicodic.dic')
 
 def mecab_senter(text):
-    words = m.parse(text).split(" ")
+    words = m.parse(text).split()
     sentences = []
     sentence = []
     for word in words:
@@ -86,6 +86,7 @@ def summarize(text, limit=50, lmtpcs=5, **options):
         4: Inverse entropy
     """
     text = re.sub(r'焦がしにんにくのマー油と葱油が香るザ★チャーハン600g','炒飯',text)
+    text = re.sub(r'\n','(_)',text) #Mecabで改行がなくなるので、一時的に置き換える。
     sentences = mecab_senter(text)
     freqdict = get_freqdict(sentences)
     if options["m"] == 0:
@@ -121,7 +122,7 @@ def summarize(text, limit=50, lmtpcs=5, **options):
             topics.append(index)
     topics = sorted(topics)
     #print(topics)
-    return "＊" + "\n＊".join(["".join(sentences[topic]).replace("。","").replace("、","") for topic in topics])
+    return "＊" + "\n＊".join(["".join(sentences[topic]).replace("。","").replace("、","").replace("(_)","") for topic in topics])
 
 
 def text_input(text):

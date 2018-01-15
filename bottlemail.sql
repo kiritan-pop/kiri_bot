@@ -4,5 +4,6 @@ create table bottlemail (
     msg text not null,
     count integer,
     send_fg integer,
-    dest text
+    dest text,
+    reply_id integer
 );

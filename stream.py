@@ -105,7 +105,7 @@ class res_toot(StreamListener):
         #print("===ローカルタイムライン===")
         if  status["account"]["username"] != BOT_ID:
             TQ.put(status)
-        cm.count()
+            cm.count()
 
     def on_delete(self, status_id):
         print(str("===削除されました【{}】===").format(str(status_id)))
@@ -157,20 +157,29 @@ def quick_rtn(content, acct, id, g_vis):
         toot("@kiritan 緊急停止しまーす！", 'direct', id ,None)
         sys.exit()
     try:
-        if re.compile("きりぼっと").search(content): # or username == '@JC' or username == '@kiritan':
+        if re.compile(r"きりぼっと").search(content): # or username == '@JC' or username == '@kiritan':
             fav_now(id)
-        if re.compile(u"草").search(content):
+        if re.compile(r"草").search(content):
             toot_now = ":" + username + ": " + username + " "
             if random.randint(0,7) == 3:
                 random.shuffle(hanalist)
                 toot_now += hanalist[0]
                 toot(toot_now, "direct", id, None)
-        if re.compile(u"^:twitter:.+🔥$").search(content):
+        if re.compile(r"^:twitter:.+🔥$").search(content):
             toot_now = ":" + username + ": " + username + " "
             toot_now += '\n:twitter: ＜ﾊﾟﾀﾊﾟﾀｰ\n川\n\n🔥'
             toot(toot_now, "direct", id, None)
-        if re.compile(u"ブリブリ").search(content):
+        if re.compile(r"ブリブリ|ぶりぶり|うん[ちこ]|💩").search(content):
             toot_now = '🌊🌊🌊 ＜ざばーっ！'
+            toot(toot_now, "public", None, None)
+        if re.compile(r"^ぬるぽ$").search(content):
+            toot_now = 'ｷﾘｯ'
+            toot(toot_now, "public", None, None)
+        if re.compile(r"^33-4$").search(content):
+            toot_now = 'ﾅﾝ'
+            toot(toot_now, "public", None, None)
+        if re.compile(r"^ちくわ大明神$").search(content):
+            toot_now = 'ﾀﾞｯ'
             toot(toot_now, "public", None, None)
     except:
         with open('error.log', 'a') as f:
@@ -351,7 +360,6 @@ def supauza(content, acct, id, g_vis):
     word = tagger.parse(word)
     spoiler = "「" + word + "」の戦闘力を測定！ぴぴぴっ！・・・"
     toot_now = ":" + username + ": " + username + "\n"
-    g_vis = status["visibility"]
     f = open(".dic_supauza", 'r')
     dic = json.load(f)
     f.close()
@@ -447,7 +455,7 @@ def bottlemail_service(content, acct, id, g_vis):
 
     bm = bottlemail.Bottlemail()
     word = re.search("([ぼボ][とト][るル][メめ]ー[るル])([サさ]ー[ビび][スす])[：:](.*)", str(content)).group(3)
-    bm.bottling(acct,word)
+    bm.bottling(acct,word,id)
 
     spoiler = "ボトルメール受け付けたよー！"
     toot_now += "受け付けたメッセージは「" + word + "」だよー！いつか届くから気長に待っててねー！"
@@ -509,7 +517,7 @@ def th_worker2():
                 elif re.compile("(きょう|今日)の.?(料理|りょうり)|[ご御夕昼朝][食飯][食た]べ[よるた]|(腹|はら)[へ減]った|お(腹|なか)すいた|(何|なに)[食た]べよ").search(content):
                     recipe_service(content=content, acct=acct, id=id, g_vis=g_vis)
                     sleep(cm.get_coolingtime())
-                elif len(content) > 100:
+                elif len(content) > 140:
                     print('★要約対象：',content)
                     content = re.sub(r"(.)\1{3,}",r"\1",content, flags=(re.DOTALL))
                     gen_txt = Toot_summary.summarize(pat1.sub("",pat2.sub("",content)),limit=10,lmtpcs=1, m=1, f=4)
@@ -601,7 +609,7 @@ def th_summarize_tooter():
                     pass
                 else:
                     content = re.sub(r"(.+)\1{3,}","",content, flags=(re.DOTALL))
-                    toots += content + "。\n"
+                    toots += content + "\n"
             con.close()
             gen_txt = Toot_summary.summarize(pat1.sub("",pat2.sub("",toots)),limit=90, lmtpcs=5, m=1, f=4)
             if gen_txt[-1:1] == '#':
@@ -626,7 +634,7 @@ def th_bottlemail_sending():
             hh9999 = int(hh + "9999")
             try:
                 sendlist = bm.drifting()
-                for id,acct,msg in sendlist:
+                for id,acct,msg,reply_id in sendlist:
                     sleep(INTERVAL*5)
                     spoiler = ":@" + acct + ": から🍾ボトルメール💌届いたよー！"
                     con = sqlite3.connect(STATUSES_DB_PATH)
@@ -643,13 +651,13 @@ def th_bottlemail_sending():
                     toots = "@" + random_acct + " :@" + acct + ":＜「" + msg + "」"
                     toots +=  "\n※ボトルメールサービス：＜メッセージ＞　であなたも送れるよー！試してみてね！"
                     toots +=  "\n#ボトルメールサービス #きりぼっと"
-                    toot(toots, "direct", None, spoiler)
+                    toot(toots, "direct",reply_id if reply_id != 0 else None, spoiler)
                     bm.sended(id, random_acct)
 
                     #到着通知
                     sleep(DELAY)
                     spoiler = ":@" + random_acct + ": が🍾ボトルメール💌受け取ったよー！"
-                    toots = "@" + acct + " 届けたメッセージは…… :@" + acct + ": ＜「" + msg + "」"
+                    toots = "@" + acct + " 届けたメッセージは……\n:@" + acct + ": ＜「" + msg + "」"
                     toots +=  "\n#ボトルメールサービス #きりぼっと"
                     toot(toots, "direct", None, spoiler)
 
@@ -675,7 +683,7 @@ def th_timer_tooter2():
     while True:
         jst_now = datetime.now(timezone('Asia/Tokyo'))
         mm = jst_now.strftime("%M")
-        if mm == '57' or mm == '37' or mm == '17':
+        if mm == '57' or mm == '37': # or mm == '17':
         #if mm != '99': #test
             try:
                 con = sqlite3.connect(STATUSES_DB_PATH)
@@ -726,7 +734,11 @@ def th_lstm_trainer():
         import lstm_kiri
         lk = lstm_kiri.Lstm_kiri()
         lk.train(text)
+        del lk,lstm_kiri
+        gc.collect()
     while True:
+        sleep(10)
+        #print('th_lstm_trainer')
         jst_now = datetime.now(timezone('Asia/Tokyo'))
         mm = jst_now.strftime("%M")
         if mm == '07':
@@ -740,14 +752,14 @@ def th_lstm_trainer():
                 c = con.cursor()
                 c.execute( r"select content from statuses where (date = ?) and time >= ? and time <= ? and acct <> ? order by time asc", [ymd,hh0000,hh9999, BOT_ID] )
                 toots = []
-                for i,row in enumerate(c.fetchall()):
+                for row in c.fetchall():
                     content = content_cleanser(row[0])
-                    if pat3.search(row[0]) or len(content) == 0:
+                    if len(content) == 0:
                         pass
                     else:
-                        toots.append(content + "\n")
+                        toots.append(content)
 
-                lstmtrain("".join(toots))
+                lstmtrain("\n".join(toots))
                 con.close()
                 sleep(60)
             except:
@@ -766,5 +778,5 @@ if __name__ == '__main__':
     threading.Thread(target=th_timer_tooter).start()
     threading.Thread(target=th_summarize_tooter).start()
     threading.Thread(target=th_timer_tooter2).start()
-    #threading.Thread(target=th_lstm_trainer).start()
+    threading.Thread(target=th_lstm_trainer).start()
     threading.Thread(target=th_bottlemail_sending).start()

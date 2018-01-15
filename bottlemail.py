@@ -24,18 +24,12 @@ class Bottlemail():
             con.commit()
             con.close()
 
-    def bottling(self,acct,msg):
+    def bottling(self,acct,msg,reply_id):
         if acct == None or msg == None:
             return
         con = sqlite3.connect(self.DB_PATH)
-        con.execute('insert into bottlemail (acct, msg, count, send_fg) values (?,?,?,?) ',(acct,msg,0,0))
+        con.execute('insert into bottlemail (acct, msg, count, send_fg, reply_id) values (?,?,?,?,?) ',(acct,msg,0,0,reply_id))
         con.commit()
-        con.close()
-
-    def test(self):
-        con = sqlite3.connect(self.DB_PATH)
-        for row in con.execute('select * from bottlemail'):
-            print(row)
         con.close()
 
     def drifting(self):
@@ -43,12 +37,12 @@ class Bottlemail():
         arrival = []
         #カウントランダムアップ
         for row in con.execute('select * from bottlemail'):
-            con.execute('update bottlemail set count=? where id=? and send_fg=?',(row[3]+random.randint(1,24), row[0],0))
+            con.execute('update bottlemail set count=? where id=? and send_fg=?',(row[3]+random.randint(1,20), row[0],0))
         con.commit()
 
         #カウント＞240の人抽出
         for row in con.execute('select * from bottlemail where count>=? and send_fg=?',(240,0)):
-            arrival.append([row[0],row[1],row[2]])
+            arrival.append([row[0],row[1],row[2],row[6]])
         con.close()
         #送信対象を返すよー！
         return arrival
@@ -63,6 +57,11 @@ class Bottlemail():
         con.commit()
         con.close()
 
+    def test(self):
+        con = sqlite3.connect(self.DB_PATH)
+        for row in con.execute('select * from bottlemail'):
+            print(row)
+        con.close()
 
 if __name__ == '__main__':
     bm = Bottlemail()
