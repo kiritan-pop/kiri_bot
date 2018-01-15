@@ -43,11 +43,11 @@ class Bottlemail():
         arrival = []
         #カウントランダムアップ
         for row in con.execute('select * from bottlemail'):
-            con.execute('update bottlemail set count=? where id=? and send_fg=?',(row[3]+random.randint(1,10), row[0],0))
+            con.execute('update bottlemail set count=? where id=? and send_fg=?',(row[3]+random.randint(1,24), row[0],0))
         con.commit()
 
-        #カウント＞100の人抽出
-        for row in con.execute('select * from bottlemail where count>=? and send_fg=?',(100,0)):
+        #カウント＞240の人抽出
+        for row in con.execute('select * from bottlemail where count>=? and send_fg=?',(240,0)):
             arrival.append([row[0],row[1],row[2]])
         con.close()
         #送信対象を返すよー！

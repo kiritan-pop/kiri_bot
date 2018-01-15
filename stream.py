@@ -24,10 +24,10 @@ INTERVAL = 0.1
 COOLING_TIME = 10
 DELAY = 1
 STATUSES_DB_PATH = "db/statuses.db"
-pat1 = re.compile(r' ([!-~ぁ-んァ-ン] )+|^([!-~ぁ-んァ-ン] )+| [!-~ぁ-んァ-ン]$')  #[!-~0-9a-zA-Zぁ-んァ-ン０-９ａ-ｚ]
+pat1 = re.compile(r' ([!-~ぁ-んァ-ン] )+|^([!-~ぁ-んァ-ン] )+| [!-~ぁ-んァ-ン]$',flags=re.MULTILINE)  #[!-~0-9a-zA-Zぁ-んァ-ン０-９ａ-ｚ]
 pat2 = re.compile(r'[ｗ！？!\?]')
 #pat3 = re.compile(r'アンケート|ﾌﾞﾘﾌﾞﾘ|:.+:|.+年.+月|friends\.nico|href')
-pat3 = re.compile(r'アンケート|ブリブリ|うんこ|[ちチ][んン][こコ]|[まマ][んン][こコ]|おっぱい|[チち][んン][ポぽ]|膣|勃起|セックス|アナル|シコ[るっ]|射精')
+pat3 = re.compile(r'アンケート|うんこ|[ちチ][んン][こコ]|[まマ][んン][こコ]|おっぱい|[チち][んン][ポぽ]|膣|勃起|セックス|アナル|シコ[るっ]|射精')
 
 #lk = lstm_kiri.Lstm_kiri()
 tagger      = MeCab.Tagger('-Owakati -d /usr/lib/mecab/dic/mecab-ipadic-neologd -u ./dic/name.dic,./dic/id.dic,./dic/nicodic.dic')
@@ -169,6 +169,9 @@ def quick_rtn(content, acct, id, g_vis):
             toot_now = ":" + username + ": " + username + " "
             toot_now += '\n:twitter: ＜ﾊﾟﾀﾊﾟﾀｰ\n川\n\n🔥'
             toot(toot_now, "direct", id, None)
+        if re.compile(u"ブリブリ").search(content):
+            toot_now = '🌊🌊🌊 ＜ざばーっ！'
+            toot(toot_now, "public", None, None)
     except:
         with open('error.log', 'a') as f:
             traceback.print_exc(file=f)
@@ -187,10 +190,15 @@ def content_cleanser(content):
     if tmp.text == None or pat3.search(tmp.text):
         return ""
     else:
-        rtext = unicodedata.normalize("NFKC", tmp.text)
+        rtext = ''
+        ps = []
+        for p in tmp.find_all("p"):
+            ps.append(p.text)
+        rtext += '。\n'.join(ps)
+        rtext = unicodedata.normalize("NFKC", rtext)
         rtext = rtext.replace(r"([^:])@",r"\1")
         rtext = rtext.replace("#","")
-        rtext = re.sub(r'^___R___', '', rtext)
+        rtext = re.sub(r'(___R___)\1{2,}', r'\1', rtext)
         #rtext = re.sub(r'([^。|^？|^！|^\?|^!])___R___', r'\1。\n', rtext)
         rtext = re.sub(r'___R___', r'\n', rtext)
         if hashtag != "":
@@ -495,6 +503,7 @@ def th_worker2():
                     supauza(content=content, acct=acct, id=id, g_vis=g_vis)
                     sleep(cm.get_coolingtime())
                 elif re.compile("([ぼボ][とト][るル][メめ]ー[るル])([サさ]ー[ビび][スす])[：:]").search(content):
+                    print("★ボトルメールサービス")
                     bottlemail_service(content=content, acct=acct, id=id, g_vis=g_vis)
                     sleep(cm.get_coolingtime())
                 elif re.compile("(きょう|今日)の.?(料理|りょうり)|[ご御夕昼朝][食飯][食た]べ[よるた]|(腹|はら)[へ減]った|お(腹|なか)すいた|(何|なに)[食た]べよ").search(content):
@@ -504,6 +513,8 @@ def th_worker2():
                     print('★要約対象：',content)
                     content = re.sub(r"(.)\1{3,}",r"\1",content, flags=(re.DOTALL))
                     gen_txt = Toot_summary.summarize(pat1.sub("",pat2.sub("",content)),limit=10,lmtpcs=1, m=1, f=4)
+                    if gen_txt[-1:1] == '#':
+                        gen_txt = gen_txt[:len(gen_txt)-1]
                     if is_japanese(gen_txt):
                         if len(gen_txt) > 5:
                             gen_txt +=  "\n#きり要約 #きりぼっと"
@@ -593,6 +604,8 @@ def th_summarize_tooter():
                     toots += content + "。\n"
             con.close()
             gen_txt = Toot_summary.summarize(pat1.sub("",pat2.sub("",toots)),limit=90, lmtpcs=5, m=1, f=4)
+            if gen_txt[-1:1] == '#':
+                gen_txt = gen_txt[:len(gen_txt)-1]
             if len(gen_txt) > 5:
                 gen_txt +=  "\n#きりまとめ #きりぼっと"
                 toot(gen_txt, "public", None, spoiler)
@@ -615,7 +628,7 @@ def th_bottlemail_sending():
                 sendlist = bm.drifting()
                 for id,acct,msg in sendlist:
                     sleep(INTERVAL*5)
-                    spoiler = ":@" + acct + ": から🍾ボトルメッセージ💌届いたよー！"
+                    spoiler = ":@" + acct + ": から🍾ボトルメール💌届いたよー！"
                     con = sqlite3.connect(STATUSES_DB_PATH)
                     c = con.cursor()
                     c.execute( r"select acct from statuses where (date = ?) and time >= ? and time <= ? and acct <> ?", [ymd,hh0000,hh9999,BOT_ID] )
@@ -626,11 +639,20 @@ def th_bottlemail_sending():
                     con.close()
                     random_acct = random.sample(acct_list,1)[0]
                     print(random_acct)
-                    toots = "@" + random_acct + " @" + acct + " :@" + acct + ":＜「" + msg + "」"
+                    #お届け！
+                    toots = "@" + random_acct + " :@" + acct + ":＜「" + msg + "」"
                     toots +=  "\n※ボトルメールサービス：＜メッセージ＞　であなたも送れるよー！試してみてね！"
                     toots +=  "\n#ボトルメールサービス #きりぼっと"
                     toot(toots, "direct", None, spoiler)
                     bm.sended(id, random_acct)
+
+                    #到着通知
+                    sleep(DELAY)
+                    spoiler = ":@" + random_acct + ": が🍾ボトルメール💌受け取ったよー！"
+                    toots = "@" + acct + " 届けたメッセージは…… :@" + acct + ": ＜「" + msg + "」"
+                    toots +=  "\n#ボトルメールサービス #きりぼっと"
+                    toot(toots, "direct", None, spoiler)
+
                 sleep(60)
             except:
                 with open('error.log', 'a') as f:
@@ -646,7 +668,10 @@ def th_timer_tooter2():
         rtntext = lk.gentxt(seedtxt)
         del lk,lstm_kiri
         gc.collect()
-        return rtntext
+        if rtntext[0:1] == '。':
+            return rtntext[1:]
+        else:
+            return rtntext
     while True:
         jst_now = datetime.now(timezone('Asia/Tokyo'))
         mm = jst_now.strftime("%M")
@@ -679,9 +704,11 @@ def th_timer_tooter2():
                 con.close()
                 seeds.reverse()
                 seedtxt = "".join(seeds)
+                if seedtxt[-1:1] != '。':
+                    seedtxt += '。'
                 print('seedtxt:',seedtxt)
                 gen_txt = lstmgentxt(seedtxt)
-                gen_txt = '@' + acct + ' :@' + acct + ':\n' + gen_txt
+                #gen_txt = '@' + acct + ' :@' + acct + ':\n' + gen_txt
                 gen_txt +=  "\n#きりつぶやき #きりぼっと"
                 #toot(gen_txt, "public", id if id > 0 else None, 'きりぼっとによる補足')
                 toot(gen_txt, "public", None, None)
