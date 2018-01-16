@@ -57,11 +57,21 @@ class Bottlemail():
         con.commit()
         con.close()
 
-    def test(self):
+    def show(self):
         con = sqlite3.connect(self.DB_PATH)
-        for row in con.execute('select * from bottlemail'):
-            print(row)
+        rows = con.execute('select * from bottlemail')
+        return rows
         con.close()
+
+    def flow_count(self):
+        con = sqlite3.connect(self.DB_PATH)
+        c = con.cursor()
+#        for row in con.execute('select count(*) from bottlemail where send_fg=0'):
+#            print(row[0])
+        c.execute('select count(*) from bottlemail where send_fg=0')
+        result = c.fetchone()
+        con.close()
+        return result[0]
 
 if __name__ == '__main__':
     bm = Bottlemail()
@@ -74,4 +84,6 @@ if __name__ == '__main__':
     #    print(msg)
     #    bm.sended(id,'kiri_bot01')
 
-    bm.test()
+    for ret in bm.show():
+        print(ret)
+    print(bm.flow_count())
