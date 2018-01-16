@@ -165,7 +165,7 @@ def quick_rtn(content, acct, id, g_vis):
                 random.shuffle(hanalist)
                 toot_now += hanalist[0]
                 toot(toot_now, "direct", id, None)
-        if re.compile(r"^:twitter:.+🔥$").search(content):
+        if re.compile(r"^:twitter:.+🔥$", flags=(re.MULTILINE | re.DOTALL)).search(content):
             toot_now = ":" + username + ": " + username + " "
             toot_now += '\n:twitter: ＜ﾊﾟﾀﾊﾟﾀｰ\n川\n\n🔥'
             toot(toot_now, "direct", id, None)
@@ -175,7 +175,7 @@ def quick_rtn(content, acct, id, g_vis):
         if re.compile(r"^ぬるぽ$").search(content):
             toot_now = 'ｷﾘｯ'
             toot(toot_now, "public", None, None)
-        if re.compile(r"^33-4$").search(content):
+        if re.compile(r"3.{0,1}3.{0,1}4").search(content):
             toot_now = 'ﾅﾝ'
             toot(toot_now, "public", None, None)
         if re.compile(r"^ちくわ大明神$").search(content):
@@ -538,6 +538,7 @@ def th_worker2():
 # 定期ものまねさーびす！
 def th_timer_tooter():
     while True:
+        sleep(10)
         jst_now = datetime.now(timezone('Asia/Tokyo'))
         mm = jst_now.strftime("%M")
         if mm == '15' or mm == '45':
@@ -590,6 +591,7 @@ def th_timer_tooter():
 # 定期ここ1時間のまとめ
 def th_summarize_tooter():
     while True:
+        sleep(10)
         jst_now = datetime.now(timezone('Asia/Tokyo'))
         mm = jst_now.strftime("%M")
         if mm == '02':
@@ -624,6 +626,7 @@ def th_summarize_tooter():
 def th_bottlemail_sending():
     bm = bottlemail.Bottlemail()
     while True:
+        sleep(10)
         jst_now = datetime.now(timezone('Asia/Tokyo'))
         mm = jst_now.strftime("%M")
         if mm == '10':
@@ -648,7 +651,7 @@ def th_bottlemail_sending():
                     random_acct = random.sample(acct_list,1)[0]
                     print(random_acct)
                     #お届け！
-                    toots = "@" + random_acct + " :@" + acct + ":＜「" + msg + "」"
+                    toots = "@" + random_acct + "\n:@" + acct + ":＜「" + msg + "」"
                     toots +=  "\n※ボトルメールサービス：＜メッセージ＞　であなたも送れるよー！試してみてね！"
                     toots +=  "\n#ボトルメールサービス #きりぼっと"
                     toot(toots, "direct",reply_id if reply_id != 0 else None, spoiler)
@@ -671,16 +674,17 @@ def th_bottlemail_sending():
 # きりぼっとのつぶやき
 def th_timer_tooter2():
     def lstmgentxt(seedtxt):
-        import lstm_kiri
-        lk = lstm_kiri.Lstm_kiri()
+        import lstm_kirigen
+        lk = lstm_kirigen.Lstm_kirigen()
         rtntext = lk.gentxt(seedtxt)
-        del lk,lstm_kiri
-        gc.collect()
+        #del lk,lstm_kiri
+        #gc.collect()
         if rtntext[0:1] == '。':
             return rtntext[1:]
         else:
             return rtntext
     while True:
+        sleep(10)
         jst_now = datetime.now(timezone('Asia/Tokyo'))
         mm = jst_now.strftime("%M")
         if mm == '57' or mm == '37': # or mm == '17':
@@ -731,11 +735,11 @@ def th_timer_tooter2():
 # トレーニング処理　（今は使ってないよー）
 def th_lstm_trainer():
     def lstmtrain(text):
-        import lstm_kiri
-        lk = lstm_kiri.Lstm_kiri()
+        import lstm_kiritrain
+        lk = lstm_kiritrain.Lstm_kiritrain()
         lk.train(text)
-        del lk,lstm_kiri
-        gc.collect()
+        #del lk,lstm_kiri
+        #gc.collect()
     while True:
         sleep(10)
         #print('th_lstm_trainer')
