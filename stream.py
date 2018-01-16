@@ -88,7 +88,7 @@ class CoolingManager():
 class men_toot(StreamListener):
     def on_notification(self, notification):
         print("===通知===")
-        if  notification["account"]["username"] != BOT_ID:
+        if  notification["account"]["username"] not in [BOT_ID,'@JC','@12222222']:
             if notification["type"] == "mention":
                 status = notification["status"]
                 TQ.put(status)
@@ -98,7 +98,8 @@ class men_toot(StreamListener):
 class res_toot(StreamListener):
     def on_update(self, status):
         #print("===ローカルタイムライン===")
-        if  status["account"]["username"] != BOT_ID:
+        if  status["account"]["username"] not in [BOT_ID,'@JC','@12222222'] and \
+            BOT_ID not in status['content']:
             TQ.put(status)
             cm.count()
 
@@ -162,33 +163,73 @@ def quick_rtn(content, acct, id, g_vis):
         toot("@kiritan 緊急停止しまーす！", 'direct', id ,None)
         sys.exit()
     try:
-        if re.compile(r"きりぼっと").search(content): # or username == '@JC' or username == '@kiritan':
+        rnd = random.randint(0,10)
+        toot_now = ''
+        id_now = id
+        vis_now = g_vis
+        if re.compile(r"きりぼっと").search(content):
             fav_now(id)
-        if re.compile(r"草").search(content):
+        elif re.compile(r"草").search(content):
             toot_now = ":" + username + ": " + username + " "
-            if random.randint(0,7) == 3:
+            if rnd == 2:
                 random.shuffle(hanalist)
                 toot_now += hanalist[0]
-                toot(toot_now, "direct", id, None)
-        if re.compile(r"^:twitter:.+🔥$", flags=(re.MULTILINE | re.DOTALL)).search(content):
+        elif re.compile(r"^:twitter:.+🔥$", flags=(re.MULTILINE | re.DOTALL)).search(content):
             toot_now = ":" + username + ": " + username + " "
             toot_now += '\n:twitter: ＜ﾊﾟﾀﾊﾟﾀｰ\n川\n\n🔥'
-            toot(toot_now, "direct", id, None)
-        if re.compile(r"ブリブリ|ぶりぶり|うん[ちこ]|💩").search(content):
-            toot_now = '🌊🌊🌊 ＜ざばーっ！'
-            toot(toot_now, "public", None, None)
-        if re.compile(r"^ぬるぽ$").search(content):
-            toot_now = 'ｷﾘｯ'
-            toot(toot_now, "public", None, None)
-        if re.compile(r"3.{0,1}3.{0,1}4").search(content):
-            toot_now = 'ﾅﾝ'
-            toot(toot_now, "public", None, None)
-        if re.compile(r"^ちくわ大明神$").search(content):
-            toot_now = 'ﾀﾞｯ'
-            toot(toot_now, "public", None, None)
-        if re.compile(r"ボロン|ぼろん").search(content):
-            toot_now = '✂️チョキン！！'
-            toot(toot_now, "public", None, None)
+            vis_now = 'direct'
+        elif re.compile(r"ブリブリ|ぶりぶり|うん[ちこ]|💩").search(content):
+            if rnd <= 3:
+                toot_now = '🌊🌊🌊 ＜ざばーっ！'
+                vis_now = 'public'
+                id_now = None
+            elif rnd == 4:
+                toot_now = '@%s きたない'%acct
+                vis_now = 'direct'
+        elif re.compile(r"ふきふき").search(content):
+            if rnd <= 3:
+                toot_now = '💨💨💨＜ぶおーっ！'
+                vis_now = 'public'
+                id_now = None
+        elif re.compile(r"^ぬるぽ$").search(content):
+            if rnd <= 6:
+                toot_now = 'ｷﾘｯ'
+                vis_now = 'public'
+                id_now = None
+        elif re.compile(r"3.{0,1}3.{0,1}4").search(content):
+            if rnd <= 6:
+                toot_now = 'ﾅﾝ'
+                vis_now = 'public'
+                id_now = None
+        elif re.compile(r"^ちくわ大明神$").search(content):
+            if rnd <= 6:
+                toot_now = 'ﾀﾞｯ'
+                vis_now = 'public'
+                id_now = None
+        elif re.compile(r"ボロン|ぼろん").search(content):
+            if rnd <= 3:
+                toot_now = '✂️チョキン！！'
+                vis_now = 'direct'
+        elif re.compile(r"(今|いま)の[な|無|ナ][し|シ]").search(content):
+            if rnd <= 3:
+                toot_now = '🚓🚓🚓＜う〜う〜！いまのなし警察でーす！'
+                vis_now = 'public'
+                id_now = None
+            elif rnd == 5:
+                toot_now = '🚓＜う〜……'
+                vis_now = 'direct'
+        elif re.compile(r"ツイッター|ツイート|[tT]witter").search(content):
+            if rnd <= 3:
+                toot_now = 'つ、つつつ、つい〜〜！！？！？？！？！'
+                vis_now = 'direct'
+            elif rnd == 6:
+                toot_now = 'つい〜……'
+                vis_now = 'direct'
+        else:
+            return
+        #
+        if len(toot_now) > 0:
+            toot(toot_now, vis_now, id_now, None)
 
     except:
         jst_now = datetime.now(timezone('Asia/Tokyo'))
