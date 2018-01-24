@@ -16,18 +16,27 @@ import Toot_summary,GenerateText,PrepareChain,bottlemail  #自前のやつー！
 import lstm_kiri
 
 BOT_ID = 'kiri_bot01'
+BOTS = [BOT_ID,'JC','12222222','friends_booster']
 INTERVAL = 0.1
 COOLING_TIME = 10
 DELAY = 1
 STATUSES_DB_PATH = "db/statuses.db"
 pat1 = re.compile(r' ([!-~ぁ-んァ-ン] )+|^([!-~ぁ-んァ-ン] )+| [!-~ぁ-んァ-ン]$',flags=re.MULTILINE)  #[!-~0-9a-zA-Zぁ-んァ-ン０-９ａ-ｚ]
 pat2 = re.compile(r'[ｗ！？!\?]')
-#pat3 = re.compile(r'アンケート|ﾌﾞﾘﾌﾞﾘ|:.+:|.+年.+月|friends\.nico|href')
-pat3 = re.compile(r'アンケート|うんこ|[ちチ][んン][こコ]|[まマ][んン][こコ]|おっぱい|[チち][んン][ポぽ]|膣|勃起|セックス|アナル|シコ[るっ]|射精')
+#NGワード
+ng_words = set(word.strip() for word in open('.ng_words').readlines())
+#print('ng_words',ng_words)
 
 tagger      = MeCab.Tagger('-Owakati -d /usr/lib/mecab/dic/mecab-ipadic-neologd -u ./dic/name.dic,./dic/id.dic,./dic/nicodic.dic')
 model       = word2vec.Word2Vec.load('db/nico.model')
 image_model = doc2vec.Doc2Vec.load('db/media.model')
+
+#トゥート先NGの人たちー！
+ng_user_set = set('friends_nico')
+
+
+#停止用
+STOPPA = []
 
 #.envファイルからトークンとかURLを取得ー！
 dotenv_path = join(dirname(__file__), '.env')
@@ -41,6 +50,7 @@ mastodon = Mastodon(
 
 TQ = queue.Queue()
 TQ2 = queue.Queue()
+Toot1bQ = queue.Queue()
 
 # 花宅配サービス用の花リスト
 hanalist = []
@@ -88,35 +98,73 @@ class CoolingManager():
 class men_toot(StreamListener):
     def on_notification(self, notification):
         print("===通知===")
-        if  notification["account"]["username"] not in [BOT_ID,'@JC','@12222222']:
-            if notification["type"] == "mention":
-                status = notification["status"]
-                TQ.put(status)
+        if notification["type"] == "mention":
+            status = notification["status"]
+            status['spoiler_text'] += ' きりぼっと'
+            TQ.put(status)
 
 #######################################################
 # マストドンＡＰＩ用部品を継承して、ローカルタイムライン受信時の処理を実装ー！
 class res_toot(StreamListener):
     def on_update(self, status):
         #print("===ローカルタイムライン===")
-        if  status["account"]["username"] not in [BOT_ID,'@JC','@12222222'] and \
+        if  status["account"]["username"] not in BOTS and \
             BOT_ID not in status['content']:
             TQ.put(status)
             cm.count()
 
     def on_delete(self, status_id):
         print(str("===削除されました【{}】===").format(str(status_id)))
+        #print(type(status_id))
+        rnd = random.randint(0,10)
+        if rnd <= 5:
+            con = sqlite3.connect(STATUSES_DB_PATH)
+            c = con.cursor()
+            c.execute( r"select acct,content from statuses where id = ?",(status_id,))
+            toot_now = '@kiritan \n'
+            row = c.fetchone()
+            con.close()
+            toot_now += ':@%s: 🚓🚓🚓＜う〜う〜！トゥー消し警察でーす！\n'%row[0]
+            toot_now += ':@%s: ＜「%s」'%( row[0], content_cleanser(row[1]) )
+            toot(toot_now, 'direct', rep=None, spo=':@%s: がトゥー消ししたよー……'%row[0], media_ids=None, interval=0)
+            sleep(DELAY)
 
 #######################################################
 # トゥート処理
-def toot(toot_now, g_vis, rep=None, spo=None, media_ids=None):
-    mastodon.status_post(status=toot_now[0:450], visibility=g_vis, in_reply_to_id=rep, spoiler_text=spo, media_ids=media_ids)
-    print("🆕toot:" + toot_now[0:20] + ":" + g_vis )
+def toot(toot_now, g_vis, rep=None, spo=None, media_ids=None, interval=0):
+    def th_toot(toot_now, g_vis, rep, spo, media_ids):
+        mastodon.status_post(status=toot_now[0:450], visibility=g_vis, in_reply_to_id=rep, spoiler_text=spo, media_ids=media_ids)
+    th = threading.Timer(interval,th_toot,args=(toot_now, g_vis, rep, spo, media_ids))
+    th.start()
+    print("🆕toot:" + toot_now[0:50] + ":" + g_vis )
+    #threading.Thread(target=mastodon.status_post,args=(status=toot_now[0:450], visibility=g_vis, in_reply_to_id=rep, spoiler_text=spo, media_ids=media_ids)).start()
 
 #######################################################
 # ファボ処理
-def fav_now(fav):  # ニコります
-    mastodon.status_favourite(fav)
-    print("🙆Fav")
+def fav_now(id):  # ニコります
+    status = mastodon.status(id)
+    if status['favourited'] == False:
+        mastodon.status_favourite(id)
+        print("🙆Fav")
+
+#######################################################
+# ブースト
+def boost_now(id):  # ぶーすと！
+    status = mastodon.status(id)
+    if status['reblogged'] == False:
+        mastodon.status_reblog(id)
+    else:
+        mastodon.status_unreblog(id)
+        mastodon.status_reblog(id)
+    print("🙆boost")
+
+#######################################################
+# ブーキャン
+def boocan_now(id):  # ぶーすと！
+    status = mastodon.status(id)
+    if status['reblogged'] == True:
+        mastodon.status_unreblog(id)
+        print("🙆unboost")
 
 #######################################################
 # ローカルタイムラインの取得設定
@@ -152,7 +200,21 @@ def th_user():
 
 #######################################################
 # 即時応答処理ー！
-def quick_rtn(content, acct, id, g_vis):
+def quick_rtn(data):
+    content = data['content']
+    id = data["id"]
+    acct = data["acct"]
+    g_vis = data["g_vis"]
+    statuses_count = data["statuses_count"]
+    spoiler_text = data["spoiler_text"]
+
+    if  Toot1bQ.empty():
+        content_1b, acct_1b, id_1b, g_vis_1b = None,None,None,None
+    else:
+        content_1b, acct_1b, id_1b, g_vis_1b = Toot1bQ.get() #キューから１回前を取得
+    #
+    Toot1bQ.put((content, acct, id, g_vis))
+
     username = "@" +  acct
     if re.compile(r"(緊急|強制)(再起動)").search(content) and acct == 'kiritan':
         print("＊＊＊＊＊＊＊＊＊＊＊再起動するよー！＊＊＊＊＊＊＊＊＊＊＊")
@@ -161,34 +223,55 @@ def quick_rtn(content, acct, id, g_vis):
     if re.compile(r"(緊急|強制)(停止|終了)").search(content) and acct == 'kiritan':
         print("＊＊＊＊＊＊＊＊＊＊＊緊急停止したよー！＊＊＊＊＊＊＊＊＊＊＊")
         toot("@kiritan 緊急停止しまーす！", 'direct', id ,None)
+        STOPPA.append('stop')
         sys.exit()
     try:
         rnd = random.randint(0,10)
         toot_now = ''
         id_now = id
         vis_now = g_vis
-        if re.compile(r"きりぼっと").search(content):
+        interval = 0
+        if "きりぼっと" in content+spoiler_text:
             fav_now(id)
-        elif re.compile(r"草").search(content):
-            toot_now = ":" + username + ": " + username + " "
-            if rnd == 2:
+            sleep(INTERVAL)
+            toot_now = username + "\n"
+            tmptxt = ''
+            swfg = True
+            i = 0
+            while swfg and i <= 10:
+                tmptxt = lstm_kiri.gentxt(str(content_1b) + content)
+                print('lstm_txt = "%s"'%tmptxt)
+                swfg = False
+                for ng_word in ng_words:
+                    if ng_word in tmptxt:
+                        swfg = True
+                i += 1
+
+            toot_now += tmptxt
+        elif statuses_count == 1:
+            interval = 3
+            toot_now = username + "\n"
+            toot_now += "新規さんいらっしゃーい！🍵🍡どうぞー！"
+        elif re.compile(r"草").search(content+spoiler_text):
+            if rnd <= 1:
+                toot_now = ":" + username + ": " + username + " "
                 random.shuffle(hanalist)
                 toot_now += hanalist[0]
         elif re.compile(r"^:twitter:.+🔥$", flags=(re.MULTILINE | re.DOTALL)).search(content):
             toot_now = ":" + username + ": " + username + " "
             toot_now += '\n:twitter: ＜ﾊﾟﾀﾊﾟﾀｰ\n川\n\n🔥'
             vis_now = 'direct'
-        elif re.compile(r"ブリブリ|ぶりぶり|うん[ちこ]|💩").search(content):
+        elif re.compile(r"ブリブリ|ぶりぶり|うん[ちこ]|💩").search(content+spoiler_text):
             if rnd <= 3:
                 toot_now = '🌊🌊🌊 ＜ざばーっ！'
                 vis_now = 'public'
                 id_now = None
             elif rnd == 4:
-                toot_now = '@%s きたない'%acct
+                toot_now = '@%s\nきたない'%acct
                 vis_now = 'direct'
         elif re.compile(r"ふきふき").search(content):
             if rnd <= 3:
-                toot_now = '💨💨💨＜ぶおーっ！'
+                toot_now = '💨💨💨＜ふわ〜っ！'
                 vis_now = 'public'
                 id_now = None
         elif re.compile(r"^ぬるぽ$").search(content):
@@ -208,28 +291,34 @@ def quick_rtn(content, acct, id, g_vis):
                 id_now = None
         elif re.compile(r"ボロン|ぼろん").search(content):
             if rnd <= 3:
-                toot_now = '✂️チョキン！！'
+                toot_now = '@%s\n✂️チョキン！！'%acct
                 vis_now = 'direct'
-        elif re.compile(r"(今|いま)の[な|無|ナ][し|シ]").search(content):
+        elif re.compile(r"^(今|いま)の[な|無|ナ][し|シ]$").search(content):
             if rnd <= 3:
                 toot_now = '🚓🚓🚓＜う〜う〜！いまのなし警察でーす！'
                 vis_now = 'public'
                 id_now = None
             elif rnd == 5:
-                toot_now = '🚓＜う〜……'
+                toot_now = '@%s\n🚓＜う〜……'%acct
                 vis_now = 'direct'
         elif re.compile(r"ツイッター|ツイート|[tT]witter").search(content):
             if rnd <= 3:
-                toot_now = 'つ、つつつ、つい〜〜！！？！？？！？！'
+                toot_now = '@%s\nつ、つつつ、つい〜〜！！？！？？！？！'%acct
                 vis_now = 'direct'
             elif rnd == 6:
-                toot_now = 'つい〜……'
+                toot_now = '@%s\nつい〜……'%acct
                 vis_now = 'direct'
+        elif re.compile(r"(:nicoru[0-9]{0,3}:.?){3}").search(content):
+            if rnd <= 7:
+                if content_1b != None and acct == acct_1b:
+                    if re.compile(r"(:nicoru[0-9]{0,3}:.?){2}").search(content_1b):
+                        toot_now = 'ガードbotでーす！'
+                        vis_now = 'public'
         else:
             return
         #
         if len(toot_now) > 0:
-            toot(toot_now, vis_now, id_now, None)
+            toot(toot_now, vis_now, id_now, None, None, interval)
 
     except:
         jst_now = datetime.now(timezone('Asia/Tokyo'))
@@ -249,24 +338,28 @@ def content_cleanser(content):
     for x in tmp.find_all("a"):
         x.extract()
 
-    if tmp.text == None or pat3.search(tmp.text):
+    if tmp.text == None:
         return ""
+
+    for ng_word in ng_words:
+        if ng_word in tmp.text:
+            return ""
+
+    rtext = ''
+    ps = []
+    for p in tmp.find_all("p"):
+        ps.append(p.text)
+    rtext += '。\n'.join(ps)
+    rtext = unicodedata.normalize("NFKC", rtext)
+    rtext = rtext.replace(r"([^:])@",r"\1")
+    rtext = rtext.replace("#","")
+    rtext = re.sub(r'(___R___)\1{2,}', r'\1', rtext)
+    #rtext = re.sub(r'([^。|^？|^！|^\?|^!])___R___', r'\1。\n', rtext)
+    rtext = re.sub(r'___R___', r'\n', rtext)
+    if hashtag != "":
+        return rtext + " #" + hashtag
     else:
-        rtext = ''
-        ps = []
-        for p in tmp.find_all("p"):
-            ps.append(p.text)
-        rtext += '。\n'.join(ps)
-        rtext = unicodedata.normalize("NFKC", rtext)
-        rtext = rtext.replace(r"([^:])@",r"\1")
-        rtext = rtext.replace("#","")
-        rtext = re.sub(r'(___R___)\1{2,}', r'\1', rtext)
-        #rtext = re.sub(r'([^。|^？|^！|^\?|^!])___R___', r'\1。\n', rtext)
-        rtext = re.sub(r'___R___', r'\n', rtext)
-        if hashtag != "":
-            return rtext + " #" + hashtag
-        else:
-            return rtext
+        return rtext
 
 #######################################################
 # 連想サービス
@@ -411,7 +504,7 @@ def supauza(content, acct, id, g_vis):
         sum = 0.0
         for word2 in words2:
             try:
-                sum += model.similarity(word1, word2)
+                sum += model.similarity(word1.strip(), word2)
             except Exception as e:
                 jst_now = datetime.now(timezone('Asia/Tokyo'))
                 ymdhms = jst_now.strftime("%Y/%m/%d %H:%M:%S")
@@ -430,7 +523,7 @@ def supauza(content, acct, id, g_vis):
         toot(username + "\n₍₍ ◝(* ,,Ծ‸Ծ,, )◟ ⁾⁾長いよー！", g_vis ,id ,None)
         return
     word = re.search("(スパウザー)(サービス|さーびす)[：:](.*)", str(content)).group(3)
-    word = tagger.parse(word)
+    word = tagger.parse(word).strip()
     spoiler = "「" + word + "」の戦闘力を測定！ぴぴぴっ！・・・"
     toot_now = ":" + username + ": " + username + "\n"
     f = open(".dic_supauza", 'r')
@@ -516,22 +609,18 @@ def recipe_service(content, acct, id, g_vis):
 # ボトルメールサービス　メッセージ登録
 def bottlemail_service(content, acct, id, g_vis):
     fav_now(id)
+    word = re.search("([ぼボ][とト][るル][メめ]ー[るル])([サさ]ー[ビび][スす])[：:](.*)", str(content), flags=(re.MULTILINE | re.DOTALL) ).group(3)
     toot_now = "@" + acct + "\n"
-    if len(content) == 0:
+    if len(word) == 0:
         sleep(DELAY)
         toot(toot_now + "₍₍ ◝(* ,,Ծ‸Ծ,, )◟ ⁾⁾メッセージ入れてー！", g_vis ,id,None)
         return
-    if re.search(r'死|殺',content):
-        sleep(DELAY)
-        toot(toot_now + "₍₍ ◝(* ,,Ծ‸Ծ,, )◟ ⁾⁾ＮＧワードあるからだめー！", g_vis ,id,None)
-        return
-    if len(content) > 300:
+    if len(word) > 300:
         sleep(DELAY)
         toot(toot_now + "₍₍ ◝(* ,,Ծ‸Ծ,, )◟ ⁾⁾長いよー！", g_vis ,id,None)
         return
 
     bm = bottlemail.Bottlemail()
-    word = re.search("([ぼボ][とト][るル][メめ]ー[るル])([サさ]ー[ビび][スす])[：:](.*)", str(content)).group(3)
     bm.bottling(acct,word,id)
 
     spoiler = "ボトルメール受け付けたよー！"
@@ -541,7 +630,7 @@ def bottlemail_service(content, acct, id, g_vis):
 #######################################################
 # 受信したトゥートの一次振り分け処理
 def th_worker():
-    while True:
+    while len(STOPPA)==0:
         sleep(INTERVAL)
         if  TQ.empty():
             pass
@@ -549,25 +638,23 @@ def th_worker():
             print("===worker受信===")
             data = {}
             status = TQ.get() #キューからトゥートを取り出すよー！
-            content = content_cleanser(status['content'])
-            acct = status["account"]["acct"]
-            id = status["id"]
-            g_vis = status["visibility"]
-            print(id,acct,content,g_vis)
-            data["content"] = content
-            data["acct"] = acct
-            data["id"] = id
-            data["g_vis"] = g_vis
-            if len(content) > 0:
+            data["id"] = status["id"]
+            data["acct"] = status["account"]["acct"]
+            data["content"] = content_cleanser(status['content'])
+            data["g_vis"] = status["visibility"]
+            data["statuses_count"] = status["account"]["statuses_count"]
+            data["spoiler_text"] = content_cleanser(status["spoiler_text"])
+            print(data["id"], data["acct"], data["content"])
+            if len(data["content"]) > 0:
                 # 即時処理はここで呼び出す
-                quick_rtn(content=content, acct=acct, id=id, g_vis=g_vis)
+                quick_rtn(data)
                 # それ以外の処理はキューに入れる
                 TQ2.put(data)
 
 #######################################################
 # 受信したトゥートの二次振り分け処理（重めの処理をやるよー！）
 def th_worker2():
-    while True:
+    while len(STOPPA)==0:
         sleep(INTERVAL)
         try:
             if  TQ2.empty():
@@ -617,7 +704,7 @@ def th_worker2():
 #######################################################
 # 定期ものまねさーびす！
 def th_monomane_tooter():
-    while True:
+    while len(STOPPA)==0:
         sleep(10)
         jst_now = datetime.now(timezone('Asia/Tokyo'))
         mm = jst_now.strftime("%M")
@@ -635,8 +722,8 @@ def th_monomane_tooter():
                 toots = ""
                 acct_list = set([])
                 for row in c.fetchall():
-                    if row[0] not in acct_list:
-                        acct_list.add(row[0])
+                    acct_list.add(row[0])
+                acct_list -= ng_user_set
                 random_acct = random.sample(acct_list,1)[0]
                 con.close()
                 con = sqlite3.connect(STATUSES_DB_PATH)
@@ -657,9 +744,9 @@ def th_monomane_tooter():
                 gen_txt = generator.generate("user_toots")
                 gen_txt = "@" + random_acct + " :@" + random_acct + ":＜「" + gen_txt + "」"
                 gen_txt = gen_txt.replace('\n',"")
-                gen_txt +=  "\n#きりものまね #きりぼっと"
+                #gen_txt +=  "\n#きりものまね #きりぼっと"
                 if len(gen_txt) > 10:
-                    toot(gen_txt, "public", None, spoiler)
+                    toot(gen_txt, "unlisted", None, spoiler)
                 sleep(60)
             except:
                 jst_now = datetime.now(timezone('Asia/Tokyo'))
@@ -673,7 +760,7 @@ def th_monomane_tooter():
 #######################################################
 # 定期ここ1時間のまとめ
 def th_summarize_tooter():
-    while True:
+    while len(STOPPA)==0:
         sleep(10)
         jst_now = datetime.now(timezone('Asia/Tokyo'))
         mm = jst_now.strftime("%M")
@@ -700,15 +787,15 @@ def th_summarize_tooter():
             if gen_txt[-1:1] == '#':
                 gen_txt = gen_txt[:len(gen_txt)-1]
             if len(gen_txt) > 5:
-                gen_txt +=  "\n#きりまとめ #きりぼっと"
-                toot(gen_txt, "public", None, spoiler)
+                #gen_txt +=  "\n#きりまとめ #きりぼっと"
+                toot(gen_txt, "unlisted", None, spoiler)
                 sleep(60)
 
 #######################################################
 # ボトルメールサービス　配信処理
 def th_bottlemail_sending():
     bm = bottlemail.Bottlemail()
-    while True:
+    while len(STOPPA)==0:
         sleep(10)
         jst_now = datetime.now(timezone('Asia/Tokyo'))
         mm = jst_now.strftime("%M")
@@ -721,15 +808,15 @@ def th_bottlemail_sending():
             try:
                 sendlist = bm.drifting()
                 for id,acct,msg,reply_id in sendlist:
-                    sleep(INTERVAL*5)
+                    sleep(DELAY)
                     spoiler = ":@" + acct + ": から🍾ボトルメール💌届いたよー！"
                     con = sqlite3.connect(STATUSES_DB_PATH)
                     c = con.cursor()
                     c.execute( r"select acct from statuses where (date = ?) and time >= ? and time <= ? and acct <> ?", [ymd,hh0000,hh9999,BOT_ID] )
                     acct_list = set([])
                     for row in c.fetchall():
-                        if row[0] not in acct_list:
-                            acct_list.add(row[0])
+                        acct_list.add(row[0])
+                    acct_list -= ng_user_set
                     con.close()
                     random_acct = random.sample(acct_list,1)[0]
                     print(random_acct)
@@ -748,13 +835,15 @@ def th_bottlemail_sending():
                     toot(toots, "direct",reply_id if reply_id != 0 else None, spoiler)
 
                 #漂流してるボトルの数
-                sleep(DELAY)
+                #ボトルが多い時は宣伝を減らすよー！
                 bmcnt = bm.flow_count()
-                spoiler = "現在漂流している🍾ボトルメール💌は%d本だよー！"%bmcnt
-                toots =  "\n※ボトルメールサービス：＜メッセージ＞　であなたも送れるよー！試してみてね！"
-                toots +=  "\n#ボトルメールサービス #きりぼっと"
-                toot(toots, "public", None, spoiler)
-                sleep(60)
+                if random.randint(0,bmcnt) <= 10:
+                    sleep(DELAY)
+                    spoiler = "現在漂流している🍾ボトルメール💌は%d本だよー！"%bmcnt
+                    toots =  "\n※ボトルメールサービス：＜メッセージ＞　であなたも送れるよー！試してみてね！"
+                    toots +=  "\n#ボトルメールサービス #きりぼっと"
+                    toot(toots, "public", None, spoiler)
+                    sleep(60)
             except:
                 jst_now = datetime.now(timezone('Asia/Tokyo'))
                 ymdhms = jst_now.strftime("%Y/%m/%d %H:%M:%S")
@@ -790,21 +879,34 @@ def th_lstm_tooter():
                     seeds.append(content)
                     #seedtxt = content
                     #if len(seedtxt)>30:
-                    if len(seeds)>5:
+                    if len(seeds)>10:
                         break
             con.close()
             seeds.reverse()
             seedtxt = "".join(seeds)
+            spoiler = None
             if seedtxt[-1:1] != '。':
                 seedtxt += '。'
-            gen_txt = lstm_kiri.gentxt(seedtxt)
+            gen_txt = ''
+            swfg = True
+            i = 0
+            while swfg and i <= 10:
+                gen_txt = lstm_kiri.gentxt(seedtxt)
+                print('lstm_txt = "%s"'%gen_txt)
+                swfg = False
+                for ng_word in ng_words:
+                    if ng_word in gen_txt:
+                        swfg = True
+                i += 1
+
             if gen_txt[0:1] == '。':
                 gen_txt = gen_txt[1:]
+            if len(gen_txt) > 20:
+                spoiler = ':@%s: 💭'%BOT_ID
 
-            #gen_txt = '@' + acct + ' :@' + acct + ':\n' + gen_txt
-            gen_txt +=  "\n#きりつぶやき #きりぼっと"
+            #gen_txt +=  "\n#きりつぶやき #きりぼっと"
             #toot(gen_txt, "public", id if id > 0 else None, 'きりぼっとによる補足')
-            toot(gen_txt, "public", None, None)
+            toot(gen_txt, "public", None, spoiler)
         except:
             jst_now = datetime.now(timezone('Asia/Tokyo'))
             ymdhms = jst_now.strftime("%Y/%m/%d %H:%M:%S")
@@ -813,13 +915,15 @@ def th_lstm_tooter():
                 traceback.print_exc(file=f)
             print("例外情報\n" + traceback.format_exc())
 
-    while True:
+    while len(STOPPA)==0:
         jst_now = datetime.now(timezone('Asia/Tokyo'))
         mm = jst_now.strftime("%M")
-        if mm == '57' or mm == '37': # or mm == '17':
+        if mm == '07' or mm == '27' or mm == '47':
+        #if mm == '17' or mm == '37' or mm == '57':
         #if mm != '99': #test
             threading.Thread(target=gen).start()
         sleep(60)
+
 
 #######################################################
 # トレーニング処理
@@ -850,12 +954,52 @@ def th_lstm_trainer():
                 f.write(ymdhms+'\n')
                 traceback.print_exc(file=f)
             print("例外情報\n" + traceback.format_exc())
-    while True:
+    while len(STOPPA)==0:
         jst_now = datetime.now(timezone('Asia/Tokyo'))
         mm = jst_now.strftime("%M")
         if mm == '07':
         #if mm != '99': #test
             threading.Thread(target=train).start()
+        sleep(60)
+
+#######################################################
+# 初めてのトゥートを探してぶーすとするよー！
+def th_timer_bst1st():
+    while len(STOPPA)==0:
+        jst_now = datetime.now(timezone('Asia/Tokyo'))
+        mm = jst_now.strftime("%M")
+        if mm == '17' or mm == '37' or mm == '57':
+        #if mm != '99': #test
+            ymd = int(jst_now.strftime("%Y%m%d"))
+            hh = jst_now.strftime("%H")
+            hh0000 = int(hh + "0000")
+            hh9999 = int(hh + "9999")
+            try:
+                con = sqlite3.connect(STATUSES_DB_PATH)
+                c = con.cursor()
+                #ランダムに人を選ぶよー！（最近いる人から）
+                c.execute( r"select acct from statuses where (date = ?) and time >= ? and time <= ? and acct <> ?", [ymd,hh0000,hh9999,BOT_ID] )
+                acct_list = set([])
+                for row in c.fetchall():
+                    acct_list.add(row[0])
+                acct_list -= ng_user_set
+                random_acct = random.sample(acct_list,1)[0] #ひとり選ぶ
+                #print("***debug:random_acct=%s"%random_acct )
+                c.execute( r"select id from statuses where acct = ? order by id asc", (random_acct,) )
+                ids = []
+                for i,row in enumerate(c.fetchall()):
+                    ids.append(row[0])
+                    if i >= 200:
+                        break
+                con.close()
+                boost_now(random.sample(ids,1)[0])
+            except:
+                jst_now = datetime.now(timezone('Asia/Tokyo'))
+                ymdhms = jst_now.strftime("%Y/%m/%d %H:%M:%S")
+                with open('error.log', 'a') as f:
+                    f.write(ymdhms+'\n')
+                    traceback.print_exc(file=f)
+                print("例外情報\n" + traceback.format_exc())
         sleep(60)
 
 #######################################################
@@ -868,6 +1012,8 @@ def th_haertbeat():
             f.write(ymdhms)
         sleep(10)
 
+#######################################################
+# メイン
 if __name__ == '__main__':
     cm = CoolingManager()
     threading.Thread(target=th_local).start()
@@ -877,6 +1023,7 @@ if __name__ == '__main__':
     threading.Thread(target=th_monomane_tooter).start()
     threading.Thread(target=th_summarize_tooter).start()
     threading.Thread(target=th_lstm_tooter).start()
-    threading.Thread(target=th_lstm_trainer).start()
+    #threading.Thread(target=th_lstm_trainer).start()
     threading.Thread(target=th_bottlemail_sending).start()
     threading.Thread(target=th_haertbeat).start()
+    threading.Thread(target=th_timer_bst1st).start()

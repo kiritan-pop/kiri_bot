@@ -37,11 +37,11 @@ class Bottlemail():
         arrival = []
         #カウントランダムアップ
         for row in con.execute('select * from bottlemail'):
-            con.execute('update bottlemail set count=? where id=? and send_fg=?',(row[3]+random.randint(1,20), row[0],0))
+            con.execute('update bottlemail set count=? where id=? and send_fg=?',(row[3]+random.randint(-40,50), row[0],0))
         con.commit()
 
-        #カウント＞240の人抽出
-        for row in con.execute('select * from bottlemail where count>=? and send_fg=?',(240,0)):
+        #カウント＞nの人抽出
+        for row in con.execute('select * from bottlemail where count>=? and send_fg=?',(200,0)):
             arrival.append([row[0],row[1],row[2],row[6]])
         con.close()
         #送信対象を返すよー！
@@ -60,6 +60,12 @@ class Bottlemail():
     def show(self):
         con = sqlite3.connect(self.DB_PATH)
         rows = con.execute('select * from bottlemail')
+        return rows
+        con.close()
+
+    def show_flow(self):
+        con = sqlite3.connect(self.DB_PATH)
+        rows = con.execute('select * from bottlemail where send_fg=0')
         return rows
         con.close()
 
@@ -84,6 +90,6 @@ if __name__ == '__main__':
     #    print(msg)
     #    bm.sended(id,'kiri_bot01')
 
-    for ret in bm.show():
+    for ret in bm.show_flow():
         print(ret)
     print(bm.flow_count())

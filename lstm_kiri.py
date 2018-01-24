@@ -9,22 +9,23 @@ from time import sleep
 import unicodedata
 import tensorflow as tf
 from keras.backend import tensorflow_backend
-#config = tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True, visible_device_list="1"))
-config = tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True))
+config = tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True, visible_device_list="1"))
+#config = tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True))
 session = tf.Session(config=config)
 tensorflow_backend.set_session(session)
 
-model_path = 'db/tootmodel10.h5'
+#model_path = 'db/tootmodel10.h5'
+model_path = 'db/lstm_toot.h5'
 print('******* lstm load model %s*******' %model_path)
 model = load_model(model_path)
 graph = tf.get_default_graph()
 
 #いろいろなパラメータ
-batch_size = 1024     #大きくすると精度が上がるけど、モデル更新が遅くなるよー！
-maxlen = 30         #
-step = 3            #
-epochs = 50         #トレーニングの回数
-diver = 0.3         #ダイバーシティ：大きくすると想起の幅が大きくなるっぽいー！
+batch_size = 256     #大きくすると精度が上がるけど、モデル更新が遅くなるよー！
+maxlen = 20           #モデルに合わせて！
+step = 1              #
+epochs = 100         #トレーニングの回数
+diver = 0.8         #ダイバーシティ：大きくすると想起の幅が大きくなるっぽいー！
 
 #tagger = MeCab.Tagger('-Owakati -d /usr/lib/mecab/dic/mecab-ipadic-neologd -u dic/name.dic,dic/id.dic,dic/nicodic.dic')
 pat3 = re.compile(r'^\n')
@@ -48,10 +49,14 @@ def sample(preds, temperature=1.2):
 
 def gentxt(text):
     generated = ''
-    sentence = text[-maxlen:]
+    if len(text) > maxlen:
+        sentence = text[-maxlen:]
+    else:
+        sentence = text * maxlen
+        sentence = sentence[-maxlen:]
     #print('input text= %s ' %text)
     print('seed text= %s ' %sentence)
-    for i in range(100):
+    for i in range(300):
         x_pred = np.zeros((1, maxlen, len(wl_chars)))
         for t, char in enumerate(list(sentence)):
             try:
@@ -65,12 +70,13 @@ def gentxt(text):
 
         generated += next_char
         sentence = sentence[1:] + next_char
-        if generated.count('\n') > 3:
+        if generated.count('\n') + generated.count('。') > 2:
             break
 
     rtn_text = generated
     rtn_text = re.sub(r'。{2,}','。',rtn_text, flags=(re.MULTILINE | re.DOTALL))
     rtn_text = re.sub(r'^。','',rtn_text, flags=(re.MULTILINE | re.DOTALL))
+    rtn_text = re.sub(r'^\n','',rtn_text, flags=(re.MULTILINE | re.DOTALL))
     #del model
     #gc.collect()
     return rtn_text
