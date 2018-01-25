@@ -51,6 +51,7 @@ mastodon = Mastodon(
 TQ = queue.Queue()
 TQ2 = queue.Queue()
 Toot1bQ = queue.Queue()
+DelQ = queue.Queue(20)
 
 # 花宅配サービス用の花リスト
 hanalist = []
@@ -116,18 +117,8 @@ class res_toot(StreamListener):
     def on_delete(self, status_id):
         print(str("===削除されました【{}】===").format(str(status_id)))
         #print(type(status_id))
-        rnd = random.randint(0,10)
-        if rnd <= 5:
-            con = sqlite3.connect(STATUSES_DB_PATH)
-            c = con.cursor()
-            c.execute( r"select acct,content from statuses where id = ?",(status_id,))
-            toot_now = '@kiritan \n'
-            row = c.fetchone()
-            con.close()
-            toot_now += ':@%s: 🚓🚓🚓＜う〜う〜！トゥー消し警察でーす！\n'%row[0]
-            toot_now += ':@%s: ＜「%s」'%( row[0], content_cleanser(row[1]) )
-            toot(toot_now, 'direct', rep=None, spo=':@%s: がトゥー消ししたよー……'%row[0], media_ids=None, interval=0)
-            sleep(DELAY)
+        if not DelQ.full():
+            DelQ.put(status_id)
 
 #######################################################
 # トゥート処理
@@ -633,23 +624,23 @@ def th_worker():
     while len(STOPPA)==0:
         sleep(INTERVAL)
         if  TQ.empty():
-            pass
-        else:
-            print("===worker受信===")
-            data = {}
-            status = TQ.get() #キューからトゥートを取り出すよー！
-            data["id"] = status["id"]
-            data["acct"] = status["account"]["acct"]
-            data["content"] = content_cleanser(status['content'])
-            data["g_vis"] = status["visibility"]
-            data["statuses_count"] = status["account"]["statuses_count"]
-            data["spoiler_text"] = content_cleanser(status["spoiler_text"])
-            print(data["id"], data["acct"], data["content"])
-            if len(data["content"]) > 0:
-                # 即時処理はここで呼び出す
-                quick_rtn(data)
-                # それ以外の処理はキューに入れる
-                TQ2.put(data)
+            continue
+
+        print("===worker受信===")
+        data = {}
+        status = TQ.get() #キューからトゥートを取り出すよー！
+        data["id"] = status["id"]
+        data["acct"] = status["account"]["acct"]
+        data["content"] = content_cleanser(status['content'])
+        data["g_vis"] = status["visibility"]
+        data["statuses_count"] = status["account"]["statuses_count"]
+        data["spoiler_text"] = content_cleanser(status["spoiler_text"])
+        print(data["id"], data["acct"], data["content"])
+        if len(data["content"]) > 0:
+            # 即時処理はここで呼び出す
+            quick_rtn(data)
+            # それ以外の処理はキューに入れる
+            TQ2.put(data)
 
 #######################################################
 # 受信したトゥートの二次振り分け処理（重めの処理をやるよー！）
@@ -658,40 +649,40 @@ def th_worker2():
         sleep(INTERVAL)
         try:
             if  TQ2.empty():
-                pass
-            else:
-                data = TQ2.get() #キューからトゥートを取り出すよー！
-                content = data['content']
-                id = data["id"]
-                acct = data["acct"]
-                g_vis = data["g_vis"]
-                if re.compile("(連想|れんそう)([サさ]ー[ビび][スす])[：:]").search(content):
-                    rensou_game(content=content, acct=acct, id=id, g_vis=g_vis)
-                    sleep(cm.get_coolingtime())
-                elif re.compile("(画像検索)([サさ]ー[ビび][スす])[：:]").search(content):
-                    search_image(content=content, acct=acct, id=id, g_vis=g_vis)
-                    sleep(cm.get_coolingtime())
-                elif re.compile("(スパウザー)([サさ]ー[ビび][スす])[：:]").search(content):
-                    supauza(content=content, acct=acct, id=id, g_vis=g_vis)
-                    sleep(cm.get_coolingtime())
-                elif re.compile("([ぼボ][とト][るル][メめ]ー[るル])([サさ]ー[ビび][スす])[：:]").search(content):
-                    print("★ボトルメールサービス")
-                    bottlemail_service(content=content, acct=acct, id=id, g_vis=g_vis)
-                    sleep(cm.get_coolingtime())
-                elif re.compile("(きょう|今日)の.?(料理|りょうり)|[ご御夕昼朝][食飯][食た]べ[よるた]|(腹|はら)[へ減]った|お(腹|なか)[空す]いた|(何|なに)[食た]べよ").search(content):
-                    recipe_service(content=content, acct=acct, id=id, g_vis=g_vis)
-                    sleep(cm.get_coolingtime())
-                elif len(content) > 140:
-                    print('★要約対象：',content)
-                    content = re.sub(r"(.)\1{3,}",r"\1",content, flags=(re.DOTALL))
-                    gen_txt = Toot_summary.summarize(pat1.sub("",pat2.sub("",content)),limit=10,lmtpcs=1, m=1, f=4)
-                    if gen_txt[-1:1] == '#':
-                        gen_txt = gen_txt[:len(gen_txt)-1]
-                    if is_japanese(gen_txt):
-                        if len(gen_txt) > 5:
-                            gen_txt +=  "\n#きり要約 #きりぼっと"
-                            toot("@" + acct + " :@" + acct + ":\n"  + gen_txt, "public", id, "勝手に要約サービス")
-                            sleep(cm.get_coolingtime())
+                continue
+
+            data = TQ2.get() #キューからトゥートを取り出すよー！
+            content = data['content']
+            id = data["id"]
+            acct = data["acct"]
+            g_vis = data["g_vis"]
+            if re.compile("(連想|れんそう)([サさ]ー[ビび][スす])[：:]").search(content):
+                rensou_game(content=content, acct=acct, id=id, g_vis=g_vis)
+                sleep(cm.get_coolingtime())
+            elif re.compile("(画像検索)([サさ]ー[ビび][スす])[：:]").search(content):
+                search_image(content=content, acct=acct, id=id, g_vis=g_vis)
+                sleep(cm.get_coolingtime())
+            elif re.compile("(スパウザー)([サさ]ー[ビび][スす])[：:]").search(content):
+                supauza(content=content, acct=acct, id=id, g_vis=g_vis)
+                sleep(cm.get_coolingtime())
+            elif re.compile("([ぼボ][とト][るル][メめ]ー[るル])([サさ]ー[ビび][スす])[：:]").search(content):
+                print("★ボトルメールサービス")
+                bottlemail_service(content=content, acct=acct, id=id, g_vis=g_vis)
+                sleep(cm.get_coolingtime())
+            elif re.compile("(きょう|今日)の.?(料理|りょうり)|[ご御夕昼朝][食飯][食た]べ[よるた]|(腹|はら)[へ減]った|お(腹|なか)[空す]いた|(何|なに)[食た]べよ").search(content):
+                recipe_service(content=content, acct=acct, id=id, g_vis=g_vis)
+                sleep(cm.get_coolingtime())
+            elif len(content) > 140:
+                print('★要約対象：',content)
+                content = re.sub(r"(.)\1{3,}",r"\1",content, flags=(re.DOTALL))
+                gen_txt = Toot_summary.summarize(pat1.sub("",pat2.sub("",content)),limit=10,lmtpcs=1, m=1, f=4)
+                if gen_txt[-1:1] == '#':
+                    gen_txt = gen_txt[:len(gen_txt)-1]
+                if is_japanese(gen_txt):
+                    if len(gen_txt) > 5:
+                        gen_txt +=  "\n#きり要約 #きりぼっと"
+                        toot("@" + acct + " :@" + acct + ":\n"  + gen_txt, "public", id, "勝手に要約サービス")
+                        sleep(cm.get_coolingtime())
         except:
             jst_now = datetime.now(timezone('Asia/Tokyo'))
             ymdhms = jst_now.strftime("%Y/%m/%d %H:%M:%S")
@@ -1002,6 +993,27 @@ def th_timer_bst1st():
                 print("例外情報\n" + traceback.format_exc())
         sleep(60)
 
+
+#######################################################
+# DELETE時の処理
+def th_delete():
+    while len(STOPPA)==0:
+        sleep(INTERVAL)
+        if  DelQ.empty():
+            continue
+        status_id = DelQ.get()
+        con = sqlite3.connect(STATUSES_DB_PATH)
+        c = con.cursor()
+        c.execute( r"select acct,content from statuses where id = ?",(status_id,))
+        toot_now = '@kiritan \n'
+        row = c.fetchone()
+        con.close()
+        if row:
+            toot_now += ':@%s: 🚓🚓🚓＜う〜う〜！トゥー消し警察でーす！\n'%row[0]
+            toot_now += ':@%s: ＜「%s」'%( row[0], content_cleanser(row[1]) )
+            toot(toot_now, 'direct', rep=None, spo=':@%s: がトゥー消ししたよー……'%row[0], media_ids=None, interval=0)
+            sleep(DELAY)
+
 #######################################################
 # はーとびーと！
 def th_haertbeat():
@@ -1027,3 +1039,4 @@ if __name__ == '__main__':
     threading.Thread(target=th_bottlemail_sending).start()
     threading.Thread(target=th_haertbeat).start()
     threading.Thread(target=th_timer_bst1st).start()
+    threading.Thread(target=th_delete).start()
