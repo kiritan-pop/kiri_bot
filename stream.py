@@ -19,13 +19,12 @@ BOT_ID = 'kiri_bot01'
 BOTS = [BOT_ID,'JC','12222222','friends_booster']
 INTERVAL = 0.1
 COOLING_TIME = 10
-DELAY = 1
+DELAY = 20
 STATUSES_DB_PATH = "db/statuses.db"
 pat1 = re.compile(r' ([!-~ぁ-んァ-ン] )+|^([!-~ぁ-んァ-ン] )+| [!-~ぁ-んァ-ン]$',flags=re.MULTILINE)  #[!-~0-9a-zA-Zぁ-んァ-ン０-９ａ-ｚ]
 pat2 = re.compile(r'[ｗ！？!\?]')
 #NGワード
 ng_words = set(word.strip() for word in open('.ng_words').readlines())
-#print('ng_words',ng_words)
 
 tagger      = MeCab.Tagger('-Owakati -d /usr/lib/mecab/dic/mecab-ipadic-neologd -u ./dic/name.dic,./dic/id.dic,./dic/nicodic.dic')
 model       = word2vec.Word2Vec.load('db/nico.model')
@@ -33,7 +32,6 @@ image_model = doc2vec.Doc2Vec.load('db/media.model')
 
 #トゥート先NGの人たちー！
 ng_user_set = set('friends_nico')
-
 
 #停止用
 STOPPA = []
@@ -51,7 +49,7 @@ mastodon = Mastodon(
 TQ = queue.Queue()
 TQ2 = queue.Queue()
 Toot1bQ = queue.Queue()
-DelQ = queue.Queue(20)
+DelQ = queue.Queue(10)
 
 # 花宅配サービス用の花リスト
 hanalist = []
@@ -226,23 +224,12 @@ def quick_rtn(data):
             fav_now(id)
             sleep(INTERVAL)
             toot_now = username + "\n"
-            tmptxt = ''
-            swfg = True
-            i = 0
-            while swfg and i <= 10:
-                tmptxt = lstm_kiri.gentxt(str(content_1b) + content)
-                print('lstm_txt = "%s"'%tmptxt)
-                swfg = False
-                for ng_word in ng_words:
-                    if ng_word in tmptxt:
-                        swfg = True
-                i += 1
-
-            toot_now += tmptxt
+            toot_now += lstm_kiri.gentxt(str(content_1b) + content)
         elif statuses_count == 1:
             interval = 3
             toot_now = username + "\n"
             toot_now += "新規さんいらっしゃーい！🍵🍡どうぞー！"
+            vis_now = 'unlisted'
         elif re.compile(r"草").search(content+spoiler_text):
             if rnd <= 1:
                 toot_now = ":" + username + ": " + username + " "
@@ -299,12 +286,18 @@ def quick_rtn(data):
             elif rnd == 6:
                 toot_now = '@%s\nつい〜……'%acct
                 vis_now = 'direct'
-        elif re.compile(r"(:nicoru[0-9]{0,3}:.?){3}").search(content):
+        elif re.compile(r"(:nicoru[0-9]{0,3}:.?){4}").search(content):
             if rnd <= 7:
                 if content_1b != None and acct == acct_1b:
-                    if re.compile(r"(:nicoru[0-9]{0,3}:.?){2}").search(content_1b):
+                    if re.compile(r"(:nicoru[0-9]{0,3}:.?){3}").search(content_1b):
                         toot_now = 'ガードbotでーす！'
                         vis_now = 'public'
+                        id_now = None
+        elif re.compile(r"\(\*´ω｀\*\)").search(content):
+            if rnd <= 6:
+                toot_now = '@%s\nその顔は……！！'%acct
+                vis_now = 'direct'
+
         else:
             return
         #
@@ -868,31 +861,18 @@ def th_lstm_tooter():
                     pass
                 else:
                     seeds.append(content)
-                    #seedtxt = content
-                    #if len(seedtxt)>30:
                     if len(seeds)>10:
                         break
             con.close()
             seeds.reverse()
+            print('seeds=',seeds)
             seedtxt = "".join(seeds)
+            print('seedtxt=%s'%seedtxt)
             spoiler = None
-            if seedtxt[-1:1] != '。':
-                seedtxt += '。'
-            gen_txt = ''
-            swfg = True
-            i = 0
-            while swfg and i <= 10:
-                gen_txt = lstm_kiri.gentxt(seedtxt)
-                print('lstm_txt = "%s"'%gen_txt)
-                swfg = False
-                for ng_word in ng_words:
-                    if ng_word in gen_txt:
-                        swfg = True
-                i += 1
-
+            gen_txt = lstm_kiri.gentxt(seedtxt)
             if gen_txt[0:1] == '。':
                 gen_txt = gen_txt[1:]
-            if len(gen_txt) > 20:
+            if len(gen_txt) > 40:
                 spoiler = ':@%s: 💭'%BOT_ID
 
             #gen_txt +=  "\n#きりつぶやき #きりぼっと"
@@ -997,22 +977,34 @@ def th_timer_bst1st():
 #######################################################
 # DELETE時の処理
 def th_delete():
+    acct_1b = ''
     while len(STOPPA)==0:
         sleep(INTERVAL)
         if  DelQ.empty():
             continue
-        status_id = DelQ.get()
-        con = sqlite3.connect(STATUSES_DB_PATH)
-        c = con.cursor()
-        c.execute( r"select acct,content from statuses where id = ?",(status_id,))
-        toot_now = '@kiritan \n'
-        row = c.fetchone()
-        con.close()
-        if row:
-            toot_now += ':@%s: 🚓🚓🚓＜う〜う〜！トゥー消し警察でーす！\n'%row[0]
-            toot_now += ':@%s: ＜「%s」'%( row[0], content_cleanser(row[1]) )
-            toot(toot_now, 'direct', rep=None, spo=':@%s: がトゥー消ししたよー……'%row[0], media_ids=None, interval=0)
-            sleep(DELAY)
+        try:
+            status_id = DelQ.get()
+            con = sqlite3.connect(STATUSES_DB_PATH)
+            c = con.cursor()
+            c.execute( r"select acct,content from statuses where id = ?",(status_id,))
+            toot_now = '@kiritan \n'
+            row = c.fetchone()
+            con.close()
+            if row:
+                if acct_1b != row[0]:
+                    toot_now += ':@%s: 🚓🚓🚓＜う〜う〜！トゥー消し警察でーす！\n'%row[0]
+                    toot_now += ':@%s: ＜「%s」'%( row[0], content_cleanser(row[1]) )
+                    toot(toot_now, 'direct', rep=None, spo=':@%s: がトゥー消ししたよー……'%row[0], media_ids=None, interval=0)
+                    #print('**DELETE:',row[0],row[1])
+                    acct_1b = row[0]
+                    sleep(DELAY)
+        except:
+            jst_now = datetime.now(timezone('Asia/Tokyo'))
+            ymdhms = jst_now.strftime("%Y/%m/%d %H:%M:%S")
+            with open('error.log', 'a') as f:
+                f.write(ymdhms+'\n')
+                traceback.print_exc(file=f)
+            print("例外情報\n" + traceback.format_exc())
 
 #######################################################
 # はーとびーと！
