@@ -99,7 +99,8 @@ class men_toot(StreamListener):
         print("===通知===")
         if notification["type"] == "mention":
             status = notification["status"]
-            status['spoiler_text'] += ' きりぼっと'
+            if '？' in status['content']:
+                status['spoiler_text'] += ' きりぼっと'
             TQ.put(status)
 
 #######################################################
@@ -225,6 +226,11 @@ def quick_rtn(data):
             sleep(INTERVAL)
             toot_now = username + "\n"
             toot_now += lstm_kiri.gentxt(str(content_1b) + content)
+        elif (statuses_count - 3)%10000 == 0:
+            interval = 3
+            toot_now = username + "\n"
+            toot_now += "そういえばさっき{0:,}トゥートだったよー！".format(statuses_count-3)
+            vis_now = 'unlisted'
         elif statuses_count == 1:
             interval = 3
             toot_now = username + "\n"
@@ -293,16 +299,19 @@ def quick_rtn(data):
                         toot_now = 'ガードbotでーす！'
                         vis_now = 'public'
                         id_now = None
-        elif re.compile(r"\(\*´ω｀\*\)").search(content):
+        elif "(*´ω｀*)" in content+spoiler_text:
             if rnd <= 6:
                 toot_now = '@%s\nその顔は……！！'%acct
                 vis_now = 'direct'
+        elif "きりちゃん" in content+spoiler_text or "ニコって" in content+spoiler_text:
+            fav_now(id)
 
         else:
             return
         #
         if len(toot_now) > 0:
             toot(toot_now, vis_now, id_now, None, None, interval)
+            sleep(DELAY)
 
     except:
         jst_now = datetime.now(timezone('Asia/Tokyo'))
@@ -510,9 +519,8 @@ def supauza(content, acct, id, g_vis):
     word = tagger.parse(word).strip()
     spoiler = "「" + word + "」の戦闘力を測定！ぴぴぴっ！・・・"
     toot_now = ":" + username + ": " + username + "\n"
-    f = open(".dic_supauza", 'r')
-    dic = json.load(f)
-    f.close()
+    with open(".dic_supauza", 'r') as f:
+        dic = json.load(f)
     score = {}
     for key,list in dic.items():
         score[key] = simizu(word,list)/len(list) * 1000
@@ -590,6 +598,60 @@ def recipe_service(content, acct, id, g_vis):
     toot("@" + acct + "\n" + gen_txt, g_vis, id ,":@" + acct + ": " + spoiler)
 
 #######################################################
+# ランク表示
+def show_rank(acct, id, g_vis):
+    if not os.path.exists("db/users_size_today.json") :
+        return
+
+    fav_now(id)
+    dt = datetime.fromtimestamp(os.stat("db/users_size_today.json").st_mtime)
+    today_str = dt.strftime('%Y/%m/%d')
+    users_size = {}
+    users_size_today = {}
+    users_cnt = {}
+    users_cnt_today = {}
+    rank_ruikei = {}
+    rank_ruikei_rev = {}
+    rank_today = {}
+    rank_today_rev = {}
+    with open("db/users_size.json", 'r') as f:
+        users_size = json.load(f)
+    with open("db/users_size_today.json", 'r') as f:
+        users_size_today = json.load(f)
+    with open("db/users_cnt.json", 'r') as f:
+        users_cnt = json.load(f)
+    with open("db/users_cnt_today.json", 'r') as f:
+        users_cnt_today = json.load(f)
+
+    #print(users_size)
+    for i,(k, size) in enumerate(sorted(users_size.items(), key=lambda x: -x[1])):
+        rank_ruikei[k] = i+1
+        rank_ruikei_rev[i+1] = k
+    for i,(k, size) in enumerate(sorted(users_size_today.items(), key=lambda x: -x[1])):
+        rank_today[k] = i+1
+        rank_today_rev[i+1] = k
+
+    spoiler = ":@{0}: のランクだよー！（※{1} 時点）".format(acct,today_str)
+    toot_now = "@{0} :@{1}: のランクは……\n".format(acct,acct)
+    toot_now += "第{0:>3}位：{1:,}字（avg.{2:.1f}字/toot）\n".format(rank_today[acct],users_size_today[acct],users_size_today[acct]/users_cnt_today[acct])
+    toot_now += "　　　（累計 第{0:>3}位：{1:.1f}万字）\n\n".format(rank_ruikei[acct],users_size[acct]/10000)
+    toot_now += "前後のランクの人は……\n"
+
+    #１ランク上の人ー！
+    if rank_today[acct] > 1:
+        acct_1b =  rank_today_rev[rank_today[acct] -1 ]
+        toot_now += ":@{3}: 第{0:>3}位：{1:,}字（avg.{2:.1f}字/toot）\n".format(rank_today[acct_1b],users_size_today[acct_1b],users_size_today[acct_1b]/users_cnt_today[acct_1b],acct_1b)
+        toot_now += "　　　（累計 第{0:>3}位：{1:.1f}万字）\n\n".format(rank_ruikei[acct_1b],users_size[acct_1b]/10000)
+
+    #１ランク下の人ー！
+    if rank_today[acct] < len(rank_today):
+        acct_1b =  rank_today_rev[rank_today[acct] +1 ]
+        toot_now += ":@{3}: 第{0:>3}位：{1:,}字（avg.{2:.1f}字/toot）\n".format(rank_today[acct_1b],users_size_today[acct_1b],users_size_today[acct_1b]/users_cnt_today[acct_1b],acct_1b)
+        toot_now += "　　　（累計 第{0:>3}位：{1:.1f}万字）\n\n".format(rank_ruikei[acct_1b],users_size[acct_1b]/10000)
+
+    toot(toot_now, g_vis ,id, spoiler)
+
+#######################################################
 # ボトルメールサービス　メッセージ登録
 def bottlemail_service(content, acct, id, g_vis):
     fav_now(id)
@@ -609,7 +671,7 @@ def bottlemail_service(content, acct, id, g_vis):
 
     spoiler = "ボトルメール受け付けたよー！"
     toot_now += "受け付けたメッセージは「" + word + "」だよー！いつか届くから気長に待っててねー！"
-    toot(toot_now, g_vis ,id,None)
+    toot(toot_now, g_vis , id, spoiler)
 
 #######################################################
 # 受信したトゥートの一次振り分け処理
@@ -643,7 +705,6 @@ def th_worker2():
         try:
             if  TQ2.empty():
                 continue
-
             data = TQ2.get() #キューからトゥートを取り出すよー！
             content = data['content']
             id = data["id"]
@@ -664,6 +725,9 @@ def th_worker2():
                 sleep(cm.get_coolingtime())
             elif re.compile("(きょう|今日)の.?(料理|りょうり)|[ご御夕昼朝][食飯][食た]べ[よるた]|(腹|はら)[へ減]った|お(腹|なか)[空す]いた|(何|なに)[食た]べよ").search(content):
                 recipe_service(content=content, acct=acct, id=id, g_vis=g_vis)
+                sleep(cm.get_coolingtime())
+            elif re.compile("(私|わたし|わたくし|自分|僕|俺|朕|ちん|余|あたし|ミー|あちき|あちし|わい|わっち|おいどん|わし|うち|おら|儂|おいら|あだす|某|麿|拙者|小生|あっし|手前|吾輩|我輩|マイ)の(ランク|ランキング|順位)").search(content):
+                show_rank(acct=acct, id=id, g_vis=g_vis)
                 sleep(cm.get_coolingtime())
             elif len(content) > 140:
                 print('★要約対象：',content)

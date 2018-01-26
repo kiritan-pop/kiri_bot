@@ -19,7 +19,6 @@ DB_PATH = "db/statuses.db"
 DB_PATH_TMP = "db/statuses_tmp.db"
 #USER_PATH = "Daily_#{Time.now.strftime('%Y%m%d')}/"
 
-
 # --- debug switch  true false
 VERB = false
 
@@ -42,12 +41,16 @@ handler do |job|
   ############################################################
   #累計トゥート文字数カウント
   when "main1"
+    db = SQLite3::Database.new(DB_PATH,{:timeout => 120000})
     FileUtils.cp(DB_PATH, DB_PATH_TMP)
-    sleep(30)
+    sleep(60)
+    db.close
+
     db = SQLite3::Database.new(DB_PATH_TMP,{:timeout => 120000})
     #累計トゥーと文字数カウント
     sql = "select acct,content from statuses;"
     users_cnt = {}
+    users_size = {}
     db.execute(sql).each {|acct,content|
 
       contents = Nokogiri::HTML.parse(content)
@@ -59,14 +62,19 @@ handler do |job|
         text += item.text.strip if item.text?
       }
 
-      if users_cnt.has_key?(acct)
-        users_cnt[acct] += text.size
+      if users_size.has_key?(acct)
+        users_size[acct] += text.size
+        users_cnt[acct] += 1
       else
-        users_cnt[acct] = text.size
+        users_size[acct] = text.size
+        users_cnt[acct] = 1
       end
     }
-    users_cnt = users_cnt.sort {|(k1, v1), (k2, v2)| v2 <=> v1 }
-    File.open("work/users_cnt.txt", "w") do |f|
+    #users_size = users_size.sort {|(k1, v1), (k2, v2)| v2 <=> v1 }
+    File.open("db/users_size.json", "w") do |f|
+      f.puts(JSON.pretty_generate(users_size))
+    end
+    File.open("db/users_cnt.json", "w") do |f|
       f.puts(JSON.pretty_generate(users_cnt))
     end
     db.close
@@ -80,6 +88,7 @@ handler do |job|
     #今日のトゥート文字数カウント
     sql = "select acct,content from statuses where date=#{today};"
     users_cnt_today = {}
+    users_size_today = {}
     db.execute(sql).each {|acct,content|
 
       contents = Nokogiri::HTML.parse(content)
@@ -91,53 +100,74 @@ handler do |job|
         text += item.text.strip if item.text?
       }
 
-      if users_cnt_today.has_key?(acct)
-        users_cnt_today[acct] += text.size
+      if users_size_today.has_key?(acct)
+        users_size_today[acct] += text.size
+        users_cnt_today[acct] += 1
       else
-        users_cnt_today[acct] = text.size
+        users_size_today[acct] = text.size
+        users_cnt_today[acct] = 1
       end
     }
-    users_cnt_today = users_cnt_today.sort {|(k1, v1), (k2, v2)| v2 <=> v1 }
-    File.open("work/users_cnt_today.txt", "w") do |f|
+    #users_size_today = users_size_today.sort {|(k1, v1), (k2, v2)| v2 <=> v1 }
+    File.open("db/users_size_today.json", "w") do |f|
+      f.puts(JSON.pretty_generate(users_size_today))
+    end
+    File.open("db/users_cnt_today.json", "w") do |f|
       f.puts(JSON.pretty_generate(users_cnt_today))
     end
+
     db.close
 
   ############################################################
   #ランキング作成してトゥート
   when "main3"
+    #累計分
     users_cnt= {}
-    File.open("work/users_cnt.txt", "r"){|f|
+    users_size= {}
+    File.open("db/users_cnt.json", "r"){|f|
       users_cnt= JSON.load(f)
     }
+    File.open("db/users_size.json", "r"){|f|
+      users_size= JSON.load(f)
+    }
+
+    #本日分
     users_cnt_today= {}
-    File.open("work/users_cnt_today.txt", "r"){|f|
+    users_size_today= {}
+    File.open("db/users_cnt_today.json", "r"){|f|
       users_cnt_today= JSON.load(f)
+    }
+    File.open("db/users_size_today.json", "r"){|f|
+      users_size_today= JSON.load(f)
     }
 
     ruikei_rank = {}
-    users_cnt.each_with_index{|(acct,cnt),i|
-      ruikei_rank[acct] = [i,cnt]
+    users_size.sort_by {|k, v| -v }.each_with_index{|(acct,size),i|
+      ruikei_rank[acct] = [i,size]
     }
 
+    char_size = 0
     char_cnt = 0
-    users_cnt_today.each_with_index{|(acct,cnt),i|
-      char_cnt += cnt
-      pp "#{i+1}位 :@#{acct}: #{cnt}字(累計#{ruikei_rank[acct][0]+1}位：#{ruikei_rank[acct][1]}字)"
+    users_size_today.sort_by {|k, v| -v }.each_with_index{|(acct,size),i|
+      char_size += size
+      char_cnt += users_cnt_today[acct]
+      #pp "#{i+1}位 :@#{acct}: #{size}字(累計#{ruikei_rank[acct][0]+1}位：#{ruikei_rank[acct][1]}字)"
     }
-    body = "📝#{char_cnt}字/💁#{users_cnt_today.size}人\nトゥートした「文字数」のランキングだよー！"
 
-    users_cnt_today.each_with_index{|(acct,cnt),i|
+    body = "📝#{char_size}字:#{char_cnt}toot:💁#{users_size_today.size}人\nトゥートした「文字数」のランキングだよー！\n"
+    users_size_today.sort_by {|k, v| -v }.each_with_index{|(acct,size),i|
       break if i > 9
-      body += "#{sprintf("%2d",i+1)}位 :@#{acct}: #{sprintf("%5d",cnt)}字(累計#{ruikei_rank[acct][0]+1}位：#{sprintf("%3d",ruikei_rank[acct][1]/10000)}万字)\n"
+      body += "#{sprintf("%2d",i+1)}位 :@#{acct}: #{sprintf("%5d",size)}字（#{sprintf("%3.1f", size.to_f/users_cnt_today[acct].to_f)}字/toot） \n"
+      body += "　　　　（累計#{ruikei_rank[acct][0]+1}位：#{sprintf("%3d",ruikei_rank[acct][1]/10000)}万字）\n"
     }
-    exe_toot(body,visibility = "unlisted",acct = nil,spoiler_text = "きりたん勝手にランキング",rep_id = nil)
+    body += "#きりランキング #きりぼっと"
+    exe_toot(body,visibility = "public",acct = nil,spoiler_text = "きりたん勝手にランキング",rep_id = nil)
 
   end
 end
 
 every(1.day, 'main1', at: '22:00')      unless VERB
 every(1.day, 'main2', at: '22:40')      unless VERB
-every(1.day, 'main3', at: '22:50')      unless VERB
-every(1.week, 'main3')   if VERB
+every(1.day, 'main3', at: '22:45')      unless VERB
+every(1.week, 'main2')   if VERB
 #every(1.week, 'main3')
