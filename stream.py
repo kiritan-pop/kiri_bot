@@ -17,7 +17,7 @@ import lstm_kiri
 
 BOT_ID = 'kiri_bot01'
 BOTS = [BOT_ID,'JC','12222222','friends_booster']
-INTERVAL = 0.1
+INTERVAL = 0.03
 COOLING_TIME = 10
 DELAY = 20
 STATUSES_DB_PATH = "db/statuses.db"
@@ -79,18 +79,21 @@ class CoolingManager():
         self.toot_count += 1
     def timer(self):
         while True:
-            sleep(1)
-            self.time += 1
+            sleep(0.1)
+            self.time += 0.1
     def timer_reseter(self):
         while True:
             sleep(60)
+            print('***流速:{0:.2f}toots/s'.format(self.toot_count / self.time))
             self.time = 0.0
             self.toot_count = 0
     def get_coolingtime(self):
         if self.time == 0:
             return DELAY
         else:
-            return (self.toot_count / self.time)  * COOLING_TIME  + DELAY
+            tmp = (self.toot_count / self.time)  * COOLING_TIME  + INTERVAL
+            print('***cooling time:{0:.1f}s'.format(tmp))
+            return tmp
 
 #######################################################
 # マストドンＡＰＩ用部品を継承して、通知時の処理を実装ー！
@@ -111,7 +114,7 @@ class res_toot(StreamListener):
         if  status["account"]["username"] not in BOTS and \
             BOT_ID not in status['content']:
             TQ.put(status)
-            cm.count()
+            CM.count()
 
     def on_delete(self, status_id):
         print(str("===削除されました【{}】===").format(str(status_id)))
@@ -216,17 +219,17 @@ def quick_rtn(data):
         STOPPA.append('stop')
         sys.exit()
     try:
-        rnd = random.randint(0,10)
+        a = int(CM.get_coolingtime())
+        rnd = random.randint(0,10+a)
         toot_now = ''
         id_now = id
         vis_now = g_vis
         interval = 0
         if "きりぼっと" in content+spoiler_text:
             fav_now(id)
-            sleep(INTERVAL)
             toot_now = username + "\n"
             toot_now += lstm_kiri.gentxt(str(content_1b) + content)
-        elif (statuses_count - 3)%10000 == 0:
+        elif statuses_count != 3 and  (statuses_count - 3)%10000 == 0:
             interval = 3
             toot_now = username + "\n"
             toot_now += "そういえばさっき{0:,}トゥートだったよー！".format(statuses_count-3)
@@ -242,9 +245,18 @@ def quick_rtn(data):
                 random.shuffle(hanalist)
                 toot_now += hanalist[0]
         elif re.compile(r"^:twitter:.+🔥$", flags=(re.MULTILINE | re.DOTALL)).search(content):
-            toot_now = ":" + username + ": " + username + " "
-            toot_now += '\n:twitter: ＜ﾊﾟﾀﾊﾟﾀｰ\n川\n\n🔥'
-            vis_now = 'direct'
+            if rnd <= 3:
+                toot_now = ":" + username + ": " + username + " "
+                toot_now += '\n:twitter: ＜ﾊﾟﾀﾊﾟﾀｰ\n川\n\n🔥'
+                vis_now = 'direct'
+            elif rnd <= 6:
+                toot_now = ":" + username + ": " + username + " "
+                toot_now += '\n(ﾉ・_・)ﾉ ﾆｹﾞﾃ!⌒:twitter: ＜ｱﾘｶﾞﾄｩ!\n🔥'
+                vis_now = 'direct'
+            elif rnd <= 7:
+                toot_now = ":" + username + ": " + username + " "
+                toot_now += '\n(ﾉ・_・)ﾉ ﾆｹﾞﾃ!⌒🍗 ＜ｱﾘｶﾞﾄｩ!\n🔥'
+                vis_now = 'direct'
         elif re.compile(r"ブリブリ|ぶりぶり|うん[ちこ]|💩").search(content+spoiler_text):
             if rnd <= 3:
                 toot_now = '🌊🌊🌊 ＜ざばーっ！'
@@ -293,10 +305,17 @@ def quick_rtn(data):
                 toot_now = '@%s\nつい〜……'%acct
                 vis_now = 'direct'
         elif re.compile(r"(:nicoru[0-9]{0,3}:.?){4}").search(content):
-            if rnd <= 7:
+            if rnd <= 5:
                 if content_1b != None and acct == acct_1b:
                     if re.compile(r"(:nicoru[0-9]{0,3}:.?){3}").search(content_1b):
-                        toot_now = 'ガードbotでーす！'
+                        toot_now = '　　三(  っ˃̵ᴗ˂̵) 通りまーす！'
+                        vis_now = 'public'
+                        id_now = None
+        elif re.compile(r"(:nicoru[0-9]{0,3}:.?){2}").search(content):
+            if rnd <= 5:
+                if content_1b != None and acct == acct_1b:
+                    if re.compile(r"(:nicoru[0-9]{0,3}:.?){3}").search(content_1b):
+                        toot_now = '　　(˃̵ᴗ˂̵っ )三 通りまーす！'
                         vis_now = 'public'
                         id_now = None
         elif "(*´ω｀*)" in content+spoiler_text:
@@ -305,13 +324,16 @@ def quick_rtn(data):
                 vis_now = 'direct'
         elif "きりちゃん" in content+spoiler_text or "ニコって" in content+spoiler_text:
             fav_now(id)
+        elif re.compile(r"なんでも|何でも").search(content):
+            if rnd <= 4:
+                toot_now = '@%s\nん？'%acct
+                vis_now = 'direct'
 
         else:
             return
         #
         if len(toot_now) > 0:
             toot(toot_now, vis_now, id_now, None, None, interval)
-            sleep(DELAY)
 
     except:
         jst_now = datetime.now(timezone('Asia/Tokyo'))
@@ -344,7 +366,7 @@ def content_cleanser(content):
         ps.append(p.text)
     rtext += '。\n'.join(ps)
     rtext = unicodedata.normalize("NFKC", rtext)
-    rtext = rtext.replace(r"([^:])@",r"\1")
+    rtext = re.sub(r'([^:])@', r'\1', rtext)
     rtext = rtext.replace("#","")
     rtext = re.sub(r'(___R___)\1{2,}', r'\1', rtext)
     #rtext = re.sub(r'([^。|^？|^！|^\?|^!])___R___', r'\1。\n', rtext)
@@ -712,23 +734,19 @@ def th_worker2():
             g_vis = data["g_vis"]
             if re.compile("(連想|れんそう)([サさ]ー[ビび][スす])[：:]").search(content):
                 rensou_game(content=content, acct=acct, id=id, g_vis=g_vis)
-                sleep(cm.get_coolingtime())
             elif re.compile("(画像検索)([サさ]ー[ビび][スす])[：:]").search(content):
                 search_image(content=content, acct=acct, id=id, g_vis=g_vis)
-                sleep(cm.get_coolingtime())
             elif re.compile("(スパウザー)([サさ]ー[ビび][スす])[：:]").search(content):
                 supauza(content=content, acct=acct, id=id, g_vis=g_vis)
-                sleep(cm.get_coolingtime())
             elif re.compile("([ぼボ][とト][るル][メめ]ー[るル])([サさ]ー[ビび][スす])[：:]").search(content):
                 print("★ボトルメールサービス")
                 bottlemail_service(content=content, acct=acct, id=id, g_vis=g_vis)
-                sleep(cm.get_coolingtime())
             elif re.compile("(きょう|今日)の.?(料理|りょうり)|[ご御夕昼朝][食飯][食た]べ[よるた]|(腹|はら)[へ減]った|お(腹|なか)[空す]いた|(何|なに)[食た]べよ").search(content):
                 recipe_service(content=content, acct=acct, id=id, g_vis=g_vis)
-                sleep(cm.get_coolingtime())
             elif re.compile("(私|わたし|わたくし|自分|僕|俺|朕|ちん|余|あたし|ミー|あちき|あちし|わい|わっち|おいどん|わし|うち|おら|儂|おいら|あだす|某|麿|拙者|小生|あっし|手前|吾輩|我輩|マイ)の(ランク|ランキング|順位)").search(content):
                 show_rank(acct=acct, id=id, g_vis=g_vis)
-                sleep(cm.get_coolingtime())
+            elif re.compile("(ランク|ランキング|順位)(おしえて|教えて)").search(content):
+                show_rank(acct=acct, id=id, g_vis=g_vis)
             elif len(content) > 140:
                 print('★要約対象：',content)
                 content = re.sub(r"(.)\1{3,}",r"\1",content, flags=(re.DOTALL))
@@ -738,8 +756,11 @@ def th_worker2():
                 if is_japanese(gen_txt):
                     if len(gen_txt) > 5:
                         gen_txt +=  "\n#きり要約 #きりぼっと"
-                        toot("@" + acct + " :@" + acct + ":\n"  + gen_txt, "public", id, "勝手に要約サービス")
-                        sleep(cm.get_coolingtime())
+                        toot("@" + acct + " :@" + acct + ":\n"  + gen_txt, g_vis, id, "勝手に要約サービス")
+            else:
+                continue
+            sleep(CM.get_coolingtime())
+
         except:
             jst_now = datetime.now(timezone('Asia/Tokyo'))
             ymdhms = jst_now.strftime("%Y/%m/%d %H:%M:%S")
@@ -747,63 +768,65 @@ def th_worker2():
                 f.write(ymdhms+'\n')
                 traceback.print_exc(file=f)
             print("例外情報\n" + traceback.format_exc())
-            sleep(cm.get_coolingtime())
+
 
 #######################################################
 # 定期ものまねさーびす！
 def th_monomane_tooter():
     while len(STOPPA)==0:
-        sleep(10)
-        jst_now = datetime.now(timezone('Asia/Tokyo'))
-        mm = jst_now.strftime("%M")
-        if mm == '15' or mm == '45':
+        a = int(CM.get_coolingtime())
+        rnd = random.randint(a+5,a+20)
+        sleep(rnd*60)
+        threading.Thread(target=gen).start()
+        #sleep(10)
+        #jst_now = datetime.now(timezone('Asia/Tokyo'))
+        #mm = jst_now.strftime("%M")
+        #if mm == '15' or mm == '45':
         #if mm != '99':
-            spoiler = "勝手にものまねサービス"
-            ymd = int((jst_now - timedelta(hours=1)).strftime("%Y%m%d"))
-            hh = (jst_now - timedelta(hours=1)).strftime("%H")
-            hh0000 = int(hh + "0000")
-            hh9999 = int(hh + "9999")
-            try:
-                con = sqlite3.connect(STATUSES_DB_PATH)
-                c = con.cursor()
-                c.execute( r"select acct from statuses where (date = ?) and time >= ? and time <= ? and acct <> ?", [ymd,hh0000,hh9999,BOT_ID] )
-                toots = ""
-                acct_list = set([])
-                for row in c.fetchall():
-                    acct_list.add(row[0])
-                acct_list -= ng_user_set
-                random_acct = random.sample(acct_list,1)[0]
-                con.close()
-                con = sqlite3.connect(STATUSES_DB_PATH)
-                c = con.cursor()
-                c.execute( r"select content from statuses where acct = ?", (random_acct,) )
-                toots = ""
-                for row in c.fetchall():
-                    content = content_cleanser(row[0])
-                    if len(content) == 0:
-                        pass
-                    else:
-                        toots += content + "。\n"
-                con.close()
-                chain = PrepareChain.PrepareChain("user_toots",toots)
-                triplet_freqs = chain.make_triplet_freqs()
-                chain.save(triplet_freqs, True)
-                generator = GenerateText.GenerateText(5)
-                gen_txt = generator.generate("user_toots")
-                gen_txt = "@" + random_acct + " :@" + random_acct + ":＜「" + gen_txt + "」"
-                gen_txt = gen_txt.replace('\n',"")
-                #gen_txt +=  "\n#きりものまね #きりぼっと"
-                if len(gen_txt) > 10:
-                    toot(gen_txt, "unlisted", None, spoiler)
-                sleep(60)
-            except:
-                jst_now = datetime.now(timezone('Asia/Tokyo'))
-                ymdhms = jst_now.strftime("%Y/%m/%d %H:%M:%S")
-                with open('error.log', 'a') as f:
-                    f.write(ymdhms+'\n')
-                    traceback.print_exc(file=f)
-                print("例外情報\n" + traceback.format_exc())
-                sleep(60)
+        spoiler = "勝手にものまねサービス"
+        ymd = int((jst_now - timedelta(hours=1)).strftime("%Y%m%d"))
+        hh = (jst_now - timedelta(hours=1)).strftime("%H")
+        hh0000 = int(hh + "0000")
+        hh9999 = int(hh + "9999")
+        try:
+            con = sqlite3.connect(STATUSES_DB_PATH)
+            c = con.cursor()
+            c.execute( r"select acct from statuses where (date = ?) and time >= ? and time <= ? and acct <> ?", [ymd,hh0000,hh9999,BOT_ID] )
+            toots = ""
+            acct_list = set([])
+            for row in c.fetchall():
+                acct_list.add(row[0])
+            acct_list -= ng_user_set
+            random_acct = random.sample(acct_list,1)[0]
+            con.close()
+            con = sqlite3.connect(STATUSES_DB_PATH)
+            c = con.cursor()
+            c.execute( r"select content from statuses where acct = ?", (random_acct,) )
+            toots = ""
+            for row in c.fetchall():
+                content = content_cleanser(row[0])
+                if len(content) == 0:
+                    pass
+                else:
+                    toots += content + "。\n"
+            con.close()
+            chain = PrepareChain.PrepareChain("user_toots",toots)
+            triplet_freqs = chain.make_triplet_freqs()
+            chain.save(triplet_freqs, True)
+            generator = GenerateText.GenerateText(5)
+            gen_txt = generator.generate("user_toots")
+            gen_txt = "@" + random_acct + " :@" + random_acct + ":＜「" + gen_txt + "」"
+            gen_txt = gen_txt.replace('\n',"")
+            #gen_txt +=  "\n#きりものまね #きりぼっと"
+            if len(gen_txt) > 10:
+                toot(gen_txt, "unlisted", None, spoiler)
+        except:
+            jst_now = datetime.now(timezone('Asia/Tokyo'))
+            ymdhms = jst_now.strftime("%Y/%m/%d %H:%M:%S")
+            with open('error.log', 'a') as f:
+                f.write(ymdhms+'\n')
+                traceback.print_exc(file=f)
+            print("例外情報\n" + traceback.format_exc())
 
 #######################################################
 # 定期ここ1時間のまとめ
@@ -951,14 +974,15 @@ def th_lstm_tooter():
             print("例外情報\n" + traceback.format_exc())
 
     while len(STOPPA)==0:
-        jst_now = datetime.now(timezone('Asia/Tokyo'))
-        mm = jst_now.strftime("%M")
-        if mm == '07' or mm == '27' or mm == '47':
+        #jst_now = datetime.now(timezone('Asia/Tokyo'))
+        #mm = jst_now.strftime("%M")
+        #if mm == '07' or mm == '27' or mm == '47':
         #if mm == '17' or mm == '37' or mm == '57':
         #if mm != '99': #test
-            threading.Thread(target=gen).start()
-        sleep(60)
-
+        a = int(CM.get_coolingtime())
+        rnd = random.randint(a+5,a+20)
+        sleep(rnd*60)
+        threading.Thread(target=gen).start()
 
 #######################################################
 # トレーニング処理
@@ -1001,41 +1025,44 @@ def th_lstm_trainer():
 # 初めてのトゥートを探してぶーすとするよー！
 def th_timer_bst1st():
     while len(STOPPA)==0:
-        jst_now = datetime.now(timezone('Asia/Tokyo'))
-        mm = jst_now.strftime("%M")
-        if mm == '17' or mm == '37' or mm == '57':
+        a = int(CM.get_coolingtime())
+        rnd = random.randint(a+5,a+20)
+        sleep(rnd*60)
+        threading.Thread(target=gen).start()
+        #jst_now = datetime.now(timezone('Asia/Tokyo'))
+        #mm = jst_now.strftime("%M")
+        #if mm == '17' or mm == '37' or mm == '57':
         #if mm != '99': #test
-            ymd = int(jst_now.strftime("%Y%m%d"))
-            hh = jst_now.strftime("%H")
-            hh0000 = int(hh + "0000")
-            hh9999 = int(hh + "9999")
-            try:
-                con = sqlite3.connect(STATUSES_DB_PATH)
-                c = con.cursor()
-                #ランダムに人を選ぶよー！（最近いる人から）
-                c.execute( r"select acct from statuses where (date = ?) and time >= ? and time <= ? and acct <> ?", [ymd,hh0000,hh9999,BOT_ID] )
-                acct_list = set([])
-                for row in c.fetchall():
-                    acct_list.add(row[0])
-                acct_list -= ng_user_set
-                random_acct = random.sample(acct_list,1)[0] #ひとり選ぶ
-                #print("***debug:random_acct=%s"%random_acct )
-                c.execute( r"select id from statuses where acct = ? order by id asc", (random_acct,) )
-                ids = []
-                for i,row in enumerate(c.fetchall()):
-                    ids.append(row[0])
-                    if i >= 200:
-                        break
-                con.close()
-                boost_now(random.sample(ids,1)[0])
-            except:
-                jst_now = datetime.now(timezone('Asia/Tokyo'))
-                ymdhms = jst_now.strftime("%Y/%m/%d %H:%M:%S")
-                with open('error.log', 'a') as f:
-                    f.write(ymdhms+'\n')
-                    traceback.print_exc(file=f)
-                print("例外情報\n" + traceback.format_exc())
-        sleep(60)
+        ymd = int(jst_now.strftime("%Y%m%d"))
+        hh = jst_now.strftime("%H")
+        hh0000 = int(hh + "0000")
+        hh9999 = int(hh + "9999")
+        try:
+            con = sqlite3.connect(STATUSES_DB_PATH)
+            c = con.cursor()
+            #ランダムに人を選ぶよー！（最近いる人から）
+            c.execute( r"select acct from statuses where (date = ?) and time >= ? and time <= ? and acct <> ?", [ymd,hh0000,hh9999,BOT_ID] )
+            acct_list = set([])
+            for row in c.fetchall():
+                acct_list.add(row[0])
+            acct_list -= ng_user_set
+            random_acct = random.sample(acct_list,1)[0] #ひとり選ぶ
+            #print("***debug:random_acct=%s"%random_acct )
+            c.execute( r"select id from statuses where acct = ? order by id asc", (random_acct,) )
+            ids = []
+            for i,row in enumerate(c.fetchall()):
+                ids.append(row[0])
+                if i >= 200:
+                    break
+            con.close()
+            boost_now(random.sample(ids,1)[0])
+        except:
+            jst_now = datetime.now(timezone('Asia/Tokyo'))
+            ymdhms = jst_now.strftime("%Y/%m/%d %H:%M:%S")
+            with open('error.log', 'a') as f:
+                f.write(ymdhms+'\n')
+                traceback.print_exc(file=f)
+            print("例外情報\n" + traceback.format_exc())
 
 
 #######################################################
@@ -1083,7 +1110,7 @@ def th_haertbeat():
 #######################################################
 # メイン
 if __name__ == '__main__':
-    cm = CoolingManager()
+    CM = CoolingManager()
     threading.Thread(target=th_local).start()
     threading.Thread(target=th_user).start()
     threading.Thread(target=th_worker).start()
