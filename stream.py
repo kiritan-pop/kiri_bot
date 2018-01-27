@@ -17,7 +17,7 @@ import lstm_kiri
 
 BOT_ID = 'kiri_bot01'
 BOTS = [BOT_ID,'JC','12222222','friends_booster']
-INTERVAL = 0.03
+INTERVAL = 0.05
 COOLING_TIME = 10
 DELAY = 20
 STATUSES_DB_PATH = "db/statuses.db"
@@ -92,7 +92,7 @@ class CoolingManager():
             return DELAY
         else:
             tmp = (self.toot_count / self.time)  * COOLING_TIME  + INTERVAL
-            print('***cooling time:{0:.1f}s'.format(tmp))
+            #print('***cooling time:{0:.1f}s'.format(tmp))
             return tmp
 
 #######################################################
@@ -220,16 +220,12 @@ def quick_rtn(data):
         sys.exit()
     try:
         a = int(CM.get_coolingtime())
-        rnd = random.randint(0,10+a)
+        rnd = random.randint(0,7+a)
         toot_now = ''
         id_now = id
         vis_now = g_vis
         interval = 0
-        if "きりぼっと" in content+spoiler_text:
-            fav_now(id)
-            toot_now = username + "\n"
-            toot_now += lstm_kiri.gentxt(str(content_1b) + content)
-        elif statuses_count != 3 and  (statuses_count - 3)%10000 == 0:
+        if statuses_count != 3 and  (statuses_count - 3)%10000 == 0:
             interval = 3
             toot_now = username + "\n"
             toot_now += "そういえばさっき{0:,}トゥートだったよー！".format(statuses_count-3)
@@ -655,21 +651,21 @@ def show_rank(acct, id, g_vis):
 
     spoiler = ":@{0}: のランクだよー！（※{1} 時点）".format(acct,today_str)
     toot_now = "@{0} :@{1}: のランクは……\n".format(acct,acct)
-    toot_now += "第{0:>3}位：{1:,}字（avg.{2:.1f}字/toot）\n".format(rank_today[acct],users_size_today[acct],users_size_today[acct]/users_cnt_today[acct])
-    toot_now += "　　　（累計 第{0:>3}位：{1:.1f}万字）\n\n".format(rank_ruikei[acct],users_size[acct]/10000)
+    toot_now += "{0:>3}位 {1:,}字/avg{2:.1f}\n".format(rank_today[acct], users_size_today[acct], users_size_today[acct]/users_cnt_today[acct])
+    toot_now += "（累計 {0:>3}位 {1:,}字/avg{2:.1f}）\n\n".format(rank_ruikei[acct], users_size[acct], users_size[acct]/users_cnt[acct])
     toot_now += "前後のランクの人は……\n"
 
     #１ランク上の人ー！
     if rank_today[acct] > 1:
         acct_1b =  rank_today_rev[rank_today[acct] -1 ]
-        toot_now += ":@{3}: 第{0:>3}位：{1:,}字（avg.{2:.1f}字/toot）\n".format(rank_today[acct_1b],users_size_today[acct_1b],users_size_today[acct_1b]/users_cnt_today[acct_1b],acct_1b)
-        toot_now += "　　　（累計 第{0:>3}位：{1:.1f}万字）\n\n".format(rank_ruikei[acct_1b],users_size[acct_1b]/10000)
+        toot_now += "　:@{3}: {0:>3}位 {1:,}字/avg{2:.1f}\n".format(rank_today[acct_1b], users_size_today[acct_1b], users_size_today[acct_1b]/users_cnt_today[acct_1b], acct_1b)
+        toot_now += "（累計 {0:>3}位 {1:,}字/avg{2:.1f}）\n\n".format(rank_ruikei[acct_1b], users_size[acct_1b], users_size[acct_1b]/users_cnt[acct_1b])
 
     #１ランク下の人ー！
     if rank_today[acct] < len(rank_today):
         acct_1b =  rank_today_rev[rank_today[acct] +1 ]
-        toot_now += ":@{3}: 第{0:>3}位：{1:,}字（avg.{2:.1f}字/toot）\n".format(rank_today[acct_1b],users_size_today[acct_1b],users_size_today[acct_1b]/users_cnt_today[acct_1b],acct_1b)
-        toot_now += "　　　（累計 第{0:>3}位：{1:.1f}万字）\n\n".format(rank_ruikei[acct_1b],users_size[acct_1b]/10000)
+        toot_now += "　:@{3}: {0:>3}位 {1:,}字/avg{2:.1f}\n".format(rank_today[acct_1b], users_size_today[acct_1b], users_size_today[acct_1b]/users_cnt_today[acct_1b], acct_1b)
+        toot_now += "（累計 {0:>3}位 {1:,}字/avg{2:.1f}）\n\n".format(rank_ruikei[acct_1b], users_size[acct_1b], users_size[acct_1b]/users_cnt[acct_1b])
 
     toot(toot_now, g_vis ,id, spoiler)
 
@@ -699,7 +695,6 @@ def bottlemail_service(content, acct, id, g_vis):
 # 受信したトゥートの一次振り分け処理
 def th_worker():
     while len(STOPPA)==0:
-        sleep(INTERVAL)
         if  TQ.empty():
             continue
 
@@ -732,6 +727,7 @@ def th_worker2():
             id = data["id"]
             acct = data["acct"]
             g_vis = data["g_vis"]
+            spoiler_text = data["spoiler_text"]
             if re.compile("(連想|れんそう)([サさ]ー[ビび][スす])[：:]").search(content):
                 rensou_game(content=content, acct=acct, id=id, g_vis=g_vis)
             elif re.compile("(画像検索)([サさ]ー[ビび][スす])[：:]").search(content):
@@ -757,6 +753,11 @@ def th_worker2():
                     if len(gen_txt) > 5:
                         gen_txt +=  "\n#きり要約 #きりぼっと"
                         toot("@" + acct + " :@" + acct + ":\n"  + gen_txt, g_vis, id, "勝手に要約サービス")
+            elif "きりぼっと" in content+spoiler_text:
+                fav_now(id)
+                toot_now = "@%s\n"%acct
+                toot_now += lstm_kiri.gentxt(content)
+                toot(toot_now, 'unlisted', id, None)
             else:
                 continue
             sleep(CM.get_coolingtime())
@@ -769,15 +770,14 @@ def th_worker2():
                 traceback.print_exc(file=f)
             print("例外情報\n" + traceback.format_exc())
 
-
 #######################################################
 # 定期ものまねさーびす！
 def th_monomane_tooter():
     while len(STOPPA)==0:
         a = int(CM.get_coolingtime())
-        rnd = random.randint(a+5,a+20)
+        rnd = random.randint(a+5,a+15)
+        print('th_monomane_tooter sleep:{0}分'.format(rnd))
         sleep(rnd*60)
-        threading.Thread(target=gen).start()
         #sleep(10)
         #jst_now = datetime.now(timezone('Asia/Tokyo'))
         #mm = jst_now.strftime("%M")
@@ -951,6 +951,8 @@ def th_lstm_tooter():
                     if len(seeds)>10:
                         break
             con.close()
+            if len(seeds) <= 2:
+                return
             seeds.reverse()
             print('seeds=',seeds)
             seedtxt = "".join(seeds)
@@ -980,7 +982,8 @@ def th_lstm_tooter():
         #if mm == '17' or mm == '37' or mm == '57':
         #if mm != '99': #test
         a = int(CM.get_coolingtime())
-        rnd = random.randint(a+5,a+20)
+        rnd = random.randint(a+5,a+15)
+        print('th_lstm_tooter sleep:{0}分'.format(rnd))
         sleep(rnd*60)
         threading.Thread(target=gen).start()
 
@@ -1026,9 +1029,9 @@ def th_lstm_trainer():
 def th_timer_bst1st():
     while len(STOPPA)==0:
         a = int(CM.get_coolingtime())
-        rnd = random.randint(a+5,a+20)
+        rnd = random.randint(a+5,a+15)
+        print('th_timer_bst1st sleep:{0}分'.format(rnd))
         sleep(rnd*60)
-        threading.Thread(target=gen).start()
         #jst_now = datetime.now(timezone('Asia/Tokyo'))
         #mm = jst_now.strftime("%M")
         #if mm == '17' or mm == '37' or mm == '57':
