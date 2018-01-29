@@ -5,6 +5,7 @@ import re, os, json, random, unicodedata, signal, sys
 import threading, MeCab, queue, urllib
 from time import sleep
 from pytz import timezone
+import dateutil
 from datetime import datetime,timedelta
 import warnings, traceback
 from bs4 import BeautifulSoup
@@ -18,7 +19,7 @@ import Toot_summary, GenerateText, PrepareChain, bottlemail, lstm_kiri, scoreman
 BOT_ID = 'kiri_bot01'
 BOTS = [BOT_ID,'JC','12222222','friends_booster']
 INTERVAL = 0.05
-COOLING_TIME = 10
+COOLING_TIME = 15
 DELAY = 20
 STATUSES_DB_PATH = "db/statuses.db"
 pat1 = re.compile(r' ([!-~ぁ-んァ-ン] )+|^([!-~ぁ-んァ-ン] )+| [!-~ぁ-んァ-ン]$',flags=re.MULTILINE)  #[!-~0-9a-zA-Zぁ-んァ-ン０-９ａ-ｚ]
@@ -51,6 +52,7 @@ mastodon = Mastodon(
 
 TQ = queue.Queue()
 TQ2 = queue.Queue()
+StatusQ = queue.Queue()
 Toot1bQ = queue.Queue()
 DelQ = queue.Queue(10)
 
@@ -108,9 +110,8 @@ class men_toot(StreamListener):
 
         if notification["type"] == "mention":
             status = notification["status"]
-            if '？' in status['content']:
-                status['spoiler_text'] += ' きりぼっと'
             TQ.put(status)
+            StatusQ.put(status)
             SM.update(notification["status"]["account"]["acct"], 'reply')
         elif notification["type"] == "favourite":
             SM.update(notification["account"]["acct"], 'fav', ymdhms)
@@ -122,11 +123,16 @@ class men_toot(StreamListener):
 # マストドンＡＰＩ用部品を継承して、ローカルタイムライン受信時の処理を実装ー！
 class res_toot(StreamListener):
     def on_update(self, status):
-        #print("===ローカルタイムライン===")
-        if  status["account"]["username"] not in BOTS and \
-            BOT_ID not in status['content']:
-            TQ.put(status)
-            CM.count()
+        print("===ローカルタイムライン===")
+        #bot達のLTLトゥートは無視する(ง •̀ω•́)ง✧＜無限ループ防止！
+        if  status["account"]["username"] in BOTS:
+            return
+        #mentionはnotificationで受けるのでLTLのはスルー！(｢・ω・)｢ 二重レス防止！
+        if re.search(r'[^:]@' + BOT_ID, status['content']):
+        #if  '@' + BOT_ID in status['content']:
+            return
+        TQ.put(status)
+        CM.count()
 
     def on_delete(self, status_id):
         print(str("===削除されました【{}】===").format(str(status_id)))
@@ -358,6 +364,11 @@ def quick_rtn(data):
                 toot_now = '@%s\nん？'%acct
                 vis_now = 'direct'
                 SM.update(acct, 'func')
+        elif re.compile(r"泣いてる|泣いた").search(content):
+            if rnd <= 4:
+                toot_now = '@%s\n泣いてるー！ｷｬｯｷｬｯ!'%acct
+                vis_now = 'direct'
+                SM.update(acct, 'func')
 
         else:
             return
@@ -372,6 +383,47 @@ def quick_rtn(data):
             f.write(ymdhms+'\n')
             traceback.print_exc(file=f)
         print("例外情報\n" + traceback.format_exc())
+
+
+#######################################################
+# トゥート内容を保存
+def save_status(status):
+    con = sqlite3.connect(STATUSES_DB_PATH)
+    c = con.cursor()
+
+    media_attachments = status["media_attachments"]
+    mediatext = ""
+    for media in media_attachments:
+        mediatext += media["url"] + " "
+
+    #print(status['created_at'])
+    jst_time = dateutil.parser.parse(str(status['created_at']))
+    jst_time = jst_time.astimezone(timezone('Asia/Tokyo'))
+    fmt = "%Y%m%d"
+    tmpdate = jst_time.strftime(fmt)
+    fmt = "%H%M%S"
+    tmptime = jst_time.strftime(fmt)
+
+    insert_sql = u"insert into statuses (id, date, time, content, acct, display_name, media_attachments) values (?, ?, ?, ?, ?, ?, ?)"
+    data = (str(status['id']),
+                tmpdate,
+                tmptime,
+                status['content'],
+                status['account']['acct'],
+                status['account']['display_name'],
+                mediatext
+                )
+    try:
+        con.execute(insert_sql, data)
+    except Exception as e:
+        jst_now = datetime.now(timezone('Asia/Tokyo'))
+        ymdhms = jst_now.strftime("%Y/%m/%d %H:%M:%S")
+        with open('error.log', 'a') as f:
+            f.write(ymdhms+'\n')
+            traceback.print_exc(file=f)
+
+    con.commit()
+    con.close()
 
 #######################################################
 # トゥート内容の標準化・クレンジング
@@ -417,7 +469,7 @@ def rensou_game(content, acct, id, g_vis):
         toot(username + "\n₍₍ ◝(* ,,Ծ‸Ծ,, )◟ ⁾⁾長いよー！", g_vis ,id,None)
         return
 
-    split = re.search("(連想|れんそう)(サービス|さーびす)[：:](.*)", str(content)).group(3).split("\n",1)
+    split = re.search(r"(連想|れんそう)(サービス|さーびす)[：:](.*)", str(content)).group(3).split("\n",1)
     word = split[0]
     nega_w = ""
     nega_wakati = ""
@@ -478,7 +530,7 @@ def search_image(content, acct, id, g_vis):
         sleep(DELAY)
         toot("長いよー！₍₍ ◝(* ,,Ծ‸Ծ,, )◟ ⁾⁾ぷーぷーダンスーー♪", g_vis ,id,None)
         return
-    word = re.search("(画像検索)(サービス|さーびす)[：:](.*)", str(content)).group(3)
+    word = re.search(r"(画像検索)(サービス|さーびす)[：:](.*)", str(content)).group(3)
     spoiler = "「" + word + "」に関連する画像"
     toot_now = ":" + username + ": " + username + "\n"
     wakati = tagger.parse(word)
@@ -567,7 +619,7 @@ def supauza(content, acct, id, g_vis):
         sleep(DELAY)
         toot(username + "\n₍₍ ◝(* ,,Ծ‸Ծ,, )◟ ⁾⁾長いよー！", g_vis ,id ,None)
         return
-    word = re.search("(スパウザー)(サービス|さーびす)[：:](.*)", str(content)).group(3)
+    word = re.search(r"(スパウザー)(サービス|さーびす)[：:](.*)", str(content)).group(3)
     word = tagger.parse(word).strip()
     spoiler = "「" + word + "」の戦闘力を測定！ぴぴぴっ！・・・"
     toot_now = ":" + username + ": " + username + "\n"
@@ -634,14 +686,17 @@ def recipe_service(content, acct, id, g_vis):
     #作り方を取得ー！途中の手順と終了手順を分けて取得するよー！
     text_chu = []
     text_end = []
+    generator = GenerateText.GenerateText(50)
     while len(text_chu) <= 3 or len(text_end) < 1:
-        tmp_text = generator.generate("recipe_text").strip()
-        if re.search(r'完成|出来上|召し上が|できあがり',tmp_text):
-            if len(text_end) <= 0:
-                text_end.append(tmp_text)
-        else:
-            if len(text_chu) <= 3:
-                text_chu.append(tmp_text)
+        tmp_texts = generator.generate("recipe_text").split('\n')
+        for tmp_text in tmp_texts:
+            print('料理のレシピ：%s'%tmp_text)
+            if re.search(r'完成|出来上|召し上が|できあがり|最後|終わり',tmp_text):
+                if len(text_end) <= 0:
+                    text_end.append(tmp_text)
+            else:
+                if len(text_chu) <= 3:
+                    text_chu.append(tmp_text)
     text_chu.extend(text_end)
     gen_txt += '＜作り方＞\n'
     for i,text in enumerate(text_chu):
@@ -683,6 +738,10 @@ def show_rank(acct, id, g_vis):
         rank_today[k] = i+1
         rank_today_rev[i+1] = k
 
+    if acct not in users_size_today:
+        toot('ごめんねー……ランク外だよー……', g_vis ,id, None)
+        return
+
     spoiler = ":@{0}: のランクだよー！（※{1} 時点）".format(acct,today_str)
     toot_now = "@{0} :@{1}: のランクは……\n".format(acct,acct)
     toot_now += "{0:>3}位 {1:,}字/avg{2:.1f}\n".format(rank_today[acct], users_size_today[acct], users_size_today[acct]/users_cnt_today[acct])
@@ -707,7 +766,7 @@ def show_rank(acct, id, g_vis):
 # ボトルメールサービス　メッセージ登録
 def bottlemail_service(content, acct, id, g_vis):
     fav_now(id)
-    word = re.search("([ぼボ][とト][るル][メめ]ー[るル])([サさ]ー[ビび][スす])[：:](.*)", str(content), flags=(re.MULTILINE | re.DOTALL) ).group(3)
+    word = re.search(r"([ぼボ][とト][るル][メめ]ー[るル])([サさ]ー[ビび][スす])[：:](.*)", str(content), flags=(re.MULTILINE | re.DOTALL) ).group(3)
     toot_now = "@" + acct + "\n"
     if len(word) == 0:
         sleep(DELAY)
@@ -732,7 +791,7 @@ def th_worker():
         if  TQ.empty():
             continue
 
-        print("===worker受信===")
+        #print("===worker1(%d)受信==="%TQ.qsize())
         data = {}
         status = TQ.get() #キューからトゥートを取り出すよー！
         data["id"] = status["id"]
@@ -741,7 +800,7 @@ def th_worker():
         data["g_vis"] = status["visibility"]
         data["statuses_count"] = status["account"]["statuses_count"]
         data["spoiler_text"] = content_cleanser(status["spoiler_text"])
-        print(data["id"], data["acct"], data["content"])
+        print(' ', data["acct"], data["content"])
         if len(data["content"]) > 0:
             # 即時処理はここで呼び出す
             quick_rtn(data)
@@ -756,52 +815,60 @@ def th_worker2():
         try:
             if  TQ2.empty():
                 continue
+
+            #print("===worker2(%d)受信==="%TQ2.qsize())
             data = TQ2.get() #キューからトゥートを取り出すよー！
+            #print('　',data["acct"], data["content"])
             content = data['content']
             id = data["id"]
             acct = data["acct"]
             g_vis = data["g_vis"]
-            spoiler_text = data["spoiler_text"]
-            if re.compile("(連想|れんそう)([サさ]ー[ビび][スす])[：:]").search(content):
+            d_spoiler_text = data["spoiler_text"]
+            if re.search(r"(連想|れんそう)([サさ]ー[ビび][スす])[：:]", content):
                 rensou_game(content=content, acct=acct, id=id, g_vis=g_vis)
                 SM.update(acct, 'func')
-            elif re.compile("(画像検索)([サさ]ー[ビび][スす])[：:]").search(content):
+            elif re.search(r"(画像検索)([サさ]ー[ビび][スす])[：:]", content):
                 search_image(content=content, acct=acct, id=id, g_vis=g_vis)
                 SM.update(acct, 'func')
-            elif re.compile("(スパウザー)([サさ]ー[ビび][スす])[：:]").search(content):
+            elif re.search(r"(スパウザー)([サさ]ー[ビび][スす])[：:]", content):
                 supauza(content=content, acct=acct, id=id, g_vis=g_vis)
                 SM.update(acct, 'func')
-            elif re.compile("([ぼボ][とト][るル][メめ]ー[るル])([サさ]ー[ビび][スす])[：:]").search(content):
+            elif re.search(r"([ぼボ][とト][るル][メめ]ー[るル])([サさ]ー[ビび][スす])[：:]", content):
                 print("★ボトルメールサービス")
                 bottlemail_service(content=content, acct=acct, id=id, g_vis=g_vis)
                 SM.update(acct, 'func')
-            elif re.compile("(きょう|今日)の.?(料理|りょうり)|[ご御夕昼朝][食飯][食た]べ[よるた]|(腹|はら)[へ減]った|お(腹|なか)[空す]いた|(何|なに)[食た]べよ").search(content):
-                recipe_service(content=content, acct=acct, id=id, g_vis=g_vis)
+            elif re.search(r"(きょう|今日)の.?(料理|りょうり)|[ご御夕昼朝][食飯][食た]べ[よるた]|(腹|はら)[へ減]った|お(腹|なか)[空す]いた|(何|なに)[食た]べよ", content):
+                #recipe_service(content=content, acct=acct, id=id, g_vis=g_vis)
+                threading.Timer(3,recipe_service,args=(content, acct, id, g_vis)).start()
                 SM.update(acct, 'func')
-            elif re.compile("(私|わたし|わたくし|自分|僕|俺|朕|ちん|余|あたし|ミー|あちき|あちし|わい|わっち|おいどん|わし|うち|おら|儂|おいら|あだす|某|麿|拙者|小生|あっし|手前|吾輩|我輩|マイ)の(ランク|ランキング|順位)").search(content):
+            elif re.search(r"(私|わたし|わたくし|自分|僕|俺|朕|ちん|余|あたし|ミー|あちき|あちし|わい|わっち|おいどん|わし|うち|おら|儂|おいら|あだす|某|麿|拙者|小生|あっし|手前|吾輩|我輩|マイ)の(ランク|ランキング|順位)", content):
                 show_rank(acct=acct, id=id, g_vis=g_vis)
                 SM.update(acct, 'func')
-            elif re.compile("(ランク|ランキング|順位)(おしえて|教えて)").search(content):
+            elif re.search(r"(ランク|ランキング|順位)(おしえて|教えて)", content):
                 show_rank(acct=acct, id=id, g_vis=g_vis)
                 SM.update(acct, 'func')
             elif len(content) > 140:
-                print('★要約対象：',content)
                 content = re.sub(r"(.)\1{3,}",r"\1",content, flags=(re.DOTALL))
                 gen_txt = Toot_summary.summarize(pat1.sub("",pat2.sub("",content)),limit=10,lmtpcs=1, m=1, f=4)
                 if gen_txt[-1:1] == '#':
                     gen_txt = gen_txt[:len(gen_txt)-1]
+                print('★要約結果：',gen_txt)
                 if is_japanese(gen_txt):
                     if len(gen_txt) > 5:
                         gen_txt +=  "\n#きり要約 #きりぼっと"
                         toot("@" + acct + " :@" + acct + ":\n"  + gen_txt, g_vis, id, "勝手に要約サービス")
-            elif "きりぼっと" in content+spoiler_text:
+            elif re.search(r"(きり|キリ)(ぼっと|ボット|[bB][oO][tT])", content + d_spoiler_text):
+                # "きりぼっと" in content + d_spoiler_text:
                 fav_now(id)
                 toot_now = "@%s\n"%acct
                 toot_now += lstm_kiri.gentxt(content)
-                toot(toot_now, 'unlisted', id, None)
+                toot(toot_now, g_vis, id, None)
             else:
                 continue
-            sleep(CM.get_coolingtime())
+
+            stm = CM.get_coolingtime()
+            print('worker2 sleep :%fs'%stm )
+            sleep(stm)
 
         except:
             jst_now = datetime.now(timezone('Asia/Tokyo'))
@@ -816,11 +883,11 @@ def th_worker2():
 def th_monomane_tooter():
     while len(STOPPA)==0:
         a = int(CM.get_coolingtime())
-        rnd = random.randint(a+5,a+15)
+        rnd = random.randint(a+3,a+8)
         print('th_monomane_tooter sleep:{0}分'.format(rnd))
         sleep(rnd*60)
         #sleep(10)
-        #jst_now = datetime.now(timezone('Asia/Tokyo'))
+        jst_now = datetime.now(timezone('Asia/Tokyo'))
         #mm = jst_now.strftime("%M")
         #if mm == '15' or mm == '45':
         #if mm != '99':
@@ -1024,7 +1091,7 @@ def th_lstm_tooter():
         #if mm == '17' or mm == '37' or mm == '57':
         #if mm != '99': #test
         a = int(CM.get_coolingtime())
-        rnd = random.randint(a+5,a+15)
+        rnd = random.randint(a+3,a+8)
         print('th_lstm_tooter sleep:{0}分'.format(rnd))
         sleep(rnd*60)
         threading.Thread(target=gen).start()
@@ -1071,17 +1138,21 @@ def th_lstm_trainer():
 def th_timer_bst1st():
     while len(STOPPA)==0:
         a = int(CM.get_coolingtime())
-        rnd = random.randint(a+5,a+15)
+        rnd = random.randint(a+3,a+8)
         print('th_timer_bst1st sleep:{0}分'.format(rnd))
         sleep(rnd*60)
-        #jst_now = datetime.now(timezone('Asia/Tokyo'))
+        jst_now = datetime.now(timezone('Asia/Tokyo'))
         #mm = jst_now.strftime("%M")
         #if mm == '17' or mm == '37' or mm == '57':
         #if mm != '99': #test
+        #ymd = int(jst_now.strftime("%Y%m%d"))
+        #hh = jst_now.strftime("%H")
+        #hh0000 = int(hh + "0000")
+        #hh9999 = int(hh + "9999")
+
         ymd = int(jst_now.strftime("%Y%m%d"))
-        hh = jst_now.strftime("%H")
-        hh0000 = int(hh + "0000")
-        hh9999 = int(hh + "9999")
+        hh0000 = int((jst_now - timedelta(minutes=rnd)).strftime("%H%M%S"))
+        hh9999 = int(jst_now.strftime("%H%M%S"))
         try:
             con = sqlite3.connect(STATUSES_DB_PATH)
             c = con.cursor()
@@ -1110,7 +1181,6 @@ def th_timer_bst1st():
                 traceback.print_exc(file=f)
             print("例外情報\n" + traceback.format_exc())
 
-
 #######################################################
 # DELETE時の処理
 def th_delete():
@@ -1134,7 +1204,7 @@ def th_delete():
                     toot(toot_now, 'direct', rep=None, spo=':@%s: がトゥー消ししたよー……'%row[0], media_ids=None, interval=0)
                     #print('**DELETE:',row[0],row[1])
                     acct_1b = row[0]
-                    SM.update(row[0], 'func')
+                    SM.update(row[0], 'func', score=-1)
                     sleep(DELAY)
         except:
             jst_now = datetime.now(timezone('Asia/Tokyo'))
@@ -1154,6 +1224,14 @@ def th_haertbeat():
             f.write(ymdhms)
         sleep(10)
 
+def th_status_saver():
+    while True:
+        if  StatusQ.empty():
+            continue
+        # トゥートを保存
+        save_status(StatusQ.get())
+        sleep(INTERVAL)
+
 #######################################################
 # メイン
 if __name__ == '__main__':
@@ -1170,3 +1248,4 @@ if __name__ == '__main__':
     threading.Thread(target=th_haertbeat).start()
     threading.Thread(target=th_timer_bst1st).start()
     threading.Thread(target=th_delete).start()
+    threading.Thread(target=th_status_saver).start()
