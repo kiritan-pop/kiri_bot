@@ -9,6 +9,9 @@
 ## dp11_model.py
 タグファイルと分かち書きされたテキストからgensimを使ってdoc2vecするよー！
 
+## normarize_mt.py
+入力されたテキストを標準化するよー！lstm_modelingtrain.pyの入力ファイル用！
+
 ## lstm_modelingtrain.py
 入力されたテキストを学習して、文章自動生成するよー！
 
@@ -18,7 +21,3 @@ publicなトゥートを取得するよー！（要sqlite3）
 ## toot_picker.rb
 取得済みのトゥートからテキストファイルを出力するよー！（要sqlite3）
 
-## eventer.rb
-## worker_0001_FTLDEL.rb
-## StreamTootsaver.py
-publicタイムラインを取得してDBに保存するよー！（要sqlite3）
