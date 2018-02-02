@@ -18,7 +18,7 @@ import Toot_summary, GenerateText, PrepareChain, bottlemail, lstm_kiri, scoreman
 
 BOT_ID = 'kiri_bot01'
 BOTS = [BOT_ID,'JC','12222222','friends_booster']
-COOLING_TIME = 15
+COOLING_TIME = 10
 DELAY = 2
 STATUSES_DB_PATH = "db/statuses.db"
 pat1 = re.compile(r' ([!-~ぁ-んァ-ン] )+|^([!-~ぁ-んァ-ン] )+| [!-~ぁ-んァ-ン]$',flags=re.MULTILINE)  #[!-~0-9a-zA-Zぁ-んァ-ン０-９ａ-ｚ]
@@ -210,17 +210,51 @@ def error_log():
         traceback.print_exc(file=f)
     print("###%s 例外情報\n"%ymdhms + traceback.format_exc())
 
+#######################################################
+# トゥート内容の標準化・クレンジング
+def content_cleanser(content):
+    tmp = BeautifulSoup(content.replace("<br />","___R___").strip(),'lxml')
+    hashtag = ""
+    for x in tmp.find_all("a",rel="tag"):
+        hashtag = x.span.text
+    for x in tmp.find_all("a"):
+        x.extract()
+
+    if tmp.text == None:
+        return ""
+
+    for ng_word in ng_words:
+        if ng_word in tmp.text:
+            return ""
+
+    rtext = ''
+    ps = []
+    for p in tmp.find_all("p"):
+        ps.append(p.text)
+    rtext += '。\n'.join(ps)
+    rtext = unicodedata.normalize("NFKC", rtext)
+    rtext = re.sub(r'([^:])@', r'\1', rtext)
+    rtext = rtext.replace("#","")
+    rtext = re.sub(r'(___R___)\1{2,}', r'\1', rtext)
+    #rtext = re.sub(r'([^。|^？|^！|^\?|^!])___R___', r'\1。\n', rtext)
+    rtext = re.sub(r'___R___', r'\n', rtext)
+    if hashtag != "":
+        return rtext + " #" + hashtag
+    else:
+        return rtext
 
 #######################################################
 # 即時応答処理ー！
 def quick_rtn(status):
     id = status["id"]
     acct = status["account"]["acct"]
+    username = "@" +  acct
     g_vis = status["visibility"]
     content = content_cleanser(status['content'])
     statuses_count = status["account"]["statuses_count"]
-    spoiler_text = content_cleanser(status["spoiler_text"])
-    if len(content) > 0:
+    spoiler_text = status["spoiler_text"]
+
+    if len(content) <= 0:
         return
 
     if  Toot1bQ.empty():
@@ -230,19 +264,20 @@ def quick_rtn(status):
     #
     Toot1bQ.put((content, acct, id, g_vis))
 
-    username = "@" +  acct
     if re.compile(r"(緊急|強制)(再起動)").search(content) and acct == 'kiritan':
         print("＊＊＊＊＊＊＊＊＊＊＊再起動するよー！＊＊＊＊＊＊＊＊＊＊＊")
         toot("@kiritan 再起動のため一旦終了しまーす！", 'direct', id ,None)
+        sleep(10)
         os.kill(os.getpid(), signal.SIGKILL)
     if re.compile(r"(緊急|強制)(停止|終了)").search(content) and acct == 'kiritan':
         print("＊＊＊＊＊＊＊＊＊＊＊緊急停止したよー！＊＊＊＊＊＊＊＊＊＊＊")
         toot("@kiritan 緊急停止しまーす！", 'direct', id ,None)
+        sleep(10)
         STOPPA.append('stop')
         sys.exit()
     try:
         a = int(CM.get_coolingtime())
-        rnd = random.randint(0,5+a)
+        rnd = random.randint(0,7+a)
         toot_now = ''
         id_now = id
         vis_now = g_vis
@@ -293,7 +328,7 @@ def quick_rtn(status):
                 SM.update(acct, 'func',score=-1)
         elif re.compile(r"ふきふき").search(content):
             if rnd <= 3:
-                toot_now = '💨💨💨＜ふわ〜っ！'
+                toot_now = '💨💨💨🍃＜ふわ〜っ！'
                 vis_now = 'public'
                 id_now = None
                 SM.update(acct, 'func')
@@ -304,7 +339,7 @@ def quick_rtn(status):
                 id_now = None
                 SM.update(acct, 'func')
         elif re.compile(r"^通過$").search(content):
-            if rnd <= 3:
+            if rnd <= 6:
                 toot_now = '⊂(｀・ω・´)⊃＜阻止！'
                 vis_now = 'public'
                 id_now = None
@@ -346,7 +381,7 @@ def quick_rtn(status):
                 vis_now = 'direct'
                 SM.update(acct, 'func',score=-1)
         elif re.compile(r"(:nicoru[0-9]{0,3}:.?){4}").search(content):
-            if rnd <= 5:
+            if rnd <= 6:
                 if content_1b != None and acct == acct_1b:
                     if re.compile(r"(:nicoru[0-9]{0,3}:.?){3}").search(content_1b):
                         toot_now = '　　三(  っ˃̵ᴗ˂̵) 通りまーす！'
@@ -354,7 +389,7 @@ def quick_rtn(status):
                         id_now = None
                         SM.update(acct, 'func')
         elif re.compile(r"(:nicoru[0-9]{0,3}:.?){2}").search(content):
-            if rnd <= 5:
+            if rnd <= 6:
                 if content_1b != None and acct == acct_1b:
                     if re.compile(r"(:nicoru[0-9]{0,3}:.?){3}").search(content_1b):
                         toot_now = '　　(˃̵ᴗ˂̵っ )三 通りまーす！'
@@ -387,7 +422,6 @@ def quick_rtn(status):
                 toot_now = '@%s\n泣いてるー！ｷｬｯｷｬｯ!'%acct
                 vis_now = 'direct'
                 SM.update(acct, 'func')
-
         else:
             return
         #
@@ -396,39 +430,6 @@ def quick_rtn(status):
 
     except:
         error_log()
-
-#######################################################
-# トゥート内容の標準化・クレンジング
-def content_cleanser(content):
-    tmp = BeautifulSoup(content.replace("<br />","___R___").strip(),'lxml')
-    hashtag = ""
-    for x in tmp.find_all("a",rel="tag"):
-        hashtag = x.span.text
-    for x in tmp.find_all("a"):
-        x.extract()
-
-    if tmp.text == None:
-        return ""
-
-    for ng_word in ng_words:
-        if ng_word in tmp.text:
-            return ""
-
-    rtext = ''
-    ps = []
-    for p in tmp.find_all("p"):
-        ps.append(p.text)
-    rtext += '。\n'.join(ps)
-    rtext = unicodedata.normalize("NFKC", rtext)
-    rtext = re.sub(r'([^:])@', r'\1', rtext)
-    rtext = rtext.replace("#","")
-    rtext = re.sub(r'(___R___)\1{2,}', r'\1', rtext)
-    #rtext = re.sub(r'([^。|^？|^！|^\?|^!])___R___', r'\1。\n', rtext)
-    rtext = re.sub(r'___R___', r'\n', rtext)
-    if hashtag != "":
-        return rtext + " #" + hashtag
-    else:
-        return rtext
 
 #######################################################
 # 連想サービス
