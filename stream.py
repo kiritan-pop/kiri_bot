@@ -3,6 +3,7 @@
 from mastodon import Mastodon,StreamListener
 import re, os, json, random, unicodedata, signal, sys
 import threading, MeCab, queue, urllib
+import concurrent.futures
 from time import sleep
 from pytz import timezone
 import dateutil
@@ -15,12 +16,10 @@ from gensim.models import word2vec,doc2vec
 import sqlite3
 import Toot_summary, GenerateText, PrepareChain, bottlemail, lstm_kiri, scoremanager  #自前のやつー！
 
-
 BOT_ID = 'kiri_bot01'
 BOTS = [BOT_ID,'JC','12222222','friends_booster']
-INTERVAL = 0.05
 COOLING_TIME = 15
-DELAY = 20
+DELAY = 2
 STATUSES_DB_PATH = "db/statuses.db"
 pat1 = re.compile(r' ([!-~ぁ-んァ-ン] )+|^([!-~ぁ-んァ-ン] )+| [!-~ぁ-んァ-ン]$',flags=re.MULTILINE)  #[!-~0-9a-zA-Zぁ-んァ-ン０-９ａ-ｚ]
 pat2 = re.compile(r'[ｗ！？!\?]')
@@ -51,10 +50,9 @@ mastodon = Mastodon(
     api_base_url=MASTODON_URL)  # インスタンス
 
 TQ = queue.Queue()
-TQ2 = queue.Queue()
 StatusQ = queue.Queue()
 Toot1bQ = queue.Queue()
-DelQ = queue.Queue(10)
+DelQ = queue.Queue()
 
 # 花宅配サービス用の花リスト
 hanalist = []
@@ -78,14 +76,16 @@ class CoolingManager():
     def __init__(self):
         self.toot_count = 0
         self.time = 0.0
+        #ex.submit(self.timer)
+        #ex.submit(self.timer_reseter)
         threading.Thread(target=self.timer).start()
         threading.Thread(target=self.timer_reseter).start()
     def count(self):
         self.toot_count += 1
     def timer(self):
         while True:
-            sleep(0.1)
-            self.time += 0.1
+            sleep(0.3)
+            self.time += 0.3
     def timer_reseter(self):
         while True:
             sleep(60)
@@ -96,9 +96,11 @@ class CoolingManager():
         if self.time == 0:
             return DELAY
         else:
-            tmp = (self.toot_count / self.time)  * COOLING_TIME  + INTERVAL
+            tmp = (self.toot_count / self.time)  * COOLING_TIME
             #print('***cooling time:{0:.1f}s'.format(tmp))
             return tmp
+
+CM = CoolingManager()
 
 #######################################################
 # マストドンＡＰＩ用部品を継承して、通知時の処理を実装ー！
@@ -110,6 +112,7 @@ class men_toot(StreamListener):
 
         if notification["type"] == "mention":
             status = notification["status"]
+            quick_rtn(status)
             TQ.put(status)
             StatusQ.put(status)
             SM.update(notification["status"]["account"]["acct"], 'reply')
@@ -118,27 +121,26 @@ class men_toot(StreamListener):
         elif notification["type"] == "reblog":
             SM.update(notification["account"]["acct"], 'boost', ymdhms)
 
-
 #######################################################
 # マストドンＡＰＩ用部品を継承して、ローカルタイムライン受信時の処理を実装ー！
 class res_toot(StreamListener):
     def on_update(self, status):
-        print("===ローカルタイムライン===")
-        #bot達のLTLトゥートは無視する(ง •̀ω•́)ง✧＜無限ループ防止！
-        if  status["account"]["username"] in BOTS:
-            return
+        #print("===ローカルタイムライン===")
         #mentionはnotificationで受けるのでLTLのはスルー！(｢・ω・)｢ 二重レス防止！
         if re.search(r'[^:]@' + BOT_ID, status['content']):
         #if  '@' + BOT_ID in status['content']:
             return
+        StatusQ.put(status)
+        #bot達のLTLトゥートは無視する(ง •̀ω•́)ง✧＜無限ループ防止！
+        if  status["account"]["username"] in BOTS:
+            return
         TQ.put(status)
+        quick_rtn(status)
         CM.count()
 
     def on_delete(self, status_id):
         print(str("===削除されました【{}】===").format(str(status_id)))
-        #print(type(status_id))
-        if not DelQ.full():
-            DelQ.put(status_id)
+        DelQ.put(status_id)
 
 #######################################################
 # トゥート処理
@@ -148,7 +150,6 @@ def toot(toot_now, g_vis, rep=None, spo=None, media_ids=None, interval=0):
     th = threading.Timer(interval,th_toot,args=(toot_now, g_vis, rep, spo, media_ids))
     th.start()
     print("🆕toot:" + toot_now[0:50] + ":" + g_vis )
-    #threading.Thread(target=mastodon.status_post,args=(status=toot_now[0:450], visibility=g_vis, in_reply_to_id=rep, spoiler_text=spo, media_ids=media_ids)).start()
 
 #######################################################
 # ファボ処理
@@ -184,12 +185,7 @@ def th_local():
         listener = res_toot()
         mastodon.stream_local(listener)
     except:
-        jst_now = datetime.now(timezone('Asia/Tokyo'))
-        ymdhms = jst_now.strftime("%Y/%m/%d %H:%M:%S")
-        with open('error.log', 'a') as f:
-            f.write(ymdhms+'\n')
-            traceback.print_exc(file=f)
-        print("例外情報\n" + traceback.format_exc())
+        error_log()
         sleep(30)
         th_local()
 
@@ -200,24 +196,32 @@ def th_user():
         listener = men_toot()
         mastodon.stream_user(listener)
     except:
-        jst_now = datetime.now(timezone('Asia/Tokyo'))
-        ymdhms = jst_now.strftime("%Y/%m/%d %H:%M:%S")
-        with open('error.log', 'a') as f:
-            f.write(ymdhms+'\n')
-            traceback.print_exc(file=f)
-        print("例外情報\n" + traceback.format_exc())
+        error_log()
         sleep(30)
         th_user()
 
 #######################################################
+# エラー時のログ書き込み
+def error_log():
+    jst_now = datetime.now(timezone('Asia/Tokyo'))
+    ymdhms = jst_now.strftime("%Y/%m/%d %H:%M:%S")
+    with open('error.log', 'a') as f:
+        f.write('\n####%s####\n'%ymdhms)
+        traceback.print_exc(file=f)
+    print("###%s 例外情報\n"%ymdhms + traceback.format_exc())
+
+
+#######################################################
 # 即時応答処理ー！
-def quick_rtn(data):
-    content = data['content']
-    id = data["id"]
-    acct = data["acct"]
-    g_vis = data["g_vis"]
-    statuses_count = data["statuses_count"]
-    spoiler_text = data["spoiler_text"]
+def quick_rtn(status):
+    id = status["id"]
+    acct = status["account"]["acct"]
+    g_vis = status["visibility"]
+    content = content_cleanser(status['content'])
+    statuses_count = status["account"]["statuses_count"]
+    spoiler_text = content_cleanser(status["spoiler_text"])
+    if len(content) > 0:
+        return
 
     if  Toot1bQ.empty():
         content_1b, acct_1b, id_1b, g_vis_1b = None,None,None,None
@@ -238,7 +242,7 @@ def quick_rtn(data):
         sys.exit()
     try:
         a = int(CM.get_coolingtime())
-        rnd = random.randint(0,7+a)
+        rnd = random.randint(0,5+a)
         toot_now = ''
         id_now = id
         vis_now = g_vis
@@ -246,11 +250,11 @@ def quick_rtn(data):
         if statuses_count != 3 and  (statuses_count - 3)%10000 == 0:
             interval = 3
             toot_now = username + "\n"
-            toot_now += "そういえばさっき{0:,}トゥートだったよー！".format(statuses_count-3)
+            toot_now += "あ！そういえばさっき{0:,}トゥートだったよー！".format(statuses_count-3)
             vis_now = 'unlisted'
             SM.update(acct, 'func')
         elif statuses_count == 1:
-            interval = 3
+            interval = 5
             toot_now = username + "\n"
             toot_now += "新規さんいらっしゃーい！🍵🍡どうぞー！"
             vis_now = 'unlisted'
@@ -277,7 +281,7 @@ def quick_rtn(data):
                 toot_now += '\n(ﾉ・_・)ﾉ ﾆｹﾞﾃ!⌒🍗 ＜ｱﾘｶﾞﾄｩ!\n🔥'
                 vis_now = 'direct'
                 SM.update(acct, 'func')
-        elif re.compile(r"ブリブリ|ぶりぶり|うん[ちこ]|💩").search(content+spoiler_text):
+        elif re.compile(r"ブリブリ|ぶりぶり|うん[ちこ]|💩|流して").search(content+spoiler_text):
             if rnd <= 3:
                 toot_now = '🌊🌊🌊 ＜ざばーっ！'
                 vis_now = 'public'
@@ -296,6 +300,12 @@ def quick_rtn(data):
         elif re.compile(r"^ぬるぽ$").search(content):
             if rnd <= 6:
                 toot_now = 'ｷﾘｯ'
+                vis_now = 'public'
+                id_now = None
+                SM.update(acct, 'func')
+        elif re.compile(r"^通過$").search(content):
+            if rnd <= 3:
+                toot_now = '⊂(｀・ω・´)⊃＜阻止！'
                 vis_now = 'public'
                 id_now = None
                 SM.update(acct, 'func')
@@ -351,6 +361,14 @@ def quick_rtn(data):
                         vis_now = 'public'
                         id_now = None
                         SM.update(acct, 'func')
+        elif re.compile(r"^貞$").search(content):
+            if rnd <= 7:
+                if content_1b != None and acct == acct_1b:
+                    if re.compile(r"^治$").search(content_1b):
+                        toot_now = '　　三(  っ˃̵ᴗ˂̵) 通りまーす！'
+                        vis_now = 'public'
+                        id_now = None
+                        SM.update(acct, 'func')
         elif "(*´ω｀*)" in content+spoiler_text:
             if rnd <= 6:
                 toot_now = '@%s\nその顔は……！！'%acct
@@ -377,53 +395,7 @@ def quick_rtn(data):
             toot(toot_now, vis_now, id_now, None, None, interval)
 
     except:
-        jst_now = datetime.now(timezone('Asia/Tokyo'))
-        ymdhms = jst_now.strftime("%Y/%m/%d %H:%M:%S")
-        with open('error.log', 'a') as f:
-            f.write(ymdhms+'\n')
-            traceback.print_exc(file=f)
-        print("例外情報\n" + traceback.format_exc())
-
-
-#######################################################
-# トゥート内容を保存
-def save_status(status):
-    con = sqlite3.connect(STATUSES_DB_PATH)
-    c = con.cursor()
-
-    media_attachments = status["media_attachments"]
-    mediatext = ""
-    for media in media_attachments:
-        mediatext += media["url"] + " "
-
-    #print(status['created_at'])
-    jst_time = dateutil.parser.parse(str(status['created_at']))
-    jst_time = jst_time.astimezone(timezone('Asia/Tokyo'))
-    fmt = "%Y%m%d"
-    tmpdate = jst_time.strftime(fmt)
-    fmt = "%H%M%S"
-    tmptime = jst_time.strftime(fmt)
-
-    insert_sql = u"insert into statuses (id, date, time, content, acct, display_name, media_attachments) values (?, ?, ?, ?, ?, ?, ?)"
-    data = (str(status['id']),
-                tmpdate,
-                tmptime,
-                status['content'],
-                status['account']['acct'],
-                status['account']['display_name'],
-                mediatext
-                )
-    try:
-        con.execute(insert_sql, data)
-    except Exception as e:
-        jst_now = datetime.now(timezone('Asia/Tokyo'))
-        ymdhms = jst_now.strftime("%Y/%m/%d %H:%M:%S")
-        with open('error.log', 'a') as f:
-            f.write(ymdhms+'\n')
-            traceback.print_exc(file=f)
-
-    con.commit()
-    con.close()
+        error_log()
 
 #######################################################
 # トゥート内容の標準化・クレンジング
@@ -492,20 +464,11 @@ def rensou_game(content, acct, id, g_vis):
 
         if toot_now != "":
             toot_now = toot_now +  "\n#連想サービス #きりぼっと"
-            sleep(DELAY)
-            #toot(toot_now, g_vis ,id if g_vis != "public" else None,spoiler)
             toot(toot_now, g_vis ,id,spoiler)
 
-    except Exception as e:
-        jst_now = datetime.now(timezone('Asia/Tokyo'))
-        ymdhms = jst_now.strftime("%Y/%m/%d %H:%M:%S")
-        with open('error.log', 'a') as f:
-            f.write(ymdhms+'\n')
-            traceback.print_exc(file=f)
-        print("例外情報\n" + traceback.format_exc())
-        print(e)
+    except:
+        error_log()
         toot_now = toot_now +  "連想できなかったー……ごめんねー……\n#連想サービス #きりぼっと"
-        sleep(DELAY)
         toot(toot_now, g_vis ,id,spoiler)
 
 #######################################################
@@ -537,17 +500,11 @@ def search_image(content, acct, id, g_vis):
     try:
         x = image_model.infer_vector(wakati.split(' '))
         results = image_model.docvecs.most_similar(positive=[x], topn=16)
-    except Exception as e:
-        jst_now = datetime.now(timezone('Asia/Tokyo'))
-        ymdhms = jst_now.strftime("%Y/%m/%d %H:%M:%S")
-        with open('error.log', 'a') as f:
-            f.write(ymdhms+'\n')
-            traceback.print_exc(file=f)
-        print("例外情報\n" + traceback.format_exc())
-        print(e)
+    except:
+        error_log()
         toot_now = toot_now +  "見つからなかったー……ごめんねー……\n#画像検索サービス #きりぼっと"
-        sleep(DELAY)
         toot(toot_now, g_vis ,id ,spoiler)
+
     media_files = []
     for result in results:
         content_type = "image/" + result[0].split(".")[-1]
@@ -560,29 +517,15 @@ def search_image(content, acct, id, g_vis):
                 toot_now = toot_now + "{:.4f} ".format(result[1]) + get_file_name(result[0]) + "\n"
                 if len(media_files) >= 4:
                     break
-            except Exception as e:
-                jst_now = datetime.now(timezone('Asia/Tokyo'))
-                ymdhms = jst_now.strftime("%Y/%m/%d %H:%M:%S")
-                with open('error.log', 'a') as f:
-                    f.write(ymdhms+'\n')
-                    traceback.print_exc(file=f)
-                print("例外情報\n" + traceback.format_exc())
-                print("ダウンロードできなかったー！")
-                print(e)
+            except:
+                error_log()
+
     if toot_now != "":
         toot_now = toot_now +  "\n#画像検索サービス #きりぼっと"
-        sleep(DELAY)
         try:
             toot(toot_now, g_vis ,id,spoiler,media_files)
-        except Exception as e:
-            jst_now = datetime.now(timezone('Asia/Tokyo'))
-            ymdhms = jst_now.strftime("%Y/%m/%d %H:%M:%S")
-            with open('error.log', 'a') as f:
-                f.write(ymdhms+'\n')
-                traceback.print_exc(file=f)
-            print("例外情報\n" + traceback.format_exc())
-            print("投稿できなかったー！")
-            print(e)
+        except:
+            error_log()
 
 #######################################################
 # 日本語っぽいかどうか判定
@@ -602,14 +545,8 @@ def supauza(content, acct, id, g_vis):
         for word2 in words2:
             try:
                 sum += model.similarity(word1.strip(), word2)
-            except Exception as e:
-                jst_now = datetime.now(timezone('Asia/Tokyo'))
-                ymdhms = jst_now.strftime("%Y/%m/%d %H:%M:%S")
-                with open('error.log', 'a') as f:
-                    f.write(ymdhms+'\n')
-                    traceback.print_exc(file=f)
-                print("例外情報\n" + traceback.format_exc())
-                print(e)
+            except:
+                error_log()
         return sum
     username = "@" +  acct
     fav_now(id)
@@ -649,26 +586,22 @@ def supauza(content, acct, id, g_vis):
     toot_now = toot_now + gen_txt + "\n#スパウザーサービス #きりぼっと"
     try:
         toot(toot_now, g_vis ,id ,spoiler)
-    except Exception as e:
-        jst_now = datetime.now(timezone('Asia/Tokyo'))
-        ymdhms = jst_now.strftime("%Y/%m/%d %H:%M:%S")
-        with open('error.log', 'a') as f:
-            f.write(ymdhms+'\n')
-            traceback.print_exc(file=f)
-        print("例外情報\n" + traceback.format_exc())
-        print("測定不能……だと……！？")
-        print(e)
+    except:
+        error_log()
         toot_now = toot_now +  "測定不能……だと……！？\n#スパウザーサービス #きりぼっと"
         toot(toot_now, g_vis ,id,spoiler)
 
+
 #######################################################
-# 料理提案サービス
-def recipe_service(content, acct, id, g_vis):
+# ランク表示
+def recipe_service(content=None, acct='kiritan', id=None, g_vis='unlisted'):
+    print('recipe_service parm ',content, acct, id, g_vis)
     fav_now(id)
     generator = GenerateText.GenerateText(1)
     #料理名を取得ー！
     gen_txt = ''
-    spoiler = "『" + generator.generate("recipe") + '』のレシピだよー！'
+    spoiler = generator.generate("recipe")
+    print('料理名：%s'%spoiler)
 
     #材料と分量を取得ー！
     zairyos = []
@@ -788,42 +721,14 @@ def bottlemail_service(content, acct, id, g_vis):
 # 受信したトゥートの一次振り分け処理
 def th_worker():
     while len(STOPPA)==0:
-        if  TQ.empty():
-            continue
-
-        #print("===worker1(%d)受信==="%TQ.qsize())
-        data = {}
-        status = TQ.get() #キューからトゥートを取り出すよー！
-        data["id"] = status["id"]
-        data["acct"] = status["account"]["acct"]
-        data["content"] = content_cleanser(status['content'])
-        data["g_vis"] = status["visibility"]
-        data["statuses_count"] = status["account"]["statuses_count"]
-        data["spoiler_text"] = content_cleanser(status["spoiler_text"])
-        print(' ', data["acct"], data["content"])
-        if len(data["content"]) > 0:
-            # 即時処理はここで呼び出す
-            quick_rtn(data)
-            # それ以外の処理はキューに入れる
-            TQ2.put(data)
-
-#######################################################
-# 受信したトゥートの二次振り分け処理（重めの処理をやるよー！）
-def th_worker2():
-    while len(STOPPA)==0:
-        sleep(INTERVAL)
+        status = TQ.get() #キューからトゥートを取り出すよー！なかったら待機してくれるはずー！
+        id = status["id"]
+        acct = status["account"]["acct"]
+        g_vis = status["visibility"]
+        content = content_cleanser(status['content'])
+        spoiler_text = content_cleanser(status["spoiler_text"])
+        print('=== %s  by %s'%('\n    '.join(content.split('\n')), acct))
         try:
-            if  TQ2.empty():
-                continue
-
-            #print("===worker2(%d)受信==="%TQ2.qsize())
-            data = TQ2.get() #キューからトゥートを取り出すよー！
-            #print('　',data["acct"], data["content"])
-            content = data['content']
-            id = data["id"]
-            acct = data["acct"]
-            g_vis = data["g_vis"]
-            d_spoiler_text = data["spoiler_text"]
             if re.search(r"(連想|れんそう)([サさ]ー[ビび][スす])[：:]", content):
                 rensou_game(content=content, acct=acct, id=id, g_vis=g_vis)
                 SM.update(acct, 'func')
@@ -838,8 +743,7 @@ def th_worker2():
                 bottlemail_service(content=content, acct=acct, id=id, g_vis=g_vis)
                 SM.update(acct, 'func')
             elif re.search(r"(きょう|今日)の.?(料理|りょうり)|[ご御夕昼朝][食飯][食た]べ[よるた]|(腹|はら)[へ減]った|お(腹|なか)[空す]いた|(何|なに)[食た]べよ", content):
-                #recipe_service(content=content, acct=acct, id=id, g_vis=g_vis)
-                threading.Timer(3,recipe_service,args=(content, acct, id, g_vis)).start()
+                recipe_service(content=content, acct=acct, id=id, g_vis=g_vis)
                 SM.update(acct, 'func')
             elif re.search(r"(私|わたし|わたくし|自分|僕|俺|朕|ちん|余|あたし|ミー|あちき|あちし|わい|わっち|おいどん|わし|うち|おら|儂|おいら|あだす|某|麿|拙者|小生|あっし|手前|吾輩|我輩|マイ)の(ランク|ランキング|順位)", content):
                 show_rank(acct=acct, id=id, g_vis=g_vis)
@@ -857,8 +761,7 @@ def th_worker2():
                     if len(gen_txt) > 5:
                         gen_txt +=  "\n#きり要約 #きりぼっと"
                         toot("@" + acct + " :@" + acct + ":\n"  + gen_txt, g_vis, id, "勝手に要約サービス")
-            elif re.search(r"(きり|キリ)(ぼっと|ボット|[bB][oO][tT])", content + d_spoiler_text):
-                # "きりぼっと" in content + d_spoiler_text:
+            elif re.search(r"(きり|キリ).*(ぼっと|ボット|[bB][oO][tT])", content + spoiler_text):
                 fav_now(id)
                 toot_now = "@%s\n"%acct
                 toot_now += lstm_kiri.gentxt(content)
@@ -867,331 +770,276 @@ def th_worker2():
                 continue
 
             stm = CM.get_coolingtime()
-            print('worker2 sleep :%fs'%stm )
+            print('worker sleep :%fs'%stm )
             sleep(stm)
 
         except:
-            jst_now = datetime.now(timezone('Asia/Tokyo'))
-            ymdhms = jst_now.strftime("%Y/%m/%d %H:%M:%S")
-            with open('error.log', 'a') as f:
-                f.write(ymdhms+'\n')
-                traceback.print_exc(file=f)
-            print("例外情報\n" + traceback.format_exc())
+            error_log()
+
+#######################################################
+# スケジューラー！
+def th_kiri_scheduler(func,mms=None,intvl=60,rndmin=0,rndmax=0):
+    #func:起動する処理
+    #mm:起動時刻（分）
+    #intmm:起動間隔（分）
+    while len(STOPPA)==0:
+        sleep(15)
+        if rndmin == 0 and rndmax == 0 or rndmin >= rndmax:
+            rndmm = 0
+        else:
+            rndmm = random.randint(rndmin,rndmax)
+
+        cmm = int(CM.get_coolingtime())
+        #時刻指定がなければ、インターバル分＋流速考慮値
+        if mms == None:
+            a = (intvl+cmm+rndmm)*60
+            print('###%s###  start at : %ds'%(func,a))
+            sleep(a)
+            func()
+            continue
+
+        #以降は時刻指定時の処理
+        jst_now = datetime.now(timezone('Asia/Tokyo'))
+        mm = jst_now.strftime("%M")
+        #print('###%s###  start at: **:%s'%(func,mms))
+        if mm in mms:
+            func()
+            sleep(60)
+
 
 #######################################################
 # 定期ものまねさーびす！
-def th_monomane_tooter():
-    while len(STOPPA)==0:
-        a = int(CM.get_coolingtime())
-        rnd = random.randint(a+3,a+8)
-        print('th_monomane_tooter sleep:{0}分'.format(rnd))
-        sleep(rnd*60)
-        #sleep(10)
-        jst_now = datetime.now(timezone('Asia/Tokyo'))
-        #mm = jst_now.strftime("%M")
-        #if mm == '15' or mm == '45':
-        #if mm != '99':
-        spoiler = "勝手にものまねサービス"
-        ymd = int((jst_now - timedelta(hours=1)).strftime("%Y%m%d"))
-        hh = (jst_now - timedelta(hours=1)).strftime("%H")
-        hh0000 = int(hh + "0000")
-        hh9999 = int(hh + "9999")
-        try:
-            con = sqlite3.connect(STATUSES_DB_PATH)
-            c = con.cursor()
-            c.execute( r"select acct from statuses where (date = ?) and time >= ? and time <= ? and acct <> ?", [ymd,hh0000,hh9999,BOT_ID] )
-            toots = ""
-            acct_list = set([])
-            for row in c.fetchall():
-                acct_list.add(row[0])
-            acct_list -= ng_user_set
-            random_acct = random.sample(acct_list,1)[0]
-            con.close()
-            con = sqlite3.connect(STATUSES_DB_PATH)
-            c = con.cursor()
-            c.execute( r"select content from statuses where acct = ?", (random_acct,) )
-            toots = ""
-            for row in c.fetchall():
-                content = content_cleanser(row[0])
-                if len(content) == 0:
-                    pass
-                else:
-                    toots += content + "。\n"
-            con.close()
-            chain = PrepareChain.PrepareChain("user_toots",toots)
-            triplet_freqs = chain.make_triplet_freqs()
-            chain.save(triplet_freqs, True)
-            generator = GenerateText.GenerateText(5)
-            gen_txt = generator.generate("user_toots")
-            gen_txt = "@" + random_acct + " :@" + random_acct + ":＜「" + gen_txt + "」"
-            gen_txt = gen_txt.replace('\n',"")
-            #gen_txt +=  "\n#きりものまね #きりぼっと"
-            SM.update(random_acct, 'func')
-            if len(gen_txt) > 10:
-                toot(gen_txt, "unlisted", None, spoiler)
-        except:
-            jst_now = datetime.now(timezone('Asia/Tokyo'))
-            ymdhms = jst_now.strftime("%Y/%m/%d %H:%M:%S")
-            with open('error.log', 'a') as f:
-                f.write(ymdhms+'\n')
-                traceback.print_exc(file=f)
-            print("例外情報\n" + traceback.format_exc())
+def monomane_tooter():
+    spoiler = "勝手にものまねサービス"
+    jst_now = datetime.now(timezone('Asia/Tokyo'))
+    ymd = int((jst_now - timedelta(hours=1)).strftime("%Y%m%d"))
+    hh = (jst_now - timedelta(hours=1)).strftime("%H")
+    hh0000 = int(hh + "0000")
+    hh9999 = int(hh + "9999")
+    try:
+        con = sqlite3.connect(STATUSES_DB_PATH,timeout = 60*1000)
+        c = con.cursor()
+        c.execute( r"select acct from statuses where (date = ?) and time >= ? and time <= ? and acct <> ?", [ymd,hh0000,hh9999,BOT_ID] )
+        toots = ""
+        acct_list = set([])
+        for row in c.fetchall():
+            acct_list.add(row[0])
+        acct_list -= ng_user_set
+        random_acct = random.sample(acct_list,1)[0]
+        con.close()
+        con = sqlite3.connect(STATUSES_DB_PATH,timeout = 60*1000)
+        c = con.cursor()
+        c.execute( r"select content from statuses where acct = ?", (random_acct,) )
+        toots = ""
+        for row in c.fetchall():
+            content = content_cleanser(row[0])
+            if len(content) == 0:
+                pass
+            else:
+                toots += content + "。\n"
+        con.close()
+        chain = PrepareChain.PrepareChain("user_toots",toots)
+        triplet_freqs = chain.make_triplet_freqs()
+        chain.save(triplet_freqs, True)
+        generator = GenerateText.GenerateText(5)
+        gen_txt = generator.generate("user_toots")
+        gen_txt = "@" + random_acct + " :@" + random_acct + ":＜「" + gen_txt + "」"
+        gen_txt = gen_txt.replace('\n',"")
+        #gen_txt +=  "\n#きりものまね #きりぼっと"
+        SM.update(random_acct, 'func')
+        if len(gen_txt) > 10:
+            toot(gen_txt, "unlisted", None, spoiler)
+    except:
+        error_log()
 
 #######################################################
 # 定期ここ1時間のまとめ
-def th_summarize_tooter():
-    while len(STOPPA)==0:
-        sleep(10)
-        jst_now = datetime.now(timezone('Asia/Tokyo'))
-        mm = jst_now.strftime("%M")
-        if mm == '02':
-        #if mm != '99':
-            ymd = int((jst_now - timedelta(hours=1)).strftime("%Y%m%d"))
-            hh = (jst_now - timedelta(hours=1)).strftime("%H")
-            hh0000 = int(hh + "0000")
-            hh9999 = int(hh + "9999")
-            spoiler = "ＬＴＬここ1時間の自動まとめ"
-            con = sqlite3.connect(STATUSES_DB_PATH)
-            c = con.cursor()
-            c.execute( r"select content from statuses where (date = ?) and time >= ? and time <= ? and acct <> ?", (ymd,hh0000,hh9999,BOT_ID) )
-            toots = ""
-            for row in c.fetchall():
-                content = content_cleanser(row[0])
-                if len(content) == 0:
-                    pass
-                else:
-                    content = re.sub(r"(.+)\1{3,}","",content, flags=(re.DOTALL))
-                    toots += content + "\n"
-            con.close()
-            gen_txt = Toot_summary.summarize(pat1.sub("",pat2.sub("",toots)),limit=90, lmtpcs=5, m=1, f=4)
-            if gen_txt[-1:1] == '#':
-                gen_txt = gen_txt[:len(gen_txt)-1]
-            if len(gen_txt) > 5:
-                #gen_txt +=  "\n#きりまとめ #きりぼっと"
-                toot(gen_txt, "unlisted", None, spoiler)
-                sleep(60)
+def summarize_tooter():
+    jst_now = datetime.now(timezone('Asia/Tokyo'))
+    ymd = int((jst_now - timedelta(hours=1)).strftime("%Y%m%d"))
+    hh = (jst_now - timedelta(hours=1)).strftime("%H")
+    hh0000 = int(hh + "0000")
+    hh9999 = int(hh + "9999")
+    spoiler = "ＬＴＬここ1時間の自動まとめ"
+    con = sqlite3.connect(STATUSES_DB_PATH,timeout = 60*1000)
+    c = con.cursor()
+    c.execute( r"select content from statuses where (date = ?) and time >= ? and time <= ? and acct <> ?", (ymd,hh0000,hh9999,BOT_ID) )
+    toots = ""
+    for row in c.fetchall():
+        content = content_cleanser(row[0])
+        if len(content) == 0:
+            pass
+        else:
+            content = re.sub(r"(.+)\1{3,}","",content, flags=(re.DOTALL))
+            toots += content + "\n"
+    con.close()
+    gen_txt = Toot_summary.summarize(pat1.sub("",pat2.sub("",toots)),limit=90, lmtpcs=5, m=1, f=4)
+    if gen_txt[-1:1] == '#':
+        gen_txt = gen_txt[:len(gen_txt)-1]
+    if len(gen_txt) > 5:
+        #gen_txt +=  "\n#きりまとめ #きりぼっと"
+        toot(gen_txt, "unlisted", None, spoiler)
 
 #######################################################
 # ボトルメールサービス　配信処理
-def th_bottlemail_sending():
+def bottlemail_sending():
     bm = bottlemail.Bottlemail()
-    while len(STOPPA)==0:
-        sleep(10)
-        jst_now = datetime.now(timezone('Asia/Tokyo'))
-        mm = jst_now.strftime("%M")
-        if mm == '10':
-        #if mm != '99': #test
-            ymd = int((jst_now - timedelta(hours=1)).strftime("%Y%m%d"))
-            hh = (jst_now - timedelta(hours=1)).strftime("%H")
-            hh0000 = int(hh + "0000")
-            hh9999 = int(hh + "9999")
-            try:
-                sendlist = bm.drifting()
-                for id,acct,msg,reply_id in sendlist:
-                    sleep(DELAY)
-                    spoiler = ":@" + acct + ": から🍾ボトルメール💌届いたよー！"
-                    con = sqlite3.connect(STATUSES_DB_PATH)
-                    c = con.cursor()
-                    c.execute( r"select acct from statuses where (date = ?) and time >= ? and time <= ? and acct <> ?", [ymd,hh0000,hh9999,BOT_ID] )
-                    acct_list = set([])
-                    for row in c.fetchall():
-                        acct_list.add(row[0])
-                    acct_list -= ng_user_set
-                    con.close()
-                    random_acct = random.sample(acct_list,1)[0]
-                    print(random_acct)
-                    #お届け！
-                    toots = "@" + random_acct + "\n:@" + acct + ":＜「" + msg + "」"
-                    toots +=  "\n※ボトルメールサービス：＜メッセージ＞　であなたも送れるよー！試してみてね！"
-                    toots +=  "\n#ボトルメールサービス #きりぼっと"
-                    toot(toots, "direct",reply_id if reply_id != 0 else None, spoiler)
-                    bm.sended(id, random_acct)
-
-                    #到着通知
-                    sleep(DELAY)
-                    spoiler = ":@" + random_acct + ": が🍾ボトルメール💌受け取ったよー！"
-                    toots = "@" + acct + " 届けたメッセージは……\n:@" + acct + ": ＜「" + msg + "」"
-                    toots +=  "\n#ボトルメールサービス #きりぼっと"
-                    toot(toots, "direct",reply_id if reply_id != 0 else None, spoiler)
-
-                #漂流してるボトルの数
-                #ボトルが多い時は宣伝を減らすよー！
-                bmcnt = bm.flow_count()
-                if random.randint(0,bmcnt) <= 10:
-                    sleep(DELAY)
-                    spoiler = "現在漂流している🍾ボトルメール💌は%d本だよー！"%bmcnt
-                    toots =  "\n※ボトルメールサービス：＜メッセージ＞　であなたも送れるよー！試してみてね！"
-                    toots +=  "\n#ボトルメールサービス #きりぼっと"
-                    toot(toots, "public", None, spoiler)
-                    sleep(60)
-            except:
-                jst_now = datetime.now(timezone('Asia/Tokyo'))
-                ymdhms = jst_now.strftime("%Y/%m/%d %H:%M:%S")
-                with open('error.log', 'a') as f:
-                    f.write(ymdhms+'\n')
-                    traceback.print_exc(file=f)
-                print("例外情報\n" + traceback.format_exc())
-
-#######################################################
-# きりぼっとのつぶやき
-def th_lstm_tooter():
-    def gen():
-        try:
-            con = sqlite3.connect(STATUSES_DB_PATH)
+    jst_now = datetime.now(timezone('Asia/Tokyo'))
+    ymd = int((jst_now - timedelta(hours=1)).strftime("%Y%m%d"))
+    hh = (jst_now - timedelta(hours=1)).strftime("%H")
+    hh0000 = int(hh + "0000")
+    hh9999 = int(hh + "9999")
+    try:
+        sendlist = bm.drifting()
+        for id,acct,msg,reply_id in sendlist:
+            sleep(DELAY)
+            spoiler = ":@" + acct + ": から🍾ボトルメール💌届いたよー！"
+            con = sqlite3.connect(STATUSES_DB_PATH,timeout = 60*1000)
             c = con.cursor()
-            jst_now = datetime.now(timezone('Asia/Tokyo'))
-            ymd = int(jst_now.strftime("%Y%m%d"))
-            hh = jst_now.strftime("%H")
-            hh0000 = int(hh + "0000")
-            hh9999 = int(hh + "9999")
-            c.execute( r"select content,id,acct from statuses where (date = ?) and time >= ? and time <= ? and acct <> ? order by time desc", [ymd,hh0000,hh9999, BOT_ID] )
-            seeds = []
-            seedtxt = ''
-            id = 0
-            acct = ''
-            for row in c.fetchall():
-                content = content_cleanser(row[0])
-                id = row[1]
-                acct = row[2]
-                if len(content) == 0:
-                    pass
-                else:
-                    seeds.append(content)
-                    if len(seeds)>10:
-                        break
-            con.close()
-            if len(seeds) <= 2:
-                return
-            seeds.reverse()
-            print('seeds=',seeds)
-            seedtxt = "".join(seeds)
-            print('seedtxt=%s'%seedtxt)
-            spoiler = None
-            gen_txt = lstm_kiri.gentxt(seedtxt)
-            if gen_txt[0:1] == '。':
-                gen_txt = gen_txt[1:]
-            if len(gen_txt) > 40:
-                spoiler = ':@%s: 💭'%BOT_ID
-
-            #gen_txt +=  "\n#きりつぶやき #きりぼっと"
-            #toot(gen_txt, "public", id if id > 0 else None, 'きりぼっとによる補足')
-            toot(gen_txt, "public", None, spoiler)
-        except:
-            jst_now = datetime.now(timezone('Asia/Tokyo'))
-            ymdhms = jst_now.strftime("%Y/%m/%d %H:%M:%S")
-            with open('error.log', 'a') as f:
-                f.write(ymdhms+'\n')
-                traceback.print_exc(file=f)
-            print("例外情報\n" + traceback.format_exc())
-
-    while len(STOPPA)==0:
-        #jst_now = datetime.now(timezone('Asia/Tokyo'))
-        #mm = jst_now.strftime("%M")
-        #if mm == '07' or mm == '27' or mm == '47':
-        #if mm == '17' or mm == '37' or mm == '57':
-        #if mm != '99': #test
-        a = int(CM.get_coolingtime())
-        rnd = random.randint(a+3,a+8)
-        print('th_lstm_tooter sleep:{0}分'.format(rnd))
-        sleep(rnd*60)
-        threading.Thread(target=gen).start()
-
-#######################################################
-# トレーニング処理
-def th_lstm_trainer():
-    def train():
-        try:
-            jst_now = datetime.now(timezone('Asia/Tokyo'))
-            ymd = int((jst_now - timedelta(hours=1)).strftime("%Y%m%d"))
-            hh = (jst_now - timedelta(hours=1)).strftime("%H")
-            hh0000 = int(hh + "0000")
-            hh9999 = int(hh + "9999")
-            con = sqlite3.connect(STATUSES_DB_PATH)
-            c = con.cursor()
-            c.execute( r"select content from statuses where (date = ?) and time >= ? and time <= ? and acct <> ? order by time asc", [ymd,hh0000,hh9999, BOT_ID] )
-            toots = []
-            for row in c.fetchall():
-                content = content_cleanser(row[0])
-                if len(content) == 0:
-                    pass
-                else:
-                    toots.append(content)
-            con.close()
-            lstm_kiri.train("\n".join(toots))
-        except:
-            jst_now = datetime.now(timezone('Asia/Tokyo'))
-            ymdhms = jst_now.strftime("%Y/%m/%d %H:%M:%S")
-            with open('error.log', 'a') as f:
-                f.write(ymdhms+'\n')
-                traceback.print_exc(file=f)
-            print("例外情報\n" + traceback.format_exc())
-    while len(STOPPA)==0:
-        jst_now = datetime.now(timezone('Asia/Tokyo'))
-        mm = jst_now.strftime("%M")
-        if mm == '07':
-        #if mm != '99': #test
-            threading.Thread(target=train).start()
-        sleep(60)
-
-#######################################################
-# 初めてのトゥートを探してぶーすとするよー！
-def th_timer_bst1st():
-    while len(STOPPA)==0:
-        a = int(CM.get_coolingtime())
-        rnd = random.randint(a+3,a+8)
-        print('th_timer_bst1st sleep:{0}分'.format(rnd))
-        sleep(rnd*60)
-        jst_now = datetime.now(timezone('Asia/Tokyo'))
-        #mm = jst_now.strftime("%M")
-        #if mm == '17' or mm == '37' or mm == '57':
-        #if mm != '99': #test
-        #ymd = int(jst_now.strftime("%Y%m%d"))
-        #hh = jst_now.strftime("%H")
-        #hh0000 = int(hh + "0000")
-        #hh9999 = int(hh + "9999")
-
-        ymd = int(jst_now.strftime("%Y%m%d"))
-        hh0000 = int((jst_now - timedelta(minutes=rnd)).strftime("%H%M%S"))
-        hh9999 = int(jst_now.strftime("%H%M%S"))
-        try:
-            con = sqlite3.connect(STATUSES_DB_PATH)
-            c = con.cursor()
-            #ランダムに人を選ぶよー！（最近いる人から）
             c.execute( r"select acct from statuses where (date = ?) and time >= ? and time <= ? and acct <> ?", [ymd,hh0000,hh9999,BOT_ID] )
             acct_list = set([])
             for row in c.fetchall():
                 acct_list.add(row[0])
             acct_list -= ng_user_set
-            random_acct = random.sample(acct_list,1)[0] #ひとり選ぶ
-            #print("***debug:random_acct=%s"%random_acct )
-            c.execute( r"select id from statuses where acct = ? order by id asc", (random_acct,) )
-            ids = []
-            for i,row in enumerate(c.fetchall()):
-                ids.append(row[0])
-                if i >= 200:
-                    break
             con.close()
-            boost_now(random.sample(ids,1)[0])
-            SM.update(random_acct, 'func')
-        except:
-            jst_now = datetime.now(timezone('Asia/Tokyo'))
-            ymdhms = jst_now.strftime("%Y/%m/%d %H:%M:%S")
-            with open('error.log', 'a') as f:
-                f.write(ymdhms+'\n')
-                traceback.print_exc(file=f)
-            print("例外情報\n" + traceback.format_exc())
+            random_acct = random.sample(acct_list,1)[0]
+            print(random_acct)
+            #お届け！
+            toots = "@" + random_acct + "\n:@" + acct + ":＜「" + msg + "」"
+            toots +=  "\n※ボトルメールサービス：＜メッセージ＞　であなたも送れるよー！試してみてね！"
+            toots +=  "\n#ボトルメールサービス #きりぼっと"
+            toot(toots, "direct",reply_id if reply_id != 0 else None, spoiler)
+            bm.sended(id, random_acct)
+
+            #到着通知
+            sleep(DELAY)
+            spoiler = ":@" + random_acct + ": が🍾ボトルメール💌受け取ったよー！"
+            toots = "@" + acct + " 届けたメッセージは……\n:@" + acct + ": ＜「" + msg + "」"
+            toots +=  "\n#ボトルメールサービス #きりぼっと"
+            toot(toots, "direct",reply_id if reply_id != 0 else None, spoiler)
+
+        #漂流してるボトルの数
+        #ボトルが多い時は宣伝を減らすよー！
+        bmcnt = bm.flow_count()
+        if random.randint(0,bmcnt) <= 10:
+            sleep(DELAY)
+            spoiler = "現在漂流している🍾ボトルメール💌は%d本だよー！"%bmcnt
+            toots =  "\n※ボトルメールサービス：＜メッセージ＞　であなたも送れるよー！試してみてね！"
+            toots +=  "\n#ボトルメールサービス #きりぼっと"
+            toot(toots, "public", None, spoiler)
+    except:
+        error_log()
+
+#######################################################
+# 初めてのトゥートを探してぶーすとするよー！
+def timer_bst1st():
+    jst_now = datetime.now(timezone('Asia/Tokyo'))
+    ymd = int(jst_now.strftime("%Y%m%d"))
+    hh0000 = int((jst_now - timedelta(minutes=15)).strftime("%H%M%S"))
+    hh9999 = int(jst_now.strftime("%H%M%S"))
+    try:
+        con = sqlite3.connect(STATUSES_DB_PATH,timeout = 60*1000)
+        c = con.cursor()
+        #ランダムに人を選ぶよー！（最近いる人から）
+        c.execute( r"select acct from statuses where (date = ?) and time >= ? and time <= ? and acct <> ?", [ymd,hh0000,hh9999,BOT_ID] )
+        acct_list = set([])
+        for row in c.fetchall():
+            acct_list.add(row[0])
+        acct_list -= ng_user_set
+        if len(acct_list) < 1:
+            print('th_timer_bst1st ０人！')
+            con.close
+            return
+        random_acct = random.sample(acct_list,1)[0] #ひとり選ぶ
+        #print("***debug:random_acct=%s"%random_acct )
+        c.execute( r"select id from statuses where acct = ? order by id asc", (random_acct,) )
+        ids = []
+        for i,row in enumerate(c.fetchall()):
+            ids.append(row[0])
+            if i >= 200:
+                break
+        con.close()
+        boost_now(random.sample(ids,1)[0])
+        SM.update(random_acct, 'func')
+    except:
+        error_log()
+
+#######################################################
+# トレーニング処理
+def lstm_trainer():
+    jst_now = datetime.now(timezone('Asia/Tokyo'))
+    ymd = int((jst_now - timedelta(hours=1)).strftime("%Y%m%d"))
+    hh = (jst_now - timedelta(hours=1)).strftime("%H")
+    hh0000 = int(hh + "0000")
+    hh9999 = int(hh + "9999")
+    try:
+        con = sqlite3.connect(STATUSES_DB_PATH,timeout = 60*1000)
+        c = con.cursor()
+        c.execute( r"select content from statuses where (date = ?) and time >= ? and time <= ? and acct <> ? order by time asc", [ymd,hh0000,hh9999, BOT_ID] )
+        toots = []
+        for row in c.fetchall():
+            content = content_cleanser(row[0])
+            if len(content) == 0:
+                pass
+            else:
+                toots.append(content)
+        con.close()
+        lstm_kiri.train("\n".join(toots))
+    except:
+        error_log()
+
+#######################################################
+# きりぼっとのつぶやき
+def lstm_tooter():
+    try:
+        con = sqlite3.connect(STATUSES_DB_PATH,timeout = 60*1000)
+        c = con.cursor()
+        jst_now = datetime.now(timezone('Asia/Tokyo'))
+        ymd = int(jst_now.strftime("%Y%m%d"))
+        hh = jst_now.strftime("%H")
+        hh0000 = int(hh + "0000")
+        hh9999 = int(hh + "9999")
+        c.execute( r"select content,id,acct from statuses where (date = ?) and time >= ? and time <= ? and acct <> ? order by time desc", [ymd,hh0000,hh9999, BOT_ID] )
+        seeds = []
+        seedtxt = ''
+        id = 0
+        acct = ''
+        for row in c.fetchall():
+            content = content_cleanser(row[0])
+            id = row[1]
+            acct = row[2]
+            if len(content) == 0:
+                pass
+            else:
+                seeds.append(content)
+                if len(seeds)>10:
+                    break
+        con.close()
+        if len(seeds) <= 2:
+            return
+        seeds.reverse()
+        print('seeds=',seeds)
+        seedtxt = "".join(seeds)
+        print('seedtxt=%s'%seedtxt)
+        spoiler = None
+        gen_txt = lstm_kiri.gentxt(seedtxt)
+        if gen_txt[0:1] == '。':
+            gen_txt = gen_txt[1:]
+        if len(gen_txt) > 40:
+            spoiler = ':@%s: 💭'%BOT_ID
+
+        toot(gen_txt, "public", None, spoiler)
+    except:
+        error_log()
 
 #######################################################
 # DELETE時の処理
 def th_delete():
     acct_1b = ''
     while len(STOPPA)==0:
-        sleep(INTERVAL)
-        if  DelQ.empty():
-            continue
+        status_id = DelQ.get()
         try:
-            status_id = DelQ.get()
-            con = sqlite3.connect(STATUSES_DB_PATH)
+            con = sqlite3.connect(STATUSES_DB_PATH,timeout = 60*1000)
             c = con.cursor()
             c.execute( r"select acct,content from statuses where id = ?",(status_id,))
             toot_now = '@kiritan \n'
@@ -1205,14 +1053,8 @@ def th_delete():
                     #print('**DELETE:',row[0],row[1])
                     acct_1b = row[0]
                     SM.update(row[0], 'func', score=-1)
-                    sleep(DELAY)
         except:
-            jst_now = datetime.now(timezone('Asia/Tokyo'))
-            ymdhms = jst_now.strftime("%Y/%m/%d %H:%M:%S")
-            with open('error.log', 'a') as f:
-                f.write(ymdhms+'\n')
-                traceback.print_exc(file=f)
-            print("例外情報\n" + traceback.format_exc())
+            error_log()
 
 #######################################################
 # はーとびーと！
@@ -1222,30 +1064,66 @@ def th_haertbeat():
         ymdhms = jst_now.strftime("%Y/%m/%d %H:%M:%S")
         with open('.heartbeat', 'w') as f:
             f.write(ymdhms)
-        sleep(10)
-
+#######################################################
+# トゥートを保存する
 def th_status_saver():
     while True:
-        if  StatusQ.empty():
-            continue
+        status = StatusQ.get()
         # トゥートを保存
-        save_status(StatusQ.get())
-        sleep(INTERVAL)
+        try:
+            con = sqlite3.connect(STATUSES_DB_PATH,timeout = 60*1000)
+            c = con.cursor()
+            media_attachments = status["media_attachments"]
+            mediatext = ""
+            for media in media_attachments:
+                mediatext += media["url"] + " "
+
+            jst_time = dateutil.parser.parse(str(status['created_at']))
+            jst_time = jst_time.astimezone(timezone('Asia/Tokyo'))
+            fmt = "%Y%m%d"
+            tmpdate = jst_time.strftime(fmt)
+            fmt = "%H%M%S"
+            tmptime = jst_time.strftime(fmt)
+
+            data = (str(status['id']),
+                        tmpdate,
+                        tmptime,
+                        status['content'],
+                        status['account']['acct'],
+                        status['account']['display_name'],
+                        mediatext
+                        )
+            insert_sql = u"insert into statuses (id, date, time, content, acct, display_name, media_attachments) values (?, ?, ?, ?, ?, ?, ?)"
+            try:
+                c.execute(insert_sql, data)
+            except:
+                pass
+
+            con.commit()
+            con.close()
+        except:
+            #保存失敗したら、キューに詰めてリトライ！
+            StatusQ.put(status)
+            error_log()
+            sleep(30)
 
 #######################################################
 # メイン
+def main():
+    with concurrent.futures.ThreadPoolExecutor(max_workers=30) as ex:
+        #タイムライン受信系
+        ex.submit(th_local)
+        ex.submit(th_user)
+        #タイムライン応答系
+        ex.submit(th_worker)
+        ex.submit(th_delete)
+        ex.submit(th_status_saver)
+        #スケジュール起動系
+        ex.submit(th_kiri_scheduler,summarize_tooter,['02'])
+        ex.submit(th_kiri_scheduler,bottlemail_sending,['05'])
+        ex.submit(th_kiri_scheduler,monomane_tooter,None,15,-10,10)
+        ex.submit(th_kiri_scheduler,lstm_tooter,None,15,-10,10)
+        ex.submit(th_kiri_scheduler,timer_bst1st,None,15,-10,10)
+
 if __name__ == '__main__':
-    CM = CoolingManager()
-    threading.Thread(target=th_local).start()
-    threading.Thread(target=th_user).start()
-    threading.Thread(target=th_worker).start()
-    threading.Thread(target=th_worker2).start()
-    threading.Thread(target=th_monomane_tooter).start()
-    threading.Thread(target=th_summarize_tooter).start()
-    threading.Thread(target=th_lstm_tooter).start()
-    #threading.Thread(target=th_lstm_trainer).start()
-    threading.Thread(target=th_bottlemail_sending).start()
-    threading.Thread(target=th_haertbeat).start()
-    threading.Thread(target=th_timer_bst1st).start()
-    threading.Thread(target=th_delete).start()
-    threading.Thread(target=th_status_saver).start()
+    main()
