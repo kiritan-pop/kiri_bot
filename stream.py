@@ -14,7 +14,7 @@ from os.path import join, dirname
 from dotenv import load_dotenv
 from gensim.models import word2vec,doc2vec
 import sqlite3
-import Toot_summary, GenerateText, PrepareChain, bottlemail, lstm_kiri, scoremanager  #自前のやつー！
+import Toot_summary, GenerateText, PrepareChain, bottlemail, lstm_kiri, scoremanager, gettingNum  #自前のやつー！
 
 BOT_ID = 'kiri_bot01'
 BOTS = [BOT_ID,'JC','12222222','friends_booster']
@@ -53,6 +53,8 @@ TQ = queue.Queue()
 StatusQ = queue.Queue()
 Toot1bQ = queue.Queue()
 DelQ = queue.Queue()
+GetNumQ = queue.Queue()
+GetNumVoteQ = queue.Queue()
 
 # 花宅配サービス用の花リスト
 hanalist = []
@@ -103,6 +105,40 @@ class CoolingManager():
 CM = CoolingManager()
 
 #######################################################
+# きりたんタイマー
+class KiriTimer():
+    def __init__(self,time=300):
+        self.time_org = time
+        self.time = time
+        self.start_fg = False
+
+    def _timer(self):
+        while True:
+            sleep(1)
+            self.time -= 1
+            if self.time <= 0:
+                self.time = 0
+                self.start_fg = False
+                return
+
+    def start(self):
+        if  self.start_fg == False:
+            self.start_fg = True
+            threading.Thread(target=self._timer).start()
+
+    def check(self):
+        if self.time < 0:
+            return 0
+        else:
+            return self.time
+
+    def reset(self, time=None):
+        if time == None:
+            self.time = self.time_org
+        else:
+            self.time = time
+
+#######################################################
 # マストドンＡＰＩ用部品を継承して、通知時の処理を実装ー！
 class men_toot(StreamListener):
     def on_notification(self, notification):
@@ -112,6 +148,7 @@ class men_toot(StreamListener):
 
         if notification["type"] == "mention":
             status = notification["status"]
+            vote_check(status)
             quick_rtn(status)
             TQ.put(status)
             StatusQ.put(status)
@@ -242,6 +279,16 @@ def content_cleanser(content):
         return rtext + " #" + hashtag
     else:
         return rtext
+
+#######################################################
+# 数取りゲーム 投票前処理
+def vote_check(status):
+    acct = status["account"]["acct"]
+    id = status["id"]
+    if re.search(r'[^:]@kiri_bot01', status['content']):
+        content = content_cleanser(status['content'])
+        if content.strip().isdigit():
+            GetNumVoteQ.put([acct,id,int(content.strip())])
 
 #######################################################
 # 即時応答処理ー！
@@ -417,11 +464,17 @@ def quick_rtn(status):
                 toot_now = '@%s\nん？'%acct
                 vis_now = 'direct'
                 SM.update(acct, 'func')
-        elif re.compile(r"泣いてる|泣いた").search(content):
+        elif re.compile(r"泣いてる|泣いた|涙が出[るた(そう)]").search(content):
             if rnd <= 4:
                 toot_now = '@%s\n泣いてるー！ｷｬｯｷｬｯ!'%acct
                 vis_now = 'direct'
                 SM.update(acct, 'func')
+        elif re.compile(r"惚気|ほっけ|ホッケ|燃やして").search(content+spoiler_text):
+            if rnd <= 4:
+                toot_now = '🔥🔥🔥🔥＜ごぉぉぉっ！'
+                vis_now = 'public'
+                id_now = None
+                SM.update(acct, 'func',score=-1)
         else:
             return
         #
@@ -752,6 +805,10 @@ def th_worker():
             elif re.search(r"(ランク|ランキング|順位)(おしえて|教えて)", content):
                 show_rank(acct=acct, id=id, g_vis=g_vis)
                 SM.update(acct, 'func')
+            elif re.search(r"(数取りゲーム).*(おねがい|お願い)", content):
+                print('数取りゲーム受信')
+                GetNumQ.put([acct,id])
+                SM.update(acct, 'func')
             elif len(content) > 140:
                 content = re.sub(r"(.)\1{3,}",r"\1",content, flags=(re.DOTALL))
                 gen_txt = Toot_summary.summarize(pat1.sub("",pat2.sub("",content)),limit=10,lmtpcs=1, m=1, f=4)
@@ -938,6 +995,8 @@ def timer_bst1st():
     ymd = int(jst_now.strftime("%Y%m%d"))
     hh0000 = int((jst_now - timedelta(minutes=15)).strftime("%H%M%S"))
     hh9999 = int(jst_now.strftime("%H%M%S"))
+    if hh0000 > hh9999:
+        hh0000 = 0
     try:
         con = sqlite3.connect(STATUSES_DB_PATH,timeout = 60*1000)
         c = con.cursor()
@@ -1058,6 +1117,107 @@ def th_delete():
             error_log()
 
 #######################################################
+# 数取りゲーム用 ゲーム値取得
+def get_gamenum():
+    #過去１５分のアクティブユーザ数をベース
+    jst_now = datetime.now(timezone('Asia/Tokyo'))
+    ymd = int(jst_now.strftime("%Y%m%d"))
+    hh0000 = int((jst_now - timedelta(minutes=5)).strftime("%H%M%S"))
+    hh9999 = int(jst_now.strftime("%H%M%S"))
+    if hh0000 > hh9999:
+        hh0000 = 0
+    try:
+        con = sqlite3.connect(STATUSES_DB_PATH,timeout = 60*1000)
+        c = con.cursor()
+        #ランダムに人を選ぶよー！（最近いる人から）
+        c.execute( r"select acct from statuses where (date = ?) and time >= ? and time <= ? and acct <> ?", [ymd,hh0000,hh9999,BOT_ID] )
+        acct_list = set([])
+        for row in c.fetchall():
+            acct_list.add(row[0])
+
+        return int(len(acct_list)/5 + 1)
+
+    except:
+        error_log()
+        return 0
+
+#######################################################
+# 数取りゲーム
+def th_gettingnum():
+    junbiTM = KiriTimer(3600)
+    junbiTM.reset(0)
+    gameTM = KiriTimer(180)
+    while len(STOPPA)==0:
+        g_acct,g_id = GetNumQ.get()
+        if junbiTM.check() > 0:
+            sleep(3)
+            toot('@%s\n開催準備中だよー！あと%d分待ってねー！'%(g_acct,int(junbiTM.check()/60)), 'unlisted', g_id, None)
+            sleep(27)
+            continue
+
+        #ゲーム値取得
+        gamenum = get_gamenum()
+        if gamenum <= 3:
+            sleep(3)
+            toot('@%s\n人少ないからまた後でねー！'%g_acct, 'unlisted', g_id, None)
+            sleep(27)
+            continue
+
+        #ゲーム開始ー！
+        fav_now(g_id)
+        sleep(DELAY)
+        gm = gettingNum.GettingNum(gamenum)
+        gameTM.reset()
+        gameTM.start()
+        toot('🔸1〜%dの中から一番大きい数を取った人が勝ちだよー！\
+                \n🔸きりぼっとにメンション（ＤＭ可）で投票してね！\
+                \n🔸ただし、他の人と被ったら失格！\
+                \n🔸他の人と被らない最大の数を取った「一人」だけが勝ち！\
+                \n🔸制限時間は%d分だよー！はじめ！！\n#数取りゲーム #きりぼっと'%(gamenum,int(gameTM.check()/60)), 'public', None, '💸数取りゲーム（ミニ）始まるよー！🎮')
+        try:
+            while True:
+                remaintm = gameTM.check()
+                if remaintm > 0:
+                    #時間切れは例外で抜ける
+                    acct,id,num = GetNumVoteQ.get(timeout=remaintm)
+                    if gm.vote(acct,num):
+                        fav_now(id)
+                    else:
+                        toot('@%s\n٩(๑`^´๑)۶範囲外だよー！'%acct, 'direct', id, None)
+                else:
+                    #時間切れ
+                    break
+        except:
+            pass
+        #ゲーム終了後、次回開始までの準備期間
+        junbiTM.reset()
+        junbiTM.start()
+        results = gm.get_results()
+        if len(results) <= 0:
+            toot('(ง •̀ω•́)ง✧数取りゲーム、０人だったよー！\n#数取りゲーム #きりぼっと', 'public', None, None)
+        else:
+            toot_now = ''
+            hanamaru = False
+            for val,accts in sorted(results.items(), key=lambda x: -x[0]):
+                if len(accts) == 0:
+                    toot_now += '　'
+                elif len(accts) == 1 and not hanamaru:
+                    toot_now += '💮'
+                    hanamaru = True
+                    print('#######%sに%d点！'%(accts[0],val))
+                    SM.update(accts[0], 'getnum', score=val)
+                else:
+                    toot_now += '❌'
+
+                toot_now += '{0:>2}：'.format(val)
+                for acct1 in accts:
+                    toot_now += ':@%s:'%acct1
+                toot_now += '\n'
+
+            toot('%s\n#数取りゲーム #きりぼっと'%toot_now, 'public', None, '数取りゲーム、結果発表ーー！！')
+
+
+#######################################################
 # はーとびーと！
 def th_haertbeat():
     while True:
@@ -1119,6 +1279,7 @@ def main():
         ex.submit(th_worker)
         ex.submit(th_delete)
         ex.submit(th_status_saver)
+        ex.submit(th_gettingnum)
         #スケジュール起動系
         ex.submit(th_kiri_scheduler,summarize_tooter,['02'])
         ex.submit(th_kiri_scheduler,bottlemail_sending,['05'])
