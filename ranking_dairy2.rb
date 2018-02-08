@@ -30,7 +30,7 @@ def exe_toot(body,visibility = "public",acct = nil,spoiler_text = nil,rep_id = n
                                       bearer_token: ENV["MASTODON_ACCESS_TOKEN"])
   acct = "@"+acct if acct != nil
   #トゥート！
-  puts "#{body},#{acct},#{visibility},#{spoiler_text},#{rep_id}"    if VERB
+  puts "#{body}" #{}",#{acct},#{visibility},#{spoiler_text},#{rep_id}"    if VERB
   client.create_status_kiri( "#{body[0,460]}#{acct}" , visibility ,spoiler_text,rep_id)  unless VERB
 end
 
@@ -156,18 +156,24 @@ handler do |job|
 
     body = "📝#{char_size}字:#{char_cnt}toot:💁#{users_size_today.size}人\nトゥートした「文字数」のランキングだよー！\n"
     users_size_today.sort_by {|k, v| -v }.each_with_index{|(acct,size),i|
-      break if i > 9
+      break if i > 6 &&  VERB == false
       body += "#{sprintf("%2d",i+1)}位 :@#{acct}: #{sprintf("%5d",size)}字（#{sprintf("%3.1f", size.to_f/users_cnt_today[acct].to_f)}字/toot） \n"
       body += "　　　　（累計#{ruikei_rank[acct][0]+1}位：#{sprintf("%3d",ruikei_rank[acct][1]/10000)}万字）\n"
     }
     body += "#きりランキング #きりぼっと"
     exe_toot(body,visibility = "public",acct = nil,spoiler_text = "きりたん勝手にランキング",rep_id = nil)
 
+    users_cnt= {}
+    users_size= {}
+    users_cnt_today = {}
+    users_size_today = {}
+
+
   end
 end
 
 every(1.day, 'main1', at: '22:00')      unless VERB
 every(1.day, 'main2', at: '22:40')      unless VERB
-every(1.day, 'main3', at: '22:45')      unless VERB
-every(1.week, 'main2')   if VERB
-#every(1.week, 'main3')
+every(1.day, 'main3', at: '22:50')      unless VERB
+every(1.week, 'main3')   if VERB
+#every(1.week, 'main2')
