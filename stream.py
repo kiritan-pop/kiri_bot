@@ -341,7 +341,7 @@ def quick_rtn(status):
         elif re.compile(r"ねむい$|眠い$").search(content):
             SM.update(acct, 'func',score=-1)
             if rnd <= 3:
-                toot_now = '@%s\n起きてー！👈͟͟͞͞= 👈͟͟͞͞ =( '-' 👈 )ﾂｸﾂｸﾂｸﾂｸ'%acct
+                toot_now = '%s\n起きてー！👈͟͟͞͞= 👈͟͟͞͞ =( '-' 👈 )ﾂｸﾂｸﾂｸﾂｸ'%username
                 vis_now = 'direct'
         elif re.compile(r"さむい$|寒い$").search(content):
             SM.update(acct, 'func',score=-1)
@@ -783,7 +783,17 @@ def th_worker():
                         continue
                     result = kiri_deep.takoramen(filename)
                     print('   ',result)
-                    if sensitive:
+                    if result == 'cat':
+                        toot_now += 'にゃーん'
+                    elif result == 'darts':
+                        toot_now += '🎯ダーツ！'
+                    elif result == 'nijie_ero':
+                        toot_now += 'えっち！'
+                    elif result == 'nijie_hiero':
+                        toot_now += 'かわいい！'
+                    elif result == 'robisute':
+                        toot_now += '🙏ろびすてとうとい！'
+                    elif sensitive:
                         if result == 'takoyaki':
                             toot_now += 'たこ焼き！'
                         elif result == 'ramen':
@@ -806,14 +816,12 @@ def th_worker():
                             toot_now += '🥗さくさくー！'
                         elif result == 'sweet':
                             toot_now += '🍧 🍨 🍦 🍰 🎂 🍮 🍩 あまーい！'
-                        elif result == 'cat':
-                            toot_now += 'にゃーん'
-                        elif result == 'darts':
-                            toot_now += '🎯ダーツ！'
-                        elif result == 'nijie_ero':
-                            toot_now += 'えっち！'
-                        elif result == 'nijie_hiero':
-                            toot_now += 'かわいい！'
+                        elif result == 'chahan':
+                            toot_now += '焦がしにんにくのマー油と葱油が香るザ★チャーハン600g！？！？！？'
+                        elif result == 'yakitori':
+                            toot_now += '鳥貴族ーー！！！！'
+                        elif result == 'pizza':
+                            toot_now += 'ぽざ！'
                     else:
                         if result == 'takoyaki':
                             toot_now += ':@%s: 🚓🚓🚓＜う〜う〜！飯テロ警察 たこ焼き%d課でーす！'%(acct,random.randint(1,5))
@@ -842,20 +850,18 @@ def th_worker():
                             toot_now += ':@%s: 🚓🚓🚓＜う〜う〜！飯テロ警察 野菜%d課でーす！'%(acct,random.randint(1,5))
                         elif result == 'sweet':
                             toot_now += ':@%s: 🚓🚓🚓＜う〜う〜！飯テロ警察 甘味%d課でーす！'%(acct,random.randint(1,5))
-                        elif result == 'cat':
-                            toot_now += 'にゃーん'
-                        elif result == 'darts':
-                            toot_now += '🎯ダーツ！'
-                        elif result == 'nijie_ero':
-                            toot_now += 'えっち！'
-                        elif result == 'nijie_hiero':
-                            toot_now += 'かわいい！'
+                        elif result == 'chahan':
+                            toot_now += ':@%s: 🚓🚓🚓＜う〜う〜！飯テロ警察 チャーハン%d課でーす！'%(acct,random.randint(1,5))
+                        elif result == 'yakitori':
+                            toot_now += ':@%s: 🚓🚓🚓＜う〜う〜！飯テロ警察 焼き鳥%d課でーす！'%(acct,random.randint(1,5))
+                        elif result == 'pizza':
+                            toot_now += ':@%s: 🚓🚓🚓＜う〜う〜！飯テロ警察 ピザ%d課でーす！'%(acct,random.randint(1,5))
 
                 if len(toot_now) > 0:
                     toot_now = "@%s\n"%acct + toot_now
                     fav_now(id)
                     sleep(DELAY)
-                    toot(toot_now, g_vis, id, None)
+                    toot(toot_now, g_vis, id, None,interval=8)
             elif len(content) > 140:
                 content = re.sub(r"(.)\1{3,}",r"\1",content, flags=(re.DOTALL))
                 gen_txt = Toot_summary.summarize(pat1.sub("",pat2.sub("",content)),limit=10,lmtpcs=1, m=1, f=4)
@@ -1223,11 +1229,12 @@ def th_gettingnum():
                 \n🔸他の人と被らない最大の数を取った「一人」だけが勝ち！\
                 \n🔸制限時間は%d分だよー！はじめ！！\n#数取りゲーム #きりぼっと'%(gamenum,int(gameTM.check()/60)), 'public', None, '💸数取りゲーム（ミニ）始まるよー！🎮')
         try:
+            #残り１分処理
+            remaintm = gameTM.check()
+            toot('数取りゲーム（ミニ）残り１分だよー！(1〜%d)\
+            \n#数取りゲーム #きりぼっと'%(gamenum,), 'public',interval=remaintm - 60)
             while True:
                 remaintm = gameTM.check()
-                #残り１分処理
-                toot('数取りゲーム（ミニ）残り１分だよー！(1〜%d)\
-                    \n#数取りゲーム #きりぼっと'%(gamenum,), 'public',interval=60)
                 if remaintm > 0:
                     #時間切れは例外で抜ける
                     acct,id,num = GetNumVoteQ.get(timeout=remaintm)

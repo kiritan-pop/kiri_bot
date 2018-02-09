@@ -25,7 +25,7 @@ for label,i in labels_index.items():
 STANDARD_SIZE = (299, 299)
 
 model_path = 'db/lstm_toot_v5.h5'
-takomodel_path = 'db/tako3.h5'
+takomodel_path = 'db/tako4.h5'
 print('******* lstm load model %s,%s*******' %(model_path,takomodel_path))
 # モデルを読み込む
 model = load_model(model_path)
@@ -34,14 +34,12 @@ graph = tf.get_default_graph()
 
 #いろいろなパラメータ
 maxlen = 10           #モデルに合わせて！
-diver = 0.4         #ダイバーシティ：大きくすると想起の幅が大きくなるっぽいー！
+diver = 0.5         #ダイバーシティ：大きくすると想起の幅が大きくなるっぽいー！
 
 pat3 = re.compile(r'^\n')
 pat4 = re.compile(r'\n')
-adaptr = ['だから','それで','けれども','しかし','だけど','および','ならびに','また','さらに',\
-        'そのうえ','つまり','または','もしくは','ところで','さて','要するに','言い換えると'\
-        'そして','やがて','でね','そんでね','だからね','あのね','あのあの','ちなみに',\
-        'ですから','だからね','でもー']
+adaptr = ['だから','それで','しかし','けど','また','さらに',\
+        'つまり','さて','そして','で','でね','そんで','でも']
 #辞書読み込み
 wl_chars = list(open('dic/wl.txt').read())
 wl_chars.append(r'\n')
@@ -61,7 +59,7 @@ def sample(preds, temperature=1.2):
 def gentxt(text):
     generated = ''
     rnd = random.sample(adaptr, 1)[0]
-    tmp = text + '\n' + rnd
+    tmp = text + '\n' + rnd + '、'
 
     if len(tmp) > maxlen:
         sentence = tmp[-maxlen:]
@@ -104,7 +102,7 @@ def takoramen(filepath):
     print("*** image:", filepath.split('/')[-1], "\n*** result:", rslt_dict)
     with open('image.log','a') as f:
         f.write("*** image:" + filepath.split('/')[-1] +  "  *** result:%s\n"%str(rslt_dict))
-    if max(result[0]) > 0.99:
+    if max(result[0]) > 0.93:
         return labels[np.where(result[0] == max(result[0]) )[0][0]]
     else:
         return 'other'
