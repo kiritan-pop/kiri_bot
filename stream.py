@@ -12,26 +12,16 @@ import warnings, traceback
 from bs4 import BeautifulSoup
 from os.path import join, dirname
 from dotenv import load_dotenv
-from gensim.models import word2vec,doc2vec
-import sqlite3
 import Toot_summary, GenerateText, PrepareChain, bottlemail  #自前のやつー！
-import kiri_util, kiri_deep, gettingNum  #自前のやつー！
+import kiri_util, kiri_deep, kiri_game  #自前のやつー！
 
 BOT_ID = 'kiri_bot01'
 BOTS = [BOT_ID,'JC','12222222','friends_booster']
 DELAY = 2
-STATUSES_DB_PATH = "db/statuses.db"
 pat1 = re.compile(r' ([!-~ぁ-んァ-ン] )+|^([!-~ぁ-んァ-ン] )+| [!-~ぁ-んァ-ン]$',flags=re.MULTILINE)  #[!-~0-9a-zA-Zぁ-んァ-ン０-９ａ-ｚ]
 pat2 = re.compile(r'[ｗ！？!\?]')
 #NGワード
 ng_words = set(word.strip() for word in open('.ng_words').readlines())
-
-tagger      = MeCab.Tagger('-Owakati -d /usr/lib/mecab/dic/mecab-ipadic-neologd -u ./dic/name.dic,./dic/id.dic,./dic/nicodic.dic')
-model       = word2vec.Word2Vec.load('db/nico.model')
-image_model = doc2vec.Doc2Vec.load('db/media.model')
-
-#トゥート先NGの人たちー！
-ng_user_set = set('friends_nico')
 
 #停止用
 STOPPA = []
@@ -239,12 +229,12 @@ def quick_rtn(status):
     #
     Toot1bQ.put((content, acct, id, g_vis))
 
-    if re.compile(r"(緊急|強制)(再起動)").search(content) and acct == 'kiritan':
+    if re.search(r"(緊急|強制)(再起動)", content) and acct == 'kiritan':
         print("＊＊＊＊＊＊＊＊＊＊＊再起動するよー！＊＊＊＊＊＊＊＊＊＊＊")
         toot("@kiritan 再起動のため一旦終了しまーす！", 'direct', id ,None)
         sleep(10)
         os.kill(os.getpid(), signal.SIGKILL)
-    if re.compile(r"(緊急|強制)(停止|終了)").search(content) and acct == 'kiritan':
+    if re.search(r"(緊急|強制)(停止|終了)", content) and acct == 'kiritan':
         print("＊＊＊＊＊＊＊＊＊＊＊緊急停止したよー！＊＊＊＊＊＊＊＊＊＊＊")
         toot("@kiritan 緊急停止しまーす！", 'direct', id ,None)
         sleep(10)
@@ -271,13 +261,13 @@ def quick_rtn(status):
             toot_now += "新規さんいらっしゃーい！🍵🍡どうぞー！"
             vis_now = 'unlisted'
             SM.update(acct, 'func')
-        elif re.compile(r"草").search(content+spoiler_text):
+        elif re.search(r"草", content+spoiler_text):
             SM.update(acct, 'func',score=-1)
             if rnd <= 1:
                 toot_now = ":" + username + ": " + username + " "
                 random.shuffle(hanalist)
                 toot_now += hanalist[0]
-        elif re.compile(r"^:twitter:.+🔥$", flags=(re.MULTILINE | re.DOTALL)).search(content):
+        elif re.search(r"^:twitter:.+🔥$", content, flags=(re.MULTILINE | re.DOTALL)):
             SM.update(acct, 'func')
             if rnd <= 3:
                 toot_now = ":" + username + ": " + username + " "
@@ -291,25 +281,25 @@ def quick_rtn(status):
                 toot_now = ":" + username + ": " + username + " "
                 toot_now += '\n(ﾉ・_・)ﾉ ﾆｹﾞﾃ!⌒🍗 ＜ｱﾘｶﾞﾄｩ!\n🔥'
                 vis_now = 'direct'
-        elif re.compile(r"ブリブリ|ぶりぶり|うん[ちこ]|💩|^流して$").search(content+spoiler_text):
+        elif re.search(r"ブリブリ|ぶりぶり|うん[ちこ]|💩|^流して$", content+spoiler_text):
             SM.update(acct, 'func',score=-1)
             if rnd <= 3:
                 toot_now = '🌊🌊🌊 ＜ざばーっ！'
                 vis_now = 'public'
                 id_now = None
-        elif re.compile(r"^ふきふき$").search(content):
+        elif re.search(r"^ふきふき$", content):
             SM.update(acct, 'func')
             if rnd <= 3:
                 toot_now = '💨💨💨🍃＜ふわ〜っ！'
                 vis_now = 'public'
                 id_now = None
-        elif re.compile(r"^ぬるぽ$").search(content):
+        elif re.search(r"^ぬるぽ$", content):
             SM.update(acct, 'func',score=-1)
             if rnd <= 6:
                 toot_now = 'ｷﾘｯ'
                 vis_now = 'public'
                 id_now = None
-        elif re.compile(r"^通過$").search(content):
+        elif re.search(r"^通過$", content):
             toot_now = '%s ⊂(｀・ω・´)⊃＜阻止！'%username
             vis_now = 'direct'
             SM.update(acct, 'func')
@@ -317,7 +307,7 @@ def quick_rtn(status):
                 toot_now = '⊂(｀・ω・´)⊃＜阻止！'
                 vis_now = 'public'
                 id_now = None
-        elif re.compile(r"3.{0,1}3.{0,1}4").search(content):
+        elif re.search(r"3.{0,1}3.{0,1}4", content):
             toot_now = '%s ﾅﾝ'%username
             vis_now = 'direct'
             SM.update(acct, 'func')
@@ -325,7 +315,7 @@ def quick_rtn(status):
                 toot_now = 'ﾅﾝ'
                 vis_now = 'public'
                 id_now = None
-        elif re.compile(r"^ちくわ大明神$").search(content):
+        elif re.search(r"^ちくわ大明神$", content):
             toot_now = '%s ﾀﾞｯ'%username
             vis_now = 'direct'
             SM.update(acct, 'func',score=-1)
@@ -333,27 +323,22 @@ def quick_rtn(status):
                 toot_now = 'ﾀﾞｯ'
                 vis_now = 'public'
                 id_now = None
-        elif re.compile(r"ボロン$|ぼろん$").search(content):
+        elif re.search(r"ボロン$|ぼろん$", content):
             SM.update(acct, 'func',score=-1)
             if rnd <= 3:
                 toot_now = '@%s\n✂️チョキン！！'%acct
                 vis_now = 'direct'
-        elif re.compile(r"ねむい$|眠い$").search(content):
-            SM.update(acct, 'func',score=-1)
-            if rnd <= 3:
-                toot_now = '%s\n起きてー！👈͟͟͞͞= 👈͟͟͞͞ =( '-' 👈 )ﾂｸﾂｸﾂｸﾂｸ'%username
-                vis_now = 'direct'
-        elif re.compile(r"さむい$|寒い$").search(content):
+        elif re.search(r"さむい$|寒い$", content):
             SM.update(acct, 'func',score=-1)
             if rnd <= 3:
                 toot_now = '@%s\n🔥🔥🔥\n🔥:@%s:🔥\n🔥🔥🔥 '%(acct,acct)
                 vis_now = 'direct'
-        elif re.compile(r"あつい$|暑い$").search(content):
+        elif re.search(r"あつい$|暑い$", content):
             SM.update(acct, 'func',score=-1)
             if rnd <= 3:
                 toot_now = '@%s\n❄❄❄\n❄:@%s:❄\n❄❄❄ '%(acct,acct)
                 vis_now = 'direct'
-        elif re.compile(r"^(今|いま)の[な|無|ナ][し|シ]$").search(content):
+        elif re.search(r"^(今|いま)の[な|無|ナ][し|シ]$", content):
             toot_now = '%s :%s:🚓🚓🚓＜う〜う〜！いまのなし警察でーす！'%(username, username)
             vis_now = 'direct'
             SM.update(acct, 'func',score=-1)
@@ -361,7 +346,7 @@ def quick_rtn(status):
                 toot_now = '🚓🚓🚓＜う〜う〜！いまのなし警察でーす！'
                 vis_now = 'public'
                 id_now = None
-        elif re.compile(r"ツイッター|ツイート|[tT]witter").search(content):
+        elif re.search(r"ツイッター|ツイート|[tT]witter", content):
             SM.update(acct, 'func',score=-1)
             if rnd <= 3:
                 toot_now = '@%s\nつ、つつつ、つい〜〜！！？！？？！？！'%acct
@@ -369,9 +354,9 @@ def quick_rtn(status):
             elif rnd == 6:
                 toot_now = '@%s\nつい〜……'%acct
                 vis_now = 'direct'
-        elif re.compile(r"(:nicoru[0-9]{0,3}:.?){4}").search(content):
+        elif re.search(r"(:nicoru[0-9]{0,3}:.?){4}", content):
             if content_1b != None and acct == acct_1b:
-                if re.compile(r"(:nicoru[0-9]{0,3}:.?){3}").search(content_1b):
+                if re.search(r"(:nicoru[0-9]{0,3}:.?){3}", content_1b):
                     SM.update(acct, 'func')
                     toot_now = '%s　　三(  っ˃̵ᴗ˂̵) 通りまーす！'%username
                     vis_now = 'direct'
@@ -380,10 +365,10 @@ def quick_rtn(status):
                         toot_now = '　　三(  っ˃̵ᴗ˂̵) 通りまーす！'
                         vis_now = 'public'
                         id_now = None
-        elif re.compile(r"(:nicoru[0-9]{0,3}:.?){2}").search(content):
+        elif re.search(r"(:nicoru[0-9]{0,3}:.?){2}", content):
             if content_1b != None and acct == acct_1b:
                 SM.update(acct, 'func')
-                if re.compile(r"(:nicoru[0-9]{0,3}:.?){3}").search(content_1b):
+                if re.search(r"(:nicoru[0-9]{0,3}:.?){3}", content_1b):
                     toot_now = '%s　　(˃̵ᴗ˂̵っ )三 通りまーす！'%username
                     vis_now = 'direct'
                     SM.update(acct, 'func')
@@ -391,10 +376,10 @@ def quick_rtn(status):
                         toot_now = '　　(˃̵ᴗ˂̵っ )三 通りまーす！'
                         vis_now = 'public'
                         id_now = None
-        elif re.compile(r"^貞$").search(content):
+        elif re.search(r"^貞$", content):
             if content_1b != None and acct == acct_1b:
                 SM.update(acct, 'func',score=-1)
-                if re.compile(r"^治$").search(content_1b):
+                if re.search(r"^治$", content_1b):
                     toot_now = '%s　　三(  っ˃̵ᴗ˂̵) 通りまーす！'%username
                     vis_now = 'direct'
                     SM.update(acct, 'func')
@@ -410,17 +395,17 @@ def quick_rtn(status):
         elif "きりちゃん" in content+spoiler_text or "ニコって" in content+spoiler_text:
             fav_now(id)
             SM.update(acct, 'reply')
-        elif re.compile(r"なんでも|何でも").search(content):
+        elif re.search(r"なんでも|何でも",content):
             SM.update(acct, 'func',score=-1)
             if rnd <= 4:
                 toot_now = '@%s\nん？'%acct
                 vis_now = 'direct'
-        elif re.compile(r"泣いてる|泣いた|涙が出[るた(そう)]").search(content):
+        elif re.search(r"泣いてる|泣いた|涙が出[るた(そう)]", content):
             SM.update(acct, 'func')
             if rnd <= 4:
                 toot_now = '@%s\n泣いてるー！ｷｬｯｷｬｯ!'%acct
                 vis_now = 'direct'
-        elif re.compile(r"惚気|ほっけ|ホッケ|^燃やして$").search(content+spoiler_text):
+        elif re.search(r"惚気|ほっけ|ホッケ|^燃やして$", content+spoiler_text):
             SM.update(acct, 'func',score=-1)
             if rnd <= 4:
                 toot_now = '🔥🔥🔥🔥＜ごぉぉぉっ！'
@@ -440,47 +425,6 @@ def quick_rtn(status):
         error_log()
 
 #######################################################
-# 連想サービス
-def rensou_game(content, acct, id, g_vis):
-    username = "@" +  acct
-    fav_now(id)
-    if len(content) == 0:
-        return
-    if len(content) > 60:
-        toot(username + "\n₍₍ ◝(* ,,Ծ‸Ծ,, )◟ ⁾⁾長いよー！", g_vis ,id,None)
-        return
-
-    split = re.search(r"(連想|れんそう)(サービス|さーびす)[：:](.*)", str(content)).group(3).split("\n",1)
-    word = split[0]
-    nega_w = ""
-    nega_wakati = ""
-    spoiler = "「" + word + "」に関連するキーワード"
-    if len(split) > 1:
-        nega_w = split[1]
-        spoiler = spoiler + " ※ただし「" + nega_w + "」の要素を引き算"
-
-    toot_now = ":" + username + ": "
-    toot_now = username + "\n"
-    wakati = " ".join(re.sub(u' [!-~ぁ-んァ-ン] ', " ", tagger.parse(word)).split() )
-    if nega_w != "":
-        nega_wakati = tagger.parse(nega_w)
-        nega_wakati = re.sub(u' [!-~ぁ-んァ-ン] ', " ", nega_wakati)
-
-    try:
-        results = model.most_similar(positive=wakati.split(),negative=nega_wakati.split())
-        for result in results:
-            toot_now = toot_now + "{:.4f} ".format(result[1]) + result[0] + "\n"
-
-        if toot_now != "":
-            toot_now = toot_now +  "\n#連想サービス #きりぼっと"
-            toot(toot_now, g_vis ,id,spoiler)
-
-    except:
-        error_log()
-        toot_now = toot_now +  "連想できなかったー……ごめんねー……\n#連想サービス #きりぼっと"
-        toot(toot_now, g_vis ,id,spoiler)
-
-#######################################################
 # 画像検索サービス
 def get_file_name(url):
     return url.split("/")[-1]
@@ -496,49 +440,6 @@ def download(url, save_path):
         file.write(source)
     return ret_path
 
-def search_image(content, acct, id, g_vis):
-    username = "@" +  acct
-    fav_now(id)
-    if len(content) == 0:
-        return
-    if len(content) > 60:
-        sleep(DELAY)
-        toot("長いよー！₍₍ ◝(* ,,Ծ‸Ծ,, )◟ ⁾⁾ぷーぷーダンスーー♪", g_vis ,id,None)
-        return
-    word = re.search(r"(画像検索)(サービス|さーびす)[：:](.*)", str(content)).group(3)
-    spoiler = "「" + word + "」に関連する画像"
-    toot_now = ":" + username + ": " + username + "\n"
-    wakati = tagger.parse(word)
-    try:
-        x = image_model.infer_vector(wakati.split(' '))
-        results = image_model.docvecs.most_similar(positive=[x], topn=16)
-    except:
-        error_log()
-        toot_now = toot_now +  "見つからなかったー……ごめんねー……\n#画像検索サービス #きりぼっと"
-        toot(toot_now, g_vis ,id ,spoiler)
-
-    media_files = []
-    for result in results:
-        content_type = "image/" + result[0].split(".")[-1]
-        if content_type == 'jpg':
-            content_type = 'jpeg'
-        if content_type == 'image/jpeg' or content_type == 'image/png' or content_type == 'image/gif':
-            try:
-                dlpath = download(result[0], "media")
-                media_files.append(mastodon.media_post(dlpath, content_type))
-                toot_now = toot_now + "{:.4f} ".format(result[1]) + get_file_name(result[0]) + "\n"
-                if len(media_files) >= 4:
-                    break
-            except:
-                error_log()
-
-    if toot_now != "":
-        toot_now = toot_now +  "\n#画像検索サービス #きりぼっと"
-        try:
-            toot(toot_now, g_vis ,id,spoiler,media_files)
-        except:
-            error_log()
-
 #######################################################
 # 日本語っぽいかどうか判定
 def is_japanese(string):
@@ -547,62 +448,6 @@ def is_japanese(string):
         if "CJK UNIFIED" in name  or "HIRAGANA" in name  or "KATAKANA" in name:
             return True
     return False
-
-#######################################################
-# スパウザーサービス
-def supauza(content, acct, id, g_vis):
-    # 類似度判定（戦闘力測定）
-    def simizu(word1,words2):
-        sum = 0.0
-        for word2 in words2:
-            try:
-                sum += model.similarity(word1.strip(), word2)
-            except:
-                error_log()
-        return sum
-    username = "@" +  acct
-    fav_now(id)
-    if len(content) == 0:
-        return
-    if len(content) > 60:
-        sleep(DELAY)
-        toot(username + "\n₍₍ ◝(* ,,Ծ‸Ծ,, )◟ ⁾⁾長いよー！", g_vis ,id ,None)
-        return
-    word = re.search(r"(スパウザー)(サービス|さーびす)[：:](.*)", str(content)).group(3)
-    word = tagger.parse(word).strip()
-    spoiler = "「" + word + "」の戦闘力を測定！ぴぴぴっ！・・・"
-    toot_now = ":" + username + ": " + username + "\n"
-    with open(".dic_supauza", 'r') as f:
-        dic = json.load(f)
-    score = {}
-    for key,list in dic.items():
-        score[key] = simizu(word,list)/len(list) * 1000
-        print(key + ":\t\t" + str(score[key]))
-
-    #総合戦闘力補正
-    rev = score["total"] * 5
-    for key,val in score.items():
-        rev += val
-    score["total"] += rev
-    toot_now += "エロ：" +  '{0:4.0f}'.format(score["ero"]) + "k\n"
-    toot_now += "汚さ：" +  '{0:4.0f}'.format(score["dirty"]) + "k\n"
-    toot_now += "炒飯：" +  '{0:4.0f}'.format(score["chahan"]) + "k\n"
-    toot_now += "アホ：" +  '{0:4.0f}'.format(score["aho"]) + "k\n"
-    toot_now += "挨拶：" +  '{0:4.0f}'.format(score["hello"]) + "k\n"
-    toot_now += "ﾆｬｰﾝ：" +  '{0:4.0f}'.format(score["nyan"]) + "k\n"
-    toot_now += "総合：" +  '{0:4.0f}'.format(score["total"]) + "k\n"
-    toot_now += "※単位：1kは昆布1枚分に相当する。\n\n"
-    #図鑑風説明文
-    generator = GenerateText.GenerateText()
-    gen_txt = generator.generate("poke")
-    toot_now = toot_now + gen_txt + "\n#スパウザーサービス #きりぼっと"
-    try:
-        toot(toot_now, g_vis ,id ,spoiler)
-    except:
-        error_log()
-        toot_now = toot_now +  "測定不能……だと……！？\n#スパウザーサービス #きりぼっと"
-        toot(toot_now, g_vis ,id,spoiler)
-
 
 #######################################################
 # ランク表示
@@ -744,14 +589,17 @@ def th_worker():
         print('=== %s  by %s'%('\n    '.join(content.split('\n')), acct))
         try:
             if re.search(r"(連想|れんそう)([サさ]ー[ビび][スす])[：:]", content):
-                rensou_game(content=content, acct=acct, id=id, g_vis=g_vis)
-                SM.update(acct, 'func')
+                toot('@%s このサービスは終了したよ〜(৹ᵒ̴̶̷᷄﹏ᵒ̴̶̷᷅৹)'%acct, g_vis, id, None,interval=3)
+                #rensou_game(content=content, acct=acct, id=id, g_vis=g_vis)
+                #SM.update(acct, 'func')
             elif re.search(r"(画像検索)([サさ]ー[ビび][スす])[：:]", content):
-                search_image(content=content, acct=acct, id=id, g_vis=g_vis)
-                SM.update(acct, 'func')
+                toot('@%s このサービスは終了したよ〜(৹ᵒ̴̶̷᷄﹏ᵒ̴̶̷᷅৹)'%acct, g_vis, id, None,interval=3)
+                #search_image(content=content, acct=acct, id=id, g_vis=g_vis)
+                #SM.update(acct, 'func')
             elif re.search(r"(スパウザー)([サさ]ー[ビび][スす])[：:]", content):
-                supauza(content=content, acct=acct, id=id, g_vis=g_vis)
-                SM.update(acct, 'func')
+                toot('@%s このサービスは終了したよ〜(৹ᵒ̴̶̷᷄﹏ᵒ̴̶̷᷅৹)'%acct, g_vis, id, None,interval=3)
+                #supauza(content=content, acct=acct, id=id, g_vis=g_vis)
+                #SM.update(acct, 'func')
             elif re.search(r"([ぼボ][とト][るル][メめ]ー[るル])([サさ]ー[ビび][スす])[：:]", content):
                 print("★ボトルメールサービス")
                 bottlemail_service(content=content, acct=acct, id=id, g_vis=g_vis)
@@ -759,11 +607,10 @@ def th_worker():
             elif re.search(r"(きょう|今日)の.?(料理|りょうり)", content):
                 recipe_service(content=content, acct=acct, id=id, g_vis=g_vis)
                 SM.update(acct, 'func')
-            elif re.search(r"(私|わたし|わたくし|自分|僕|俺|朕|ちん|余|あたし|ミー|あちき|あちし|わい|わっち|おいどん|わし|うち|おら|儂|おいら|あだす|某|麿|拙者|小生|あっし|手前|吾輩|我輩|マイ)の(ランク|ランキング|順位)", content):
-                show_rank(acct=acct, id=id, g_vis=g_vis)
-                SM.update(acct, 'func')
-            elif re.search(r"(ランク|ランキング|順位)(おしえて|教えて)", content):
-                show_rank(acct=acct, id=id, g_vis=g_vis)
+            elif re.search(r"(私|わたし|わたくし|自分|僕|俺|朕|ちん|余|あたし|ミー|あちき|あちし|\
+                わい|わっち|おいどん|わし|うち|おら|儂|おいら|あだす|某|麿|拙者|小生|あっし|手前|吾輩|我輩|マイ)の(ランク|ランキング|順位)", content):
+                toot('@%s このサービスは終了したよ〜(৹ᵒ̴̶̷᷄﹏ᵒ̴̶̷᷅৹)'%acct, g_vis, id, None,interval=3)
+                #show_rank(acct=acct, id=id, g_vis=g_vis)
                 SM.update(acct, 'func')
             elif re.search(r"(数取りゲーム).*(おねがい|お願い)", content):
                 print('数取りゲーム受信')
@@ -779,7 +626,7 @@ def th_worker():
                     continue
                 for media in media_attachments:
                     filename = download(media["url"] , "media")
-                    if '.mp' in filename:
+                    if '.mp' in filename or '.webm' in filename:
                         continue
                     result = kiri_deep.takoramen(filename)
                     print('   ',result)
@@ -921,243 +768,116 @@ def th_kiri_scheduler(func,mms=None,intvl=60,rndmin=0,rndmax=0):
 #######################################################
 # 定期ものまねさーびす！
 def monomane_tooter():
+    DAO = kiri_util.DAO_statuses()
     spoiler = "勝手にものまねサービス"
-    jst_now = datetime.now(timezone('Asia/Tokyo'))
-    ymd = int((jst_now - timedelta(hours=1)).strftime("%Y%m%d"))
-    hh = (jst_now - timedelta(hours=1)).strftime("%H")
-    hh0000 = int(hh + "0000")
-    hh9999 = int(hh + "9999")
-    try:
-        con = sqlite3.connect(STATUSES_DB_PATH,timeout = 60*1000)
-        c = con.cursor()
-        c.execute( r"select acct from statuses where (date = ?) and time >= ? and time <= ? and acct <> ?", [ymd,hh0000,hh9999,BOT_ID] )
-        toots = ""
-        acct_list = set([])
-        for row in c.fetchall():
-            acct_list.add(row[0])
-        acct_list -= ng_user_set
-        random_acct = random.sample(acct_list,1)[0]
-        con.close()
-        con = sqlite3.connect(STATUSES_DB_PATH,timeout = 60*1000)
-        c = con.cursor()
-        c.execute( r"select content from statuses where acct = ?", (random_acct,) )
-        toots = ""
-        for row in c.fetchall():
-            content = content_cleanser(row[0])
-            if len(content) == 0:
-                pass
-            else:
-                toots += content + "。\n"
-        con.close()
-        chain = PrepareChain.PrepareChain("user_toots",toots)
-        triplet_freqs = chain.make_triplet_freqs()
-        chain.save(triplet_freqs, True)
-        generator = GenerateText.GenerateText(5)
-        gen_txt = generator.generate("user_toots")
-        gen_txt = "@" + random_acct + " :@" + random_acct + ":＜「" + gen_txt + "」"
-        gen_txt = gen_txt.replace('\n',"")
-        #gen_txt +=  "\n#きりものまね #きりぼっと"
-        SM.update(random_acct, 'func')
-        if len(gen_txt) > 10:
-            toot(gen_txt, "unlisted", None, spoiler)
-    except:
-        error_log()
+    random_acct = DAO.sample_acct(timedelta(minutes=15))
+    toots = ""
+    for row in DAO.get_user_toots(random_acct):
+        content = content_cleanser(row[0])
+        if len(content) == 0:
+            pass
+        else:
+            toots += content + "。\n"
+    chain = PrepareChain.PrepareChain("user_toots",toots)
+    triplet_freqs = chain.make_triplet_freqs()
+    chain.save(triplet_freqs, True)
+    generator = GenerateText.GenerateText(5)
+    gen_txt = generator.generate("user_toots")
+    gen_txt = "@" + random_acct + " :@" + random_acct + ":＜「" + gen_txt + "」"
+    gen_txt = gen_txt.replace('\n',"")
+    #gen_txt +=  "\n#きりものまね #きりぼっと"
+    SM.update(random_acct, 'func')
+    if len(gen_txt) > 10:
+        toot(gen_txt, "unlisted", None, spoiler)
 
 #######################################################
 # 定期ここ1時間のまとめ
 def summarize_tooter():
-    jst_now = datetime.now(timezone('Asia/Tokyo'))
-    ymd = int((jst_now - timedelta(hours=1)).strftime("%Y%m%d"))
-    hh = (jst_now - timedelta(hours=1)).strftime("%H")
-    hh0000 = int(hh + "0000")
-    hh9999 = int(hh + "9999")
+    DAO = kiri_util.DAO_statuses()
     spoiler = "ＬＴＬここ1時間の自動まとめ"
-    con = sqlite3.connect(STATUSES_DB_PATH,timeout = 60*1000)
-    c = con.cursor()
-    c.execute( r"select content from statuses where (date = ?) and time >= ? and time <= ? and acct <> ?", (ymd,hh0000,hh9999,BOT_ID) )
     toots = ""
-    for row in c.fetchall():
+    for row in DAO.get_toots_1hour():
         content = content_cleanser(row[0])
         if len(content) == 0:
             pass
         else:
             content = re.sub(r"(.+)\1{3,}","",content, flags=(re.DOTALL))
             toots += content + "\n"
-    con.close()
     gen_txt = Toot_summary.summarize(pat1.sub("",pat2.sub("",toots)),limit=90, lmtpcs=5, m=1, f=4)
     if gen_txt[-1:1] == '#':
         gen_txt = gen_txt[:len(gen_txt)-1]
     if len(gen_txt) > 5:
-        #gen_txt +=  "\n#きりまとめ #きりぼっと"
         toot(gen_txt, "unlisted", None, spoiler)
 
 #######################################################
 # ボトルメールサービス　配信処理
 def bottlemail_sending():
+    DAO = kiri_util.DAO_statuses()
     bm = bottlemail.Bottlemail()
-    jst_now = datetime.now(timezone('Asia/Tokyo'))
-    ymd = int((jst_now - timedelta(hours=1)).strftime("%Y%m%d"))
-    hh = (jst_now - timedelta(hours=1)).strftime("%H")
-    hh0000 = int(hh + "0000")
-    hh9999 = int(hh + "9999")
-    try:
-        sendlist = bm.drifting()
-        for id,acct,msg,reply_id in sendlist:
-            sleep(DELAY)
-            spoiler = ":@" + acct + ": から🍾ボトルメール💌届いたよー！"
-            con = sqlite3.connect(STATUSES_DB_PATH,timeout = 60*1000)
-            c = con.cursor()
-            c.execute( r"select acct from statuses where (date = ?) and time >= ? and time <= ? and acct <> ?", [ymd,hh0000,hh9999,BOT_ID] )
-            acct_list = set([])
-            for row in c.fetchall():
-                acct_list.add(row[0])
-            acct_list -= ng_user_set
-            con.close()
-            random_acct = random.sample(acct_list,1)[0]
-            print(random_acct)
-            #お届け！
-            toots = "@" + random_acct + "\n:@" + acct + ":＜「" + msg + "」"
-            toots +=  "\n※ボトルメールサービス：＜メッセージ＞　であなたも送れるよー！試してみてね！"
-            toots +=  "\n#ボトルメールサービス #きりぼっと"
-            toot(toots, "direct",reply_id if reply_id != 0 else None, spoiler)
-            bm.sended(id, random_acct)
+    sendlist = bm.drifting()
+    for id,acct,msg,reply_id in sendlist:
+        sleep(DELAY)
+        spoiler = ":@" + acct + ": から🍾ボトルメール💌届いたよー！"
+        random_acct = DAO.sample_acct(timedelta(hours=1))
+        #お届け！
+        toots = "@" + random_acct + "\n:@" + acct + ":＜「" + msg + "」"
+        toots +=  "\n※ボトルメールサービス：＜メッセージ＞　であなたも送れるよー！試してみてね！"
+        toots +=  "\n#ボトルメールサービス #きりぼっと"
+        toot(toots, "direct",reply_id if reply_id != 0 else None, spoiler)
+        bm.sended(id, random_acct)
 
-            #到着通知
-            sleep(DELAY)
-            spoiler = ":@" + random_acct + ": が🍾ボトルメール💌受け取ったよー！"
-            toots = "@" + acct + " 届けたメッセージは……\n:@" + acct + ": ＜「" + msg + "」"
-            toots +=  "\n#ボトルメールサービス #きりぼっと"
-            toot(toots, "direct",reply_id if reply_id != 0 else None, spoiler)
+        #到着通知
+        sleep(DELAY)
+        spoiler = ":@" + random_acct + ": が🍾ボトルメール💌受け取ったよー！"
+        toots = "@" + acct + " 届けたメッセージは……\n:@" + acct + ": ＜「" + msg + "」"
+        toots +=  "\n#ボトルメールサービス #きりぼっと"
+        toot(toots, "direct",reply_id if reply_id != 0 else None, spoiler)
 
-        #漂流してるボトルの数
-        #ボトルが多い時は宣伝を減らすよー！
-        bmcnt = bm.flow_count()
-        if random.randint(0,bmcnt) <= 10:
-            sleep(DELAY)
-            spoiler = "現在漂流している🍾ボトルメール💌は%d本だよー！"%bmcnt
-            toots =  "\n※ボトルメールサービス：＜メッセージ＞　であなたも送れるよー！試してみてね！"
-            toots +=  "\n#ボトルメールサービス #きりぼっと"
-            toot(toots, "public", None, spoiler)
-    except:
-        error_log()
+    #漂流してるボトルの数
+    #ボトルが多い時は宣伝を減らすよー！
+    bmcnt = bm.flow_count()
+    if random.randint(0,bmcnt) <= 10:
+        sleep(DELAY)
+        spoiler = "現在漂流している🍾ボトルメール💌は%d本だよー！"%bmcnt
+        toots =  "\n※ボトルメールサービス：＜メッセージ＞　であなたも送れるよー！試してみてね！"
+        toots +=  "\n#ボトルメールサービス #きりぼっと"
+        toot(toots, "public", None, spoiler)
 
 #######################################################
 # 初めてのトゥートを探してぶーすとするよー！
 def timer_bst1st():
-    jst_now = datetime.now(timezone('Asia/Tokyo'))
-    ymd = int(jst_now.strftime("%Y%m%d"))
-    hh0000 = int((jst_now - timedelta(minutes=15)).strftime("%H%M%S"))
-    hh9999 = int(jst_now.strftime("%H%M%S"))
-    if hh0000 > hh9999:
-        hh0000 = 0
-    try:
-        con = sqlite3.connect(STATUSES_DB_PATH,timeout = 60*1000)
-        c = con.cursor()
-        #ランダムに人を選ぶよー！（最近いる人から）
-        c.execute( r"select acct from statuses where (date = ?) and time >= ? and time <= ? and acct <> ?", [ymd,hh0000,hh9999,BOT_ID] )
-        acct_list = set([])
-        for row in c.fetchall():
-            acct_list.add(row[0])
-        acct_list -= ng_user_set
-        if len(acct_list) < 1:
-            print('th_timer_bst1st ０人！')
-            con.close
-            return
-        random_acct = random.sample(acct_list,1)[0] #ひとり選ぶ
-        #print("***debug:random_acct=%s"%random_acct )
-        c.execute( r"select id from statuses where acct = ? order by id asc", (random_acct,) )
-        ids = []
-        for i,row in enumerate(c.fetchall()):
-            ids.append(row[0])
-            if i >= 200:
-                break
-        con.close()
-        boost_now(random.sample(ids,1)[0])
-        SM.update(random_acct, 'func')
-    except:
-        error_log()
-
-#######################################################
-# トレーニング処理
-def lstm_trainer():
-    jst_now = datetime.now(timezone('Asia/Tokyo'))
-    ymd = int((jst_now - timedelta(hours=1)).strftime("%Y%m%d"))
-    hh = (jst_now - timedelta(hours=1)).strftime("%H")
-    hh0000 = int(hh + "0000")
-    hh9999 = int(hh + "9999")
-    try:
-        con = sqlite3.connect(STATUSES_DB_PATH,timeout = 60*1000)
-        c = con.cursor()
-        c.execute( r"select content from statuses where (date = ?) and time >= ? and time <= ? and acct <> ? order by time asc", [ymd,hh0000,hh9999, BOT_ID] )
-        toots = []
-        for row in c.fetchall():
-            content = content_cleanser(row[0])
-            if len(content) == 0:
-                pass
-            else:
-                toots.append(content)
-        con.close()
-        kiri_deep.train("\n".join(toots))
-    except:
-        error_log()
+    DAO = kiri_util.DAO_statuses()
+    random_acct = DAO.sample_acct(timedelta(minutes=15))
+    boost_now(DAO.get_random_1id(random_acct))
+    SM.update(random_acct, 'func')
 
 #######################################################
 # きりぼっとのつぶやき
 def lstm_tooter():
-    try:
-        con = sqlite3.connect(STATUSES_DB_PATH,timeout = 60*1000)
-        c = con.cursor()
-        jst_now = datetime.now(timezone('Asia/Tokyo'))
-        ymd = int(jst_now.strftime("%Y%m%d"))
-        hh = jst_now.strftime("%H")
-        hh0000 = int(hh + "0000")
-        hh9999 = int(hh + "9999")
-        c.execute( r"select content,id,acct from statuses where (date = ?) and time >= ? and time <= ? and acct <> ? order by time desc", [ymd,hh0000,hh9999, BOT_ID] )
-        seeds = []
-        seedtxt = ''
-        id = 0
-        acct = ''
-        for row in c.fetchall():
-            content = content_cleanser(row[0])
-            id = row[1]
-            acct = row[2]
-            if len(content) == 0:
-                pass
-            else:
-                seeds.append(content)
-                if len(seeds)>10:
-                    break
-        con.close()
-        if len(seeds) <= 2:
-            return
-        seeds.reverse()
-        print('seeds=',seeds)
-        seedtxt = "".join(seeds)
-        print('seedtxt=%s'%seedtxt)
-        spoiler = None
-        gen_txt = kiri_deep.gentxt(seedtxt)
-        if gen_txt[0:1] == '。':
-            gen_txt = gen_txt[1:]
-        if len(gen_txt) > 40:
-            spoiler = ':@%s: 💭'%BOT_ID
+    DAO = kiri_util.DAO_statuses()
+    seeds = DAO.get_least_10toots()
+    if len(seeds) <= 2:
+        return
+    seedtxt = "".join(seeds)
+    spoiler = None
+    gen_txt = kiri_deep.gentxt(seedtxt)
+    if gen_txt[0:1] == '。':
+        gen_txt = gen_txt[1:]
+    if len(gen_txt) > 40:
+        spoiler = ':@%s: 💭'%BOT_ID
 
-        toot(gen_txt, "public", None, spoiler)
-    except:
-        error_log()
+    toot(gen_txt, "public", None, spoiler)
 
 #######################################################
 # DELETE時の処理
 def th_delete():
+    DAO = kiri_util.DAO_statuses()
     acct_1b = ''
     while len(STOPPA)==0:
-        status_id = DelQ.get()
         try:
-            con = sqlite3.connect(STATUSES_DB_PATH,timeout = 60*1000)
-            c = con.cursor()
-            c.execute( r"select acct,content from statuses where id = ?",(status_id,))
             toot_now = '@kiritan \n'
-            row = c.fetchone()
-            con.close()
+            row = DAO.pickup_1toot(DelQ.get())
+            print('th_delete:',row)
             if row:
                 if acct_1b != row[0]:
                     toot_now += ':@%s: 🚓🚓🚓＜う〜う〜！トゥー消し警察でーす！\n'%row[0]
@@ -1170,33 +890,10 @@ def th_delete():
             error_log()
 
 #######################################################
-# 数取りゲーム用 ゲーム値取得
-def get_gamenum():
-    #過去１５分のアクティブユーザ数をベース
-    jst_now = datetime.now(timezone('Asia/Tokyo'))
-    ymd = int(jst_now.strftime("%Y%m%d"))
-    hh0000 = int((jst_now - timedelta(minutes=5)).strftime("%H%M%S"))
-    hh9999 = int(jst_now.strftime("%H%M%S"))
-    if hh0000 > hh9999:
-        hh0000 = 0
-    try:
-        con = sqlite3.connect(STATUSES_DB_PATH,timeout = 60*1000)
-        c = con.cursor()
-        #ランダムに人を選ぶよー！（最近いる人から）
-        c.execute( r"select acct from statuses where (date = ?) and time >= ? and time <= ? and acct <> ?", [ymd,hh0000,hh9999,BOT_ID] )
-        acct_list = set([])
-        for row in c.fetchall():
-            acct_list.add(row[0])
-
-        return int(len(acct_list))
-
-    except:
-        error_log()
-        return 0
-
-#######################################################
 # 数取りゲーム
 def th_gettingnum():
+    DAO = kiri_util.DAO_statuses()
+    gamenum = 100
     junbiTM = kiri_util.KiriTimer(3600)
     junbiTM.reset(0)
     gameTM = kiri_util.KiriTimer(240)
@@ -1208,19 +905,18 @@ def th_gettingnum():
             sleep(27)
             continue
 
-        #ゲーム値取得
-        gamenum = get_gamenum()
-        if gamenum <= 5:
+        #アクティブ人数確認
+        i = DAO.get_gamenum()
+        if  i <= 5:
             sleep(3)
             toot('@%s\n人少ないからまた後でねー！'%g_acct, 'unlisted', g_id, None)
             sleep(27)
             continue
 
         #ゲーム開始ー！
-        gamenum = 100
         fav_now(g_id)
         sleep(DELAY)
-        gm = gettingNum.GettingNum(gamenum)
+        gm = kiri_game.GettingNum(gamenum)
         gameTM.reset()
         gameTM.start()
         toot('🔸1〜%dの中から一番大きい数を取った人が勝ちだよー！\
@@ -1273,9 +969,7 @@ def th_gettingnum():
                 for acct1 in accts:
                     toot_now += ':@%s:'%acct1
                 toot_now += '\n'
-
             toot('%s\n#数取りゲーム #きりぼっと'%toot_now, 'public', None, '数取りゲーム、結果発表ーー！！')
-
 
 #######################################################
 # はーとびーと！
@@ -1288,40 +982,12 @@ def th_haertbeat():
 #######################################################
 # トゥートを保存する
 def th_status_saver():
+    DAO = kiri_util.DAO_statuses()
     while True:
         status = StatusQ.get()
         # トゥートを保存
         try:
-            con = sqlite3.connect(STATUSES_DB_PATH,timeout = 60*1000)
-            c = con.cursor()
-            media_attachments = status["media_attachments"]
-            mediatext = ""
-            for media in media_attachments:
-                mediatext += media["url"] + " "
-
-            #jst_time = dateutil.parser.parse(str())
-            jst_time = status['created_at'].astimezone(timezone('Asia/Tokyo'))
-            fmt = "%Y%m%d"
-            tmpdate = jst_time.strftime(fmt)
-            fmt = "%H%M%S"
-            tmptime = jst_time.strftime(fmt)
-
-            data = (str(status['id']),
-                        tmpdate,
-                        tmptime,
-                        status['content'],
-                        status['account']['acct'],
-                        status['account']['display_name'],
-                        mediatext
-                        )
-            insert_sql = u"insert into statuses (id, date, time, content, acct, display_name, media_attachments) values (?, ?, ?, ?, ?, ?, ?)"
-            try:
-                c.execute(insert_sql, data)
-            except:
-                pass
-
-            con.commit()
-            con.close()
+            DAO.save_toot(status)
         except:
             #保存失敗したら、キューに詰めてリトライ！
             StatusQ.put(status)
@@ -1331,7 +997,7 @@ def th_status_saver():
 #######################################################
 # メイン
 def main():
-    with concurrent.futures.ThreadPoolExecutor(max_workers=30) as ex:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=15) as ex:
         #タイムライン受信系
         #ex.submit(mastodon.stream_local, res_toot() ) #LTL
         ex.submit(mastodon.stream_public, res_toot() ) #FTL
