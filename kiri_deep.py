@@ -56,7 +56,7 @@ def sample(preds, temperature=1.2):
     probas = np.random.multinomial(1, preds, 1)
     return np.argmax(probas)
 
-def gentxt(text):
+def lstm_gentxt(text):
     generated = ''
     rnd = random.sample(adaptr, 1)[0]
     tmp = text + '\n' + rnd + '、'
@@ -102,7 +102,7 @@ def takoramen(filepath):
     print("*** image:", filepath.split('/')[-1], "\n*** result:", rslt_dict)
     with open('image.log','a') as f:
         f.write("*** image:" + filepath.split('/')[-1] +  "  *** result:%s\n"%str(rslt_dict))
-    if max(result[0]) > 0.93:
+    if max(result[0]) > 0.9:
         return labels[np.where(result[0] == max(result[0]) )[0][0]]
     else:
         return 'other'

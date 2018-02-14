@@ -9,8 +9,11 @@ import threading
 from pytz import timezone
 from dateutil import parser
 from datetime import datetime,timedelta
+from bs4 import BeautifulSoup
 import warnings, traceback
 BOT_ID = 'kiri_bot01'
+#NGワード
+ng_words = set(word.strip() for word in open('.ng_words').readlines())
 
 #######################################################
 # エラー時のログ書き込み
@@ -22,6 +25,74 @@ def error_log():
         traceback.print_exc(file=f)
     print("###%s 例外情報\n"%ymdhms + traceback.format_exc())
 
+#######################################################
+# トゥート内容の標準化・クレンジング
+def content_cleanser(content):
+    tmp = BeautifulSoup(content.replace("<br />","___R___").strip(),'lxml')
+    hashtag = ""
+    for x in tmp.find_all("a",rel="tag"):
+        hashtag = x.span.text
+    for x in tmp.find_all("a"):
+        x.extract()
+
+    if tmp.text == None:
+        return ""
+
+    for ng_word in ng_words:
+        if ng_word in tmp.text:
+            return ""
+
+    rtext = ''
+    ps = []
+    for p in tmp.find_all("p"):
+        ps.append(p.text)
+    rtext += '。\n'.join(ps)
+    rtext = unicodedata.normalize("NFKC", rtext)
+    rtext = re.sub(r'([^:])@', r'\1', rtext)
+    rtext = rtext.replace("#","")
+    rtext = re.sub(r'(___R___)\1{2,}', r'\1', rtext)
+    rtext = re.sub(r'___R___', r'\n', rtext)
+    if hashtag != "":
+        return rtext + " #" + hashtag
+    else:
+        return rtext
+
+#######################################################
+# スケジューラー！
+def scheduler(func,mms=None,intvl=60,rndmin=0,rndmax=0,CM=None):
+    #func:起動する処理
+    #mm:起動時刻（分）
+    #intmm:起動間隔（分）
+    while True:
+        sleep(5)
+        try:
+            #時刻指定がなければ、インターバル分＋流速考慮値
+            if mms == None:
+                if rndmin == 0 and rndmax == 0 or rndmin >= rndmax:
+                    rndmm = 0
+                else:
+                    rndmm = random.randint(rndmin,rndmax)
+                if CM==None:
+                    cmm = 0
+                else:
+                    cmm = int(CM.get_coolingtime())
+                a = (intvl+cmm+rndmm)*60
+                print('###%s###  start at : %ds'%(func,a))
+                sleep(a)
+                func()
+            else:
+                #以降は時刻指定時の処理
+                jst_now = datetime.now(timezone('Asia/Tokyo'))
+                mm = jst_now.strftime("%M")
+                #print('###%s###  start at: **:%s'%(func,mms))
+                if mm in mms:
+                    func()
+                    sleep(60)
+        except Exception:
+            error_log()
+
+#######################################################
+# スコア管理
 class ScoreManager():
     DB_PATH = "db/scoremanager.db"
     DB_SCHEMA_PATH = "scoremanager.sql"
@@ -65,15 +136,11 @@ class ScoreManager():
         c.execute( r"select * from scoremanager where acct = ?",(acct,))
         row = c.fetchone()
         if row == None:
-            c.execute('insert into scoremanager (acct, score_getnum, score_fav,\
-             datetime_fav, score_boost, datetime_boost,  score_reply, score_func)\
-             values (?,?,?,?,?,?,?,?) ',(acct,i_score_getnum, i_score_fav,
-              i_datetime_fav, i_score_boost, i_datetime_boost, i_score_reply, i_score_func) )
+            c.execute('insert into scoremanager (acct, score_getnum, score_fav, datetime_fav, score_boost, datetime_boost,  score_reply, score_func) values (?,?,?,?,?,?,?,?) ',
+                        (acct,i_score_getnum, i_score_fav, i_datetime_fav, i_score_boost, i_datetime_boost, i_score_reply, i_score_func) )
         else:
             r_acct, r_score_getnum, r_score_fav, r_datetime_fav, r_score_boost,\
-             r_datetime_boost, r_score_reply, r_score_func   = row
-            #print('row=',row)
-            #にこ、ぶー爆はカウントしない
+                r_datetime_boost, r_score_reply, r_score_func   = row
             if i_datetime_fav == None:
                 i_fav_time   = None
             else:
@@ -109,8 +176,6 @@ class ScoreManager():
 
             if i_datetime_boost != None:
                 r_datetime_boost = i_datetime_boost
-
-            #print(i_fav_time, r_fav_time, i_boost_time, r_boost_time, diff)
 
             c.execute('update scoremanager set score_getnum=?, score_fav=?, datetime_fav=?, score_boost=?, datetime_boost=?,  score_reply=?, score_func=? where acct=?',\
                 (r_score_getnum+i_score_getnum, r_score_fav+i_score_fav, r_datetime_fav, r_score_boost+i_score_boost, r_datetime_boost, r_score_reply+i_score_reply, r_score_func+i_score_func, acct) )
@@ -192,14 +257,13 @@ class KiriTimer():
 #######################################################
 # きりたんだお〜！
 class DAO_statuses():
-    #トゥート先NGの人たちー！
-    ng_user_set = set('friends_nico')
-    STATUSES_DB_PATH = "db/statuses.db"
     def __init__(self):
-        self.con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 60*1000)
-        self.c = self.con.cursor()
+        #path
+        self.STATUSES_DB_PATH = "db/statuses.db"
         #NGワード
         self.ng_words = set(word.strip() for word in open('.ng_words').readlines())
+        #トゥート先NGの人たちー！
+        self.ng_user_set = set('friends_nico')
 
     #######################################################
     # 指定された時間内から一人ユーザを選ぶ
@@ -210,13 +274,16 @@ class DAO_statuses():
         hh9999 = int(jst_now.strftime("%H%M%S"))
         if hh0000 > hh9999:
             hh9999 = 2359
-        self.c.execute( r"select acct from statuses where (date = ?) and time >=\
-                    ? and time <= ? and acct <> ?", [ymd,hh0000,hh9999,BOT_ID] )
-        toots = ""
+
         acct_list = set([])
-        for row in self.c.fetchall():
+        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 60*1000)
+        c = con.cursor()
+        sql = r"select acct from statuses where (date = ?) and time >= ? and time <= ? and acct <> ?"
+        for row in c.execute(sql , [ymd,hh0000,hh9999,BOT_ID] ) :
             acct_list.add(row[0])
         acct_list -= self.ng_user_set
+        con.close()
+
         return random.sample(acct_list,1)[0]
 
     #######################################################
@@ -224,49 +291,47 @@ class DAO_statuses():
     def get_random_1id(self,acct):
         if acct == None:
             return
-        #self.c.execute( r"select id from statuses where acct = ? order by id asc", (acct,) )
-        self.c.execute( r"select id from statuses where acct = ?", (acct,) )
         ids = []
-        for i,row in enumerate(c.fetchall()):
+        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 60*1000)
+        c = con.cursor()
+        sql = r"select id from statuses where acct = ?"
+        for i,row in enumerate(c.execute( sql, (acct,))):
             ids.append(row[0])
             if i >= 10000:
                 break
+        con.close()
         return random.sample(ids,1)[0]
 
     #######################################################
     # 直近１０トゥートを返す
     def get_least_10toots(self):
-        jst_now = datetime.now(timezone('Asia/Tokyo'))
-        ymd = int(jst_now.strftime("%Y%m%d"))
-        hh = jst_now.strftime("%H")
-        hh0000 = int(hh + "0000")
-        hh9999 = int(hh + "9999")
-        self.c.execute( r"select content,id,acct from statuses where (date = ?) \
-                and time >= ? and time <= ? and acct <> ? order by time desc"\
-                , [ymd,hh0000,hh9999, BOT_ID] )
         seeds = []
-        seedtxt = ''
-        id = 0
-        acct = ''
-        for row in self.c.fetchall():
+        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 60*1000)
+        c = con.cursor()
+        sql = r"select content from statuses order by id desc"
+        for row in c.execute(sql):
             content = content_cleanser(row[0])
-            id = row[1]
-            acct = row[2]
+            #print('get_least_10toots content=',content)
             if len(content) == 0:
-                pass
+                continue
             else:
                 seeds.append(content)
                 if len(seeds)>10:
                     break
-        return seeds.reverse()
+        con.close()
+        seeds.reverse()
+        return seeds
 
     #######################################################
     # ｉｄ指定でトゥート内容を返す
     def pickup_1toot(self,status_id):
-            self.c.execute( r"select acct,content from statuses where id = ?",
-                            (status_id,))
-            row = self.c.fetchone()
-            return row
+        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 60*1000)
+        c = con.cursor()
+        c.execute( r"select acct,content from statuses where id = ?",
+                        (status_id,))
+        row = c.fetchone()
+        con.close()
+        return row
 
     #######################################################
     # 数取りゲーム用 人数カウント
@@ -278,46 +343,55 @@ class DAO_statuses():
         hh9999 = int(jst_now.strftime("%H%M%S"))
         if hh0000 > hh9999:
             hh0000 = 0
-        try:
-            #ランダムに人を選ぶよー！（最近いる人から）
-            self.c.execute( r"select acct from statuses where (date = ?) and time >= ? and time <= ? and acct <> ?",[ymd,hh0000,hh9999,BOT_ID] )
-            acct_list = set([])
-            for row in self.c.fetchall():
-                acct_list.add(row[0])
+        #ランダムに人を選ぶよー！（最近いる人から）
+        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 60*1000)
+        c = con.cursor()
+        c.execute( r"select acct from statuses where (date = ?) and time >= ? and time <= ? and acct <> ?",[ymd,hh0000,hh9999,BOT_ID] )
+        acct_list = set([])
+        for row in c.fetchall():
+            acct_list.add(row[0])
 
-            return int(len(acct_list))
+        con.close()
+        return len(acct_list)
 
-        except:
-            error_log()
-            return 0
-
+    #######################################################
+    # モノマネ用
     def get_user_toots(self,acct):
-        self.c.execute( r"select content from statuses where acct = ?", (acct,) )
-        return self.c.fetchall()
+        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 60*1000)
+        c = con.cursor()
+        c.execute( r"select content from statuses where acct = ?", (acct,) )
+        rows = c.fetchall()
+        con.close()
+        return rows
 
+    #######################################################
+    # ここ1時間の要約
     def get_toots_1hour(self):
         jst_now = datetime.now(timezone('Asia/Tokyo'))
         ymd = int((jst_now - timedelta(hours=1)).strftime("%Y%m%d"))
         hh = (jst_now - timedelta(hours=1)).strftime("%H")
         hh0000 = int(hh + "0000")
         hh9999 = int(hh + "9999")
-        self.c.execute( r"select content from statuses where (date = ?) and time\
-                >= ? and time <= ? and acct <> ?", (ymd,hh0000,hh9999,BOT_ID) )
-        return self.c.fetchall()
+        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 60*1000)
+        c = con.cursor()
+        c.execute( r"select content from statuses where (date = ?) and time >= ? and time <= ? and acct <> ?",
+                    (ymd,hh0000,hh9999,BOT_ID) )
+        rows = c.fetchall()
+        con.close()
+        return rows
 
+    #######################################################
+    # トゥートの保存
     def save_toot(self, status):
         media_attachments = status["media_attachments"]
         mediatext = ""
         for media in media_attachments:
             mediatext += media["url"] + " "
-
-        #jst_time = dateutil.parser.parse(str())
         jst_time = status['created_at'].astimezone(timezone('Asia/Tokyo'))
         fmt = "%Y%m%d"
         tmpdate = jst_time.strftime(fmt)
         fmt = "%H%M%S"
         tmptime = jst_time.strftime(fmt)
-
         data = (str(status['id']),
                     tmpdate,
                     tmptime,
@@ -326,13 +400,18 @@ class DAO_statuses():
                     status['account']['display_name'],
                     mediatext
                     )
+        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 60*1000)
+        c = con.cursor()
         insert_sql = u"insert into statuses (id, date, time, content, acct,\
                 display_name, media_attachments) values (?, ?, ?, ?, ?, ?, ?)"
         try:
-            self.c.execute(insert_sql, data)
-            self.con.commit()
-        except:
-            pass
+            c.execute(insert_sql, data)
+        except sqlite3.Error:
+            raise
+        else:
+            con.commit()
+        finally:
+            con.close()
 
 if __name__ == '__main__':
     pass
