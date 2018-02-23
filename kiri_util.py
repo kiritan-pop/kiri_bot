@@ -267,20 +267,15 @@ class DAO_statuses():
 
     #######################################################
     # 指定された時間内から一人ユーザを選ぶ
-    def sample_acct(self,delta):
-        jst_now = datetime.now(timezone('Asia/Tokyo'))
-        ymd = int((jst_now - delta).strftime("%Y%m%d"))
-        hh0000 = int((jst_now - delta).strftime("%H%M%S"))
-        hh9999 = int(jst_now.strftime("%H%M%S"))
-        if hh0000 > hh9999:
-            hh9999 = 2359
-
+    def sample_acct(self,delta=None):
         acct_list = set([])
         con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 60*1000)
         c = con.cursor()
-        sql = r"select acct from statuses where (date = ?) and time >= ? and time <= ? and acct <> ?"
-        for row in c.execute(sql , [ymd,hh0000,hh9999,BOT_ID] ) :
+        sql = r"select acct from statuses where acct <> ? order by id desc"
+        for row in c.execute(sql , [BOT_ID,] ) :
             acct_list.add(row[0])
+            if len(acct_list)>10:
+                break
         acct_list -= self.ng_user_set
         con.close()
 
@@ -294,10 +289,13 @@ class DAO_statuses():
         ids = []
         con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 60*1000)
         c = con.cursor()
-        sql = r"select id from statuses where acct = ?"
-        for i,row in enumerate(c.execute( sql, (acct,))):
+        if random.randint(0,100) % 2 == 0:
+            sql = r"select id from statuses where acct = ?  order by id asc"
+        else:
+            sql = r"select id from statuses where acct = ?  order by id desc"
+        for row in c.execute( sql, (acct,)):
             ids.append(row[0])
-            if i >= 10000:
+            if len(ids) >= 3000:
                 break
         con.close()
         return random.sample(ids,1)[0]
@@ -406,6 +404,9 @@ class DAO_statuses():
                 display_name, media_attachments) values (?, ?, ?, ?, ?, ?, ?)"
         try:
             c.execute(insert_sql, data)
+
+        except sqlite3.IntegrityError:
+            pass
         except sqlite3.Error:
             raise
         else:

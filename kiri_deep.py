@@ -24,8 +24,8 @@ for label,i in labels_index.items():
 
 STANDARD_SIZE = (299, 299)
 
-model_path = 'db/lstm_toot_v5.h5'
-takomodel_path = 'db/tako4.h5'
+model_path = 'db/lstm_toot_v6.h5'
+takomodel_path = 'db/tako5.h5'
 print('******* lstm load model %s,%s*******' %(model_path,takomodel_path))
 # モデルを読み込む
 model = load_model(model_path)
@@ -34,7 +34,7 @@ graph = tf.get_default_graph()
 
 #いろいろなパラメータ
 maxlen = 10           #モデルに合わせて！
-diver = 0.5         #ダイバーシティ：大きくすると想起の幅が大きくなるっぽいー！
+diver = 0.4         #ダイバーシティ：大きくすると想起の幅が大きくなるっぽいー！
 
 pat3 = re.compile(r'^\n')
 pat4 = re.compile(r'\n')
@@ -102,7 +102,7 @@ def takoramen(filepath):
     print("*** image:", filepath.split('/')[-1], "\n*** result:", rslt_dict)
     with open('image.log','a') as f:
         f.write("*** image:" + filepath.split('/')[-1] +  "  *** result:%s\n"%str(rslt_dict))
-    if max(result[0]) > 0.9:
+    if max(result[0]) > 0.8:
         return labels[np.where(result[0] == max(result[0]) )[0][0]]
     else:
         return 'other'
