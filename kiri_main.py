@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 import Toot_summary, GenerateText, PrepareChain, bottlemail
 import kiri_util, kiri_deep, kiri_game
 
+MASTER_ID = 'kiritan'
 BOT_ID = 'kiri_bot01'
 BOTS = [BOT_ID,'JC','12222222','friends_booster']
 DELAY = 2
@@ -21,7 +22,7 @@ pat2 = re.compile(r'[ｗ！？!\?]')
 
 #得点管理、流速監視
 SM = kiri_util.ScoreManager()
-CM = kiri_util.CoolingManager(10)
+CM = kiri_util.CoolingManager(20)
 DAO = kiri_util.DAO_statuses()
 
 #.envファイルからトークンとかURLを取得ー！
@@ -56,7 +57,7 @@ for i in range(32):
 for i in range(16):
     hanalist.append('🐽')
     hanalist.append('👃')
-hanalist.append('🌷🌸🌹🌺🌻🌼大当たり！🌼🌻🌺🌹🌸🌷  @kiritan')
+hanalist.append('🌷🌸🌹🌺🌻🌼大当たり！🌼🌻🌺🌹🌸🌷  @%s'%MASTER_ID)
 
 #######################################################
 # マストドンＡＰＩ用部品を継承して、通知時の処理を実装ー！
@@ -71,7 +72,7 @@ class men_toot(StreamListener):
             vote_check(status)
             #quick_rtn(status)
             TQ.put(status)
-            StatusQ.put(status)
+            #StatusQ.put(status)
             SM.update(notification["status"]["account"]["acct"], 'reply')
         elif notification["type"] == "favourite":
             SM.update(notification["account"]["acct"], 'fav', ymdhms)
@@ -101,7 +102,7 @@ class res_toot(StreamListener):
             if  status["account"]["username"] in BOTS:
                 return
             TQ.put(status)
-            quick_rtn(status)
+            #quick_rtn(status)
             CM.count(status['created_at'])
 
     def on_delete(self, status_id):
@@ -110,7 +111,7 @@ class res_toot(StreamListener):
 
 #######################################################
 # トゥート処理
-def toot(toot_now, g_vis, rep=None, spo=None, media_ids=None, interval=0):
+def toot(toot_now, g_vis='direct', rep=None, spo=None, media_ids=None, interval=0):
     def th_toot(toot_now, g_vis, rep, spo, media_ids):
         mastodon.status_post(status=toot_now[0:450], visibility=g_vis, in_reply_to_id=rep, spoiler_text=spo, media_ids=media_ids)
     th = threading.Timer(interval=interval,function=th_toot,args=(toot_now, g_vis, rep, spo, media_ids))
@@ -200,24 +201,27 @@ def quick_rtn(status):
     #
     Toot1bQ.put((content, acct, id, g_vis))
 
-    if re.search(r"^(緊急|強制)(停止|終了)$", content) and acct == 'kiritan':
+    if re.search(r"^(緊急|強制)(停止|終了)$", content) and acct == MASTER_ID:
         print("＊＊＊＊＊＊＊＊＊＊＊緊急停止したよー！＊＊＊＊＊＊＊＊＊＊＊")
-        toot("@kiritan 緊急停止しまーす！", 'direct', id ,None)
+        toot("@%s 緊急停止しまーす！"%MASTER_ID, 'direct', id ,None)
         sleep(10)
         os.kill(os.getpid(), signal.SIGKILL)
 
     a = int(CM.get_coolingtime())
+    a = int(a*a / 2)
     rnd = random.randint(-1,7+a)
+    if acct == MASTER_ID:
+        rnd = 0
     if rnd == -1:
         return
     toot_now = ''
     id_now = id
     vis_now = g_vis
     interval = 0
-    if statuses_count != 3 and  (statuses_count - 3)%10000 == 0:
-        interval = 3
+    if statuses_count != 0 and  statuses_count%10000 == 0:
+        interval = 180
         toot_now = username + "\n"
-        toot_now += "あ！そういえばさっき{0:,}トゥートだったよー！".format(statuses_count-3)
+        toot_now += "あ！そういえばさっき{0:,}トゥートだったよー！".format(statuses_count)
         vis_now = 'unlisted'
         SM.update(acct, 'func')
     elif statuses_count == 1:
@@ -265,11 +269,11 @@ def quick_rtn(status):
             vis_now = 'public'
             id_now = None
     elif re.search(r"^通過$", content):
-        toot_now = '%s ⊂(｀・ω・´)⊃＜阻止！'%username
+        toot_now = '%s ⊂(๑•᎑•๑)⊃＜阻止！'%username
         vis_now = 'direct'
         SM.update(acct, 'func')
         if rnd <= 4:
-            toot_now = '⊂(｀・ω・´)⊃＜阻止！'
+            toot_now = '⊂(๑•᎑•๑)⊃＜阻止！'
             vis_now = 'public'
             id_now = None
     elif re.search(r"3.{0,1}3.{0,1}4", content):
@@ -301,8 +305,11 @@ def quick_rtn(status):
             vis_now = 'direct'
     elif re.search(r"^(今|いま)の[な|無|ナ][し|シ]$", content):
         SM.update(acct, 'func',score=-1)
+        if rnd <= 6:
+            toot_now = '@%s\n:@%s: 🚓🚓🚓＜う〜う〜！いまのなし警察でーす！'%(acct,acct)
+            vis_now = 'direct'
         if rnd <= 3:
-            toot_now = '🚓🚓🚓＜う〜う〜！いまのなし警察でーす！'
+            toot_now = ':@%s: 🚓🚓🚓＜う〜う〜！いまのなし警察でーす！'%acct
             vis_now = 'public'
             id_now = None
     elif re.search(r"ツイッター|ツイート|[tT]witter", content):
@@ -389,6 +396,27 @@ def quick_rtn(status):
         toot(toot_now, vis_now, id_now, None, None, interval)
 
 #######################################################
+# 即時応答処理ー！
+def business_contact(status):
+    id = status["id"]
+    acct = status["account"]["acct"]
+    g_vis = status["visibility"]
+    content = kiri_util.content_cleanser(status['content'])
+    statuses_count = status["account"]["statuses_count"]
+    spoiler_text = status["spoiler_text"]
+    created_at = status['created_at']
+
+    #最後にトゥートしてから3時間以上？
+    ymdhms = DAO.get_least_created_at(acct)
+    diff = timedelta(hours=3)
+    if ymdhms == None:
+        toot_now = '@%s 新規さんかも−！\n:@%s: (◍•ᴗ•◍)◜よっ！ひさしぶりー！'%(MASTER_ID,acct)
+        toot(toot_now)
+    elif ymdhms + diff < created_at:
+        toot_now = '@%s 帰ってきたよ−！(前回書込：%s)\n:@%s: (◍•ᴗ•◍)◜よっ！'%(MASTER_ID, ymdhms.strftime("%Y.%m.%d %H:%M:%S"), acct)
+        toot(toot_now)
+
+#######################################################
 # 画像検索サービス
 def get_file_name(url):
     return url.split("/")[-1]
@@ -415,7 +443,7 @@ def is_japanese(string):
 
 #######################################################
 # ランク表示
-def recipe_service(content=None, acct='kiritan', id=None, g_vis='unlisted'):
+def recipe_service(content=None, acct=MASTER_ID, id=None, g_vis='unlisted'):
     print('recipe_service parm ',content, acct, id, g_vis)
     fav_now(id)
     generator = GenerateText.GenerateText(1)
@@ -655,14 +683,14 @@ def th_worker():
                 if random.randint(0,10+a) > 3:
                     continue
                 toot_now = "@%s\n"%acct
-                toot_now += kiri_deep.lstm_gentxt(content)
+                toot_now += kiri_deep.lstm_gentxt(content,num=1)
                 toot(toot_now, g_vis, id, None,interval=5)
                 SM.update(acct, 'reply')
             elif re.search(r'[^:]@kiri_bot01', status['content']):
                 if not content.strip().isdigit():
                     fav_now(id)
                     toot_now = "@%s\n"%acct
-                    toot_now += kiri_deep.lstm_gentxt(content)
+                    toot_now += kiri_deep.lstm_gentxt(content,num=1)
                     toot(toot_now, g_vis, id, None,interval=5)
             else:
                 continue
@@ -764,7 +792,7 @@ def lstm_tooter():
         return
     seedtxt = "".join(seeds)
     spoiler = None
-    gen_txt = kiri_deep.lstm_gentxt(seedtxt)
+    gen_txt = kiri_deep.lstm_gentxt(seedtxt,num=3)
     if gen_txt[0:1] == '。':
         gen_txt = gen_txt[1:]
     if len(gen_txt) > 40:
@@ -778,7 +806,7 @@ def th_delete():
     acct_1b = ''
     while True:
         try:
-            toot_now = '@kiritan \n'
+            toot_now = '@%s \n'%MASTER_ID
             row = DAO.pickup_1toot(DelQ.get())
             #print('th_delete:',row)
             if row:
@@ -880,18 +908,22 @@ def th_gettingnum():
             kiri_util.error_log()
 
 #######################################################
-# トゥートを保存する
-def th_status_saver():
+# トゥートをいろいろ
+def th_worker_quick():
     while True:
         status = StatusQ.get()
+        # 即時応答
+        quick_rtn(status)
+        # 業務連絡
+        business_contact(status)
         # トゥートを保存
         try:
             DAO.save_toot(status)
         except Exception:
             #保存失敗したら、キューに詰めてリトライ！
-            StatusQ.put(status)
+            #StatusQ.put(status)
             kiri_util.error_log()
-            sleep(30)
+            #sleep(30)
 
 def t_local():
     try:
@@ -916,7 +948,7 @@ def th_nicoru():
     gen_txt = ''
     while len(gen_txt) < 430:
         gen_txt += ':nicoru{0}:'.format(random.randint(0,360))
-    toot('@kiritan '+gen_txt, "direct", None, None)
+    toot('@%s '%MASTER_ID + gen_txt, "direct", None, None)
 
 #######################################################
 # メイン
@@ -929,14 +961,14 @@ def main():
     #タイムライン応答系
     threads.append( threading.Thread(target=th_worker) )
     threads.append( threading.Thread(target=th_delete) )
-    threads.append( threading.Thread(target=th_status_saver) )
+    threads.append( threading.Thread(target=th_worker_quick) )
     threads.append( threading.Thread(target=th_gettingnum) )
     #スケジュール起動系
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(summarize_tooter,['02'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(bottlemail_sending,['05'])) )
-    threads.append( threading.Thread(target=kiri_util.scheduler, args=(monomane_tooter,None,30,0,30,CM)) )
-    threads.append( threading.Thread(target=kiri_util.scheduler, args=(lstm_tooter,None,15,0,10,CM)) )
-    threads.append( threading.Thread(target=kiri_util.scheduler, args=(timer_bst1st,None,45,0,45,CM)) )
+    threads.append( threading.Thread(target=kiri_util.scheduler, args=(monomane_tooter,None,30,0,5,CM)) )
+    threads.append( threading.Thread(target=kiri_util.scheduler, args=(lstm_tooter,None,15,0,5,CM)) )
+    threads.append( threading.Thread(target=kiri_util.scheduler, args=(timer_bst1st,None,45,0,5,CM)) )
     #threads.append( threading.Thread(target=kiri_util.scheduler, args=(th_nicoru,None,60,0,60,CM)) )
 
     for th in threads:

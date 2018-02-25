@@ -24,7 +24,7 @@ for label,i in labels_index.items():
 
 STANDARD_SIZE = (299, 299)
 
-model_path = 'db/lstm_toot_v6.h5'
+model_path = 'db/lstm_toot_v7.h5'
 takomodel_path = 'db/tako5.h5'
 print('******* lstm load model %s,%s*******' %(model_path,takomodel_path))
 # モデルを読み込む
@@ -33,8 +33,8 @@ takomodel = load_model(takomodel_path)
 graph = tf.get_default_graph()
 
 #いろいろなパラメータ
-maxlen = 10           #モデルに合わせて！
-diver = 0.4         #ダイバーシティ：大きくすると想起の幅が大きくなるっぽいー！
+maxlen = 15           #モデルに合わせて！
+diver = 0.45         #ダイバーシティ：大きくすると想起の幅が大きくなるっぽいー！
 
 pat3 = re.compile(r'^\n')
 pat4 = re.compile(r'\n')
@@ -56,7 +56,7 @@ def sample(preds, temperature=1.2):
     probas = np.random.multinomial(1, preds, 1)
     return np.argmax(probas)
 
-def lstm_gentxt(text):
+def lstm_gentxt(text,num=0):
     generated = ''
     rnd = random.sample(adaptr, 1)[0]
     tmp = text + '\n' + rnd + '、'
@@ -67,6 +67,10 @@ def lstm_gentxt(text):
         sentence = tmp * maxlen
         sentence = sentence[-maxlen:]
     print('seed text= %s ' %sentence)
+    if num == 0:
+        vol = random.randint(1,5)
+    else:
+        vol = num
     for i in range(300):
         x_pred = np.zeros((1, maxlen, len(wl_chars)))
         for t, char in enumerate(list(sentence)):
@@ -82,13 +86,12 @@ def lstm_gentxt(text):
 
         generated += next_char
         sentence = sentence[1:] + next_char
-        if generated.count('\n') + generated.count('。') > 2:
+        if generated.count('\n') + generated.count('。') > vol:
             break
 
     rtn_text = generated
     rtn_text = re.sub(r'。{2,}','。',rtn_text, flags=(re.MULTILINE | re.DOTALL))
-    rtn_text = re.sub(r'^。','',rtn_text, flags=(re.MULTILINE | re.DOTALL))
-    rtn_text = re.sub(r'^\n','',rtn_text, flags=(re.MULTILINE | re.DOTALL))
+    rtn_text = re.sub(r'^[。、\n]','',rtn_text, flags=(re.MULTILINE | re.DOTALL))
     return rtn_text
 
 def takoramen(filepath):

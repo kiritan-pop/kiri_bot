@@ -414,5 +414,21 @@ class DAO_statuses():
         finally:
             con.close()
 
+    #######################################################
+    # 対象の人の最新のトゥート日付を取得（新規さん等はNoneを返す）
+    def get_least_created_at(self,acct):
+        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 60*1000)
+        c = con.cursor()
+        c.execute( r"select date, time from statuses where acct = ? order by id desc ", (acct,))
+        row = c.fetchone()
+        con.close()
+        if row:
+            date = '{0:08d}'.format(row[0])
+            time = '{0:06d}'.format(row[1])
+            ymdhms = '%s %s'%(date,time)
+            return parser.parse(ymdhms).astimezone(timezone('Asia/Tokyo'))
+        else:
+            return None
+
 if __name__ == '__main__':
     pass
