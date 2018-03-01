@@ -15,14 +15,14 @@ import kiri_util, kiri_deep, kiri_game
 
 MASTER_ID = 'kiritan'
 BOT_ID = 'kiri_bot01'
-BOTS = [BOT_ID,'JC','12222222','friends_booster']
+BOTS = [BOT_ID,'12222222','friends_booster','5','neruru']
 DELAY = 2
 pat1 = re.compile(r' ([!-~ぁ-んァ-ン] )+|^([!-~ぁ-んァ-ン] )+| [!-~ぁ-んァ-ン]$',flags=re.MULTILINE)  #[!-~0-9a-zA-Zぁ-んァ-ン０-９ａ-ｚ]
 pat2 = re.compile(r'[ｗ！？!\?]')
 
 #得点管理、流速監視
 SM = kiri_util.ScoreManager()
-CM = kiri_util.CoolingManager(20)
+CM = kiri_util.CoolingManager(10)
 DAO = kiri_util.DAO_statuses()
 
 #.envファイルからトークンとかURLを取得ー！
@@ -98,9 +98,6 @@ class res_toot(StreamListener):
             return
         else:
             StatusQ.put(status)
-            #bot達のLTLトゥートは無視する(ง •̀ω•́)ง✧＜無限ループ防止！
-            if  status["account"]["username"] in BOTS:
-                return
             TQ.put(status)
             #quick_rtn(status)
             CM.count(status['created_at'])
@@ -187,13 +184,18 @@ def quick_rtn(status):
     username = "@" +  acct
     g_vis = status["visibility"]
     content = kiri_util.content_cleanser(status['content'])
-    print('=== %s  by %s'%('\n    '.join(content.split('\n')), acct))
+    application = status['application']['name']
+    print('=== %s  by %s,%s'%('\n    '.join(content.split('\n')), acct,application))
     statuses_count = status["account"]["statuses_count"]
     spoiler_text = status["spoiler_text"]
-
+    #botはスルー
+    if  acct in BOTS:
+        return
+    #ももながbotの場合もスルー
+    if  acct == 'JC' and application == '女子会':
+        return
     if len(content) <= 0:
         return
-
     if  Toot1bQ.empty():
         content_1b, acct_1b, id_1b, g_vis_1b = None,None,None,None
     else:
@@ -208,7 +210,7 @@ def quick_rtn(status):
         os.kill(os.getpid(), signal.SIGKILL)
 
     a = int(CM.get_coolingtime())
-    a = int(a*a / 2)
+    #a = int(a*a / 2)
     rnd = random.randint(-1,7+a)
     if acct == MASTER_ID:
         rnd = 0
@@ -253,13 +255,29 @@ def quick_rtn(status):
     elif re.search(r"ブリブリ|ぶりぶり|うん[ちこ]|💩|^流して$", content+spoiler_text):
         SM.update(acct, 'func',score=-1)
         if rnd <= 3:
-            toot_now = '🌊🌊🌊 ＜ざばーっ！'
+            toot_now = '🌊🌊🌊🌊 ＜ざばーっ！'
             vis_now = 'public'
             id_now = None
-    elif re.search(r"^ふきふき$", content):
+    elif re.search(r"^ふきふき$|^竜巻$", content):
         SM.update(acct, 'func')
+        if rnd <= 1:
+            toot_now = '🌪🌪🌪🌪＜ごぉ〜〜っ！'
+            vis_now = 'public'
+            id_now = None
         if rnd <= 3:
             toot_now = '💨💨💨🍃＜ふわ〜っ！'
+            vis_now = 'public'
+            id_now = None
+    elif re.search(r"^凍らせて$", content):
+        SM.update(acct, 'func')
+        if rnd <= 3:
+            toot_now = '❄❄❄❄❄＜カチコチ−！'
+            vis_now = 'public'
+            id_now = None
+    elif re.search(r"^雷$", content):
+        SM.update(acct, 'func')
+        if rnd <= 3:
+            toot_now = '⚡️⚡️⚡️⚡️＜ビリビリ−！'
             vis_now = 'public'
             id_now = None
     elif re.search(r"^ぬるぽ$", content):
@@ -269,11 +287,11 @@ def quick_rtn(status):
             vis_now = 'public'
             id_now = None
     elif re.search(r"^通過$", content):
-        toot_now = '%s ⊂(๑•᎑•๑)⊃＜阻止！'%username
+        toot_now = '%s ( ⊂๑˃̵᎑˂̵)⊃＜阻止！'%username
         vis_now = 'direct'
         SM.update(acct, 'func')
         if rnd <= 4:
-            toot_now = '⊂(๑•᎑•๑)⊃＜阻止！'
+            toot_now = '⊂(˃̵᎑˂̵๑⊃ )＜阻止！'
             vis_now = 'public'
             id_now = None
     elif re.search(r"3.{0,1}3.{0,1}4", content):
@@ -405,6 +423,7 @@ def business_contact(status):
     statuses_count = status["account"]["statuses_count"]
     spoiler_text = status["spoiler_text"]
     created_at = status['created_at']
+    display_name = status["account"]['display_name']
 
     #最後にトゥートしてから3時間以上？
     ymdhms = DAO.get_least_created_at(acct)
@@ -413,7 +432,7 @@ def business_contact(status):
         toot_now = '@%s 新規さんかも−！\n:@%s: (◍•ᴗ•◍)◜よっ！ひさしぶりー！'%(MASTER_ID,acct)
         toot(toot_now)
     elif ymdhms + diff < created_at:
-        toot_now = '@%s 帰ってきたよ−！(前回書込：%s)\n:@%s: (◍•ᴗ•◍)◜よっ！'%(MASTER_ID, ymdhms.strftime("%Y.%m.%d %H:%M:%S"), acct)
+        toot_now = '@%s 帰ってきたよ−！(前回書込：%s)\n:@%s: %s！(◍•ᴗ•◍)◜よっ！'%(MASTER_ID, ymdhms.strftime("%Y.%m.%d %H:%M:%S"), acct, display_name)
         toot(toot_now)
 
 #######################################################
@@ -572,6 +591,7 @@ def th_worker():
     while True:
         try:
             status = TQ.get() #キューからトゥートを取り出すよー！なかったら待機してくれるはずー！
+            #bot達のLTLトゥートは無視する(ง •̀ω•́)ง✧＜無限ループ防止！
             id = status["id"]
             acct = status["account"]["acct"]
             g_vis = status["visibility"]
@@ -579,7 +599,12 @@ def th_worker():
             spoiler_text = kiri_util.content_cleanser(status["spoiler_text"])
             media_attachments = status["media_attachments"]
             sensitive = status['sensitive']
-
+            application = status['application']['name']
+            if  acct in BOTS:
+                continue
+            #ももながbotの場合もスルー
+            if  acct == 'JC' and application == '女子会':
+                continue
             if re.search(r"(連想|れんそう)([サさ]ー[ビび][スす])[：:]", content):
                 toot('@%s このサービスは終了したよ〜(৹ᵒ̴̶̷᷄﹏ᵒ̴̶̷᷅৹)'%acct, g_vis, id, None,interval=3)
                 #rensou_game(content=content, acct=acct, id=id, g_vis=g_vis)
@@ -668,7 +693,7 @@ def th_worker():
                     fav_now(id)
                     sleep(DELAY)
                     toot(toot_now, g_vis, id, None,interval=8)
-            elif len(content) > 140:
+            elif len(content) > 140 and spoiler_text == None:
                 content = re.sub(r"(.)\1{3,}",r"\1",content, flags=(re.DOTALL))
                 gen_txt = Toot_summary.summarize(pat1.sub("",pat2.sub("",content)),limit=10,lmtpcs=1, m=1, f=4)
                 if gen_txt[-1:1] == '#':
@@ -811,10 +836,13 @@ def th_delete():
             #print('th_delete:',row)
             if row:
                 if acct_1b != row[0]:
+                    date = '{0:08d}'.format(row[2])
+                    time = '{0:06d}'.format(row[3])
+                    ymdhms = '%s %s'%(date,time)
+                    ymdhms = dateutil.parser.parse(ymdhms).astimezone(timezone('Asia/Tokyo'))
                     toot_now += ':@%s: 🚓🚓🚓＜う〜う〜！トゥー消し警察でーす！\n'%row[0]
-                    toot_now += ':@%s: ＜「%s」'%( row[0], kiri_util.content_cleanser(row[1]) )
+                    toot_now += ':@%s: ＜「%s」 at %s'%(row[0], kiri_util.content_cleanser(row[1]) , ymdhms.strftime("%Y.%m.%d %H:%M:%S"))
                     toot(toot_now, 'direct', rep=None, spo=':@%s: がトゥー消ししたよー……'%row[0], media_ids=None, interval=0)
-                    #print('**DELETE:',row[0],row[1])
                     acct_1b = row[0]
                     SM.update(row[0], 'func', score=-1)
         except Exception:
