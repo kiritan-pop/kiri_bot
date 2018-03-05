@@ -287,7 +287,7 @@ class DAO_statuses():
         if acct == None:
             return
         ids = []
-        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 60*1000)
+        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 6*1000)
         c = con.cursor()
         if random.randint(0,100) % 2 == 0:
             sql = r"select id from statuses where acct = ?  order by id asc"
@@ -304,7 +304,7 @@ class DAO_statuses():
     # 直近１０トゥートを返す
     def get_least_10toots(self):
         seeds = []
-        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 60*1000)
+        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 6*1000)
         c = con.cursor()
         sql = r"select content from statuses order by id desc"
         for row in c.execute(sql):
@@ -323,9 +323,9 @@ class DAO_statuses():
     #######################################################
     # ｉｄ指定でトゥート内容を返す
     def pickup_1toot(self,status_id):
-        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 60*1000)
+        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 6*1000)
         c = con.cursor()
-        c.execute( r"select acct,content from statuses where id = ?",
+        c.execute( r"select acct, content, date, time  from statuses where id = ?",
                         (status_id,))
         row = c.fetchone()
         con.close()
@@ -342,7 +342,7 @@ class DAO_statuses():
         if hh0000 > hh9999:
             hh0000 = 0
         #ランダムに人を選ぶよー！（最近いる人から）
-        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 60*1000)
+        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 6*1000)
         c = con.cursor()
         c.execute( r"select acct from statuses where (date = ?) and time >= ? and time <= ? and acct <> ?",[ymd,hh0000,hh9999,BOT_ID] )
         acct_list = set([])
@@ -355,7 +355,7 @@ class DAO_statuses():
     #######################################################
     # モノマネ用
     def get_user_toots(self,acct):
-        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 60*1000)
+        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 6*1000)
         c = con.cursor()
         c.execute( r"select content from statuses where acct = ?", (acct,) )
         rows = c.fetchall()
@@ -370,7 +370,7 @@ class DAO_statuses():
         hh = (jst_now - timedelta(hours=1)).strftime("%H")
         hh0000 = int(hh + "0000")
         hh9999 = int(hh + "9999")
-        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 60*1000)
+        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 6*1000)
         c = con.cursor()
         c.execute( r"select content from statuses where (date = ?) and time >= ? and time <= ? and acct <> ?",
                     (ymd,hh0000,hh9999,BOT_ID) )
@@ -398,7 +398,7 @@ class DAO_statuses():
                     status['account']['display_name'],
                     mediatext
                     )
-        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 60*1000)
+        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 6*1000)
         c = con.cursor()
         insert_sql = u"insert into statuses (id, date, time, content, acct,\
                 display_name, media_attachments) values (?, ?, ?, ?, ?, ?, ?)"
@@ -417,7 +417,7 @@ class DAO_statuses():
     #######################################################
     # 対象の人の最新のトゥート日付を取得（新規さん等はNoneを返す）
     def get_least_created_at(self,acct):
-        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 60*1000)
+        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 6*1000)
         c = con.cursor()
         c.execute( r"select date, time from statuses where acct = ? order by id desc ", (acct,))
         row = c.fetchone()

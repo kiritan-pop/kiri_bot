@@ -34,7 +34,7 @@ graph = tf.get_default_graph()
 
 #いろいろなパラメータ
 maxlen = 15           #モデルに合わせて！
-diver = 0.45         #ダイバーシティ：大きくすると想起の幅が大きくなるっぽいー！
+diver = 0.5         #ダイバーシティ：大きくすると想起の幅が大きくなるっぽいー！
 
 pat3 = re.compile(r'^\n')
 pat4 = re.compile(r'\n')

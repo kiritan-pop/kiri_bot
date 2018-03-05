@@ -15,7 +15,7 @@ import kiri_util, kiri_deep, kiri_game
 
 MASTER_ID = 'kiritan'
 BOT_ID = 'kiri_bot01'
-BOTS = [BOT_ID,'12222222','friends_booster','5','neruru']
+BOTS = [BOT_ID,'12222222','friends_booster','5']
 DELAY = 2
 pat1 = re.compile(r' ([!-~ぁ-んァ-ン] )+|^([!-~ぁ-んァ-ン] )+| [!-~ぁ-んァ-ン]$',flags=re.MULTILINE)  #[!-~0-9a-zA-Zぁ-んァ-ン０-９ａ-ｚ]
 pat2 = re.compile(r'[ｗ！？!\?]')
@@ -30,6 +30,9 @@ dotenv_path = join(dirname(__file__), '.env')
 load_dotenv(dotenv_path)
 MASTODON_URL = os.environ.get("MASTODON_URL")
 MASTODON_ACCESS_TOKEN = os.environ.get("MASTODON_ACCESS_TOKEN")
+
+
+publicdon = Mastodon(api_base_url=MASTODON_URL)  # インスタンス
 
 mastodon = Mastodon(
     access_token=MASTODON_ACCESS_TOKEN,
@@ -70,9 +73,8 @@ class men_toot(StreamListener):
         if notification["type"] == "mention":
             status = notification["status"]
             vote_check(status)
-            #quick_rtn(status)
+            quick_rtn(status)
             TQ.put(status)
-            #StatusQ.put(status)
             SM.update(notification["status"]["account"]["acct"], 'reply')
         elif notification["type"] == "favourite":
             SM.update(notification["account"]["acct"], 'fav', ymdhms)
@@ -97,9 +99,15 @@ class res_toot(StreamListener):
                     TQ.put(status)
             return
         else:
-            StatusQ.put(status)
-            TQ.put(status)
             #quick_rtn(status)
+            TQ.put(status)
+
+#######################################################
+# タイムライン保存用（認証なし）
+class public_listener(StreamListener):
+    def on_update(self, status):
+            StatusQ.put(status)
+            quick_rtn(status)
             CM.count(status['created_at'])
 
     def on_delete(self, status_id):
@@ -110,7 +118,16 @@ class res_toot(StreamListener):
 # トゥート処理
 def toot(toot_now, g_vis='direct', rep=None, spo=None, media_ids=None, interval=0):
     def th_toot(toot_now, g_vis, rep, spo, media_ids):
-        mastodon.status_post(status=toot_now[0:450], visibility=g_vis, in_reply_to_id=rep, spoiler_text=spo, media_ids=media_ids)
+        if rep != None:
+            try:
+                status = mastodon.status(rep)
+            except Exception:
+                mastodon.status_post(status=toot_now[0:450], visibility=g_vis, in_reply_to_id=None, spoiler_text=spo, media_ids=media_ids)
+            else:
+                mastodon.status_post(status=toot_now[0:450], visibility=g_vis, in_reply_to_id=rep, spoiler_text=spo, media_ids=media_ids)
+        else:
+            mastodon.status_post(status=toot_now[0:450], visibility=g_vis, in_reply_to_id=None, spoiler_text=spo, media_ids=media_ids)
+
     th = threading.Timer(interval=interval,function=th_toot,args=(toot_now, g_vis, rep, spo, media_ids))
     th.start()
     print("🆕toot:" + toot_now[0:50] + ":" + g_vis )
@@ -184,8 +201,11 @@ def quick_rtn(status):
     username = "@" +  acct
     g_vis = status["visibility"]
     content = kiri_util.content_cleanser(status['content'])
-    application = status['application']['name']
-    print('=== %s  by %s,%s'%('\n    '.join(content.split('\n')), acct,application))
+    if status['application']:
+        application = status['application']['name']
+    else:
+        application = ''
+    print('===%s\t「%s」'%(acct, '\n    '.join(content.split('\n'))))
     statuses_count = status["account"]["statuses_count"]
     spoiler_text = status["spoiler_text"]
     #botはスルー
@@ -193,6 +213,8 @@ def quick_rtn(status):
         return
     #ももながbotの場合もスルー
     if  acct == 'JC' and application == '女子会':
+        return
+    if  acct == 'neruru' and application == 'Futomomodaisuki':
         return
     if len(content) <= 0:
         return
@@ -342,26 +364,19 @@ def quick_rtn(status):
         if content_1b != None and acct == acct_1b:
             if re.search(r"(:nicoru[0-9]{0,3}:.?){3}", content_1b):
                 SM.update(acct, 'func')
-                #toot_now = '%s　　三(  っ˃̵ᴗ˂̵) 通りまーす！'%username
-                toot_now = '%s\n:nicoru120::nicoru135::nicoru150::nicoru155::nicoru170:'%username
-                vis_now = 'direct'
-                SM.update(acct, 'func')
                 if rnd <= 6:
                     #toot_now = '　　三(  っ˃̵ᴗ˂̵) 通りまーす！'
-                    toot_now = ':nicoru120::nicoru135::nicoru150::nicoru155::nicoru170:'
+                    toot_now = ':nicoru180: :nicoru180: :nicoru180: :nicoru180: :nicoru180: '
                     vis_now = 'public'
                     id_now = None
     elif re.search(r"(:nicoru[0-9]{0,3}:.?){2}", content):
         if content_1b != None and acct == acct_1b:
             SM.update(acct, 'func')
             if re.search(r"(:nicoru[0-9]{0,3}:.?){3}", content_1b):
-                #toot_now = '%s　　(˃̵ᴗ˂̵っ )三 通りまーす！'%username
-                toot_now = '%s\n:nicoru30:'%username
-                vis_now = 'direct'
                 SM.update(acct, 'func')
                 if rnd <= 6:
                     #toot_now = '　　(˃̵ᴗ˂̵っ )三 通りまーす！'
-                    toot_now = ':nicoru30:'
+                    toot_now = ':nicoru180:'
                     vis_now = 'public'
                     id_now = None
     elif re.search(r"^貞$", content):
@@ -393,6 +408,12 @@ def quick_rtn(status):
         if rnd <= 4:
             toot_now = '@%s\n泣いてるー！ｷｬｯｷｬｯ!'%acct
             vis_now = 'direct'
+    elif re.search(r"^はいじゃないが$", content+spoiler_text):
+        SM.update(acct, 'func')
+        if rnd <= 6:
+            toot_now = 'はいじゃが！'
+            vis_now = 'public'
+            id_now = None
     elif re.search(r"惚気|ほっけ|ホッケ|^燃やして$", content+spoiler_text):
         SM.update(acct, 'func',score=-1)
         if rnd <= 4:
@@ -429,11 +450,17 @@ def business_contact(status):
     ymdhms = DAO.get_least_created_at(acct)
     diff = timedelta(hours=3)
     if ymdhms == None:
-        toot_now = '@%s 新規さんかも−！\n:@%s: (◍•ᴗ•◍)◜よっ！ひさしぶりー！'%(MASTER_ID,acct)
+        toot_now = '@%s 新規さんかも−！\n:@%s:(%s)＜「%s」'%(MASTER_ID, acct, display_name, content)
         toot(toot_now)
     elif ymdhms + diff < created_at:
-        toot_now = '@%s 帰ってきたよ−！(前回書込：%s)\n:@%s: %s！(◍•ᴗ•◍)◜よっ！'%(MASTER_ID, ymdhms.strftime("%Y.%m.%d %H:%M:%S"), acct, display_name)
+        toot_now = '@%s 帰ってきたよ−！(前回書込：%s)\n:@%s:(%s)＜「%s」'%(MASTER_ID, ymdhms.strftime("%Y.%m.%d %H:%M:%S"), acct, display_name, content)
         toot(toot_now)
+
+    watch_list = set([kansi_acct.strip() for kansi_acct in open('.watch_list').readlines()])
+    if acct in watch_list:
+        toot_now = '@%s :@%s: %s\n「%s」'%(MASTER_ID, acct, display_name, content)
+        toot(toot_now)
+
 
 #######################################################
 # 画像検索サービス
@@ -604,6 +631,8 @@ def th_worker():
                 continue
             #ももながbotの場合もスルー
             if  acct == 'JC' and application == '女子会':
+                continue
+            if  acct == 'neruru' and application == 'Futomomodaisuki':
                 continue
             if re.search(r"(連想|れんそう)([サさ]ー[ビび][スす])[：:]", content):
                 toot('@%s このサービスは終了したよ〜(৹ᵒ̴̶̷᷄﹏ᵒ̴̶̷᷅৹)'%acct, g_vis, id, None,interval=3)
@@ -937,21 +966,23 @@ def th_gettingnum():
 
 #######################################################
 # トゥートをいろいろ
-def th_worker_quick():
-    while True:
-        status = StatusQ.get()
-        # 即時応答
-        quick_rtn(status)
-        # 業務連絡
-        business_contact(status)
-        # トゥートを保存
-        try:
-            DAO.save_toot(status)
-        except Exception:
-            #保存失敗したら、キューに詰めてリトライ！
-            #StatusQ.put(status)
-            kiri_util.error_log()
-            #sleep(30)
+def th_saver():
+    try:
+        while True:
+            status = StatusQ.get()
+            # 業務連絡
+            business_contact(status)
+            # トゥートを保存
+            try:
+                DAO.save_toot(status)
+            except Exception:
+                #保存失敗したら、キューに詰めてリトライ！
+                #StatusQ.put(status)
+                kiri_util.error_log()
+    except Exception:
+        kiri_util.error_log()
+        sleep(30)
+        th_saver()
 
 def t_local():
     try:
@@ -961,6 +992,14 @@ def t_local():
         kiri_util.error_log()
         sleep(30)
         t_local()
+
+def t_sub():
+    try:
+        publicdon.stream_local(public_listener())
+    except:
+        kiri_util.error_log()
+        sleep(30)
+        t_sub()
 
 def t_user():
     try:
@@ -986,10 +1025,11 @@ def main():
     threads.append( threading.Thread(target=t_local ) ) #LTL
     #threads.append( threading.Thread(target=mastodon.stream_public,args=(res_toot(),) ) ) #FTL
     threads.append( threading.Thread(target=t_user ) ) #LTL
+    threads.append( threading.Thread(target=t_sub ) ) #LTL
     #タイムライン応答系
     threads.append( threading.Thread(target=th_worker) )
     threads.append( threading.Thread(target=th_delete) )
-    threads.append( threading.Thread(target=th_worker_quick) )
+    threads.append( threading.Thread(target=th_saver) )
     threads.append( threading.Thread(target=th_gettingnum) )
     #スケジュール起動系
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(summarize_tooter,['02'])) )
