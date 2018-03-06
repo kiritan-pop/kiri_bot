@@ -38,10 +38,6 @@ def content_cleanser(content):
     if tmp.text == None:
         return ""
 
-    for ng_word in ng_words:
-        if ng_word in tmp.text:
-            return ""
-
     rtext = ''
     ps = []
     for p in tmp.find_all("p"):
@@ -52,6 +48,8 @@ def content_cleanser(content):
     rtext = rtext.replace("#","")
     rtext = re.sub(r'(___R___)\1{2,}', r'\1', rtext)
     rtext = re.sub(r'___R___', r'\n', rtext)
+    for ng_word in ng_words:
+        rtext.replace(ng_word,'■■■')
     if hashtag != "":
         return rtext + " #" + hashtag
     else:

@@ -80,6 +80,9 @@ class men_toot(StreamListener):
             SM.update(notification["account"]["acct"], 'fav', ymdhms)
         elif notification["type"] == "reblog":
             SM.update(notification["account"]["acct"], 'boost', ymdhms)
+        elif notification["type"] == "follow":
+            SM.update(notification["account"]["acct"], 'boost', ymdhms)
+            follow(notification["account"]["id"])
 
 #######################################################
 # マストドンＡＰＩ用部品を継承して、ローカルタイムライン受信時の処理を実装ー！
@@ -169,6 +172,11 @@ def boocan_now(id):  # ぶーすと！
     if status['reblogged'] == True:
         mastodon.status_unreblog(id)
         print("🙆unboost")
+
+def follow(id):
+    th = threading.Timer(interval=8,function=mastodon.account_follow,args=(id,))
+    th.start()
+    print("♥follow")
 
 #######################################################
 # 数取りゲーム 投票前処理
@@ -741,11 +749,14 @@ def th_worker():
                 toot(toot_now, g_vis, id, None,interval=5)
                 SM.update(acct, 'reply')
             elif re.search(r'[^:]@kiri_bot01', status['content']):
-                if not content.strip().isdigit():
-                    fav_now(id)
-                    toot_now = "@%s\n"%acct
-                    toot_now += kiri_deep.lstm_gentxt(content,num=1)
-                    toot(toot_now, g_vis, id, None,interval=5)
+                if content.strip().isdigit():
+                    continue
+                if len(content) == 0:
+                    continue
+                fav_now(id)
+                toot_now = "@%s\n"%acct
+                toot_now += kiri_deep.lstm_gentxt(content,num=1)
+                toot(toot_now, g_vis, id, None,interval=5)
             else:
                 continue
 
