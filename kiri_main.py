@@ -39,6 +39,7 @@ mastodon = Mastodon(
     api_base_url=MASTODON_URL)  # インスタンス
 
 TQ = queue.Queue()
+QQ = queue.Queue()
 StatusQ = queue.Queue()
 Toot1bQ = queue.Queue()
 DelQ = queue.Queue()
@@ -72,8 +73,9 @@ class men_toot(StreamListener):
 
         if notification["type"] == "mention":
             status = notification["status"]
+            QQ.put(status)
             vote_check(status)
-            quick_rtn(status)
+            #quick_rtn(status)
             TQ.put(status)
             SM.update(notification["status"]["account"]["acct"], 'reply')
         elif notification["type"] == "favourite":
@@ -109,8 +111,9 @@ class res_toot(StreamListener):
 # タイムライン保存用（認証なし）
 class public_listener(StreamListener):
     def on_update(self, status):
+            QQ.put(status)
             StatusQ.put(status)
-            quick_rtn(status)
+            #quick_rtn(status)
             CM.count(status['created_at'])
 
     def on_delete(self, status_id):
@@ -173,6 +176,8 @@ def boocan_now(id):  # ぶーすと！
         mastodon.status_unreblog(id)
         print("🙆unboost")
 
+#######################################################
+# フォロー
 def follow(id):
     th = threading.Timer(interval=8,function=mastodon.account_follow,args=(id,))
     th.start()
@@ -241,7 +246,7 @@ def quick_rtn(status):
 
     a = int(CM.get_coolingtime())
     #a = int(a*a / 2)
-    rnd = random.randint(-1,7+a)
+    rnd = random.randint(-1,10+a)
     if acct == MASTER_ID:
         rnd = 0
     if rnd == -1:
@@ -250,6 +255,40 @@ def quick_rtn(status):
     id_now = id
     vis_now = g_vis
     interval = 0
+    if re.search(r"(:nicoru[0-9]{0,3}:.?){4}", content):
+        if content_1b != None and acct == acct_1b:
+            if re.search(r"(:nicoru[0-9]{0,3}:.?){3}", content_1b):
+                SM.update(acct, 'func')
+                if rnd <= 6:
+                    #toot_now = '　　三(  っ˃̵ᴗ˂̵) 通りまーす！'
+                    toot_now = ':nicoru180: :nicoru180: :nicoru180: :nicoru180: :nicoru180: '
+                    vis_now = 'public'
+                    id_now = None
+    elif re.search(r"(:nicoru[0-9]{0,3}:.?){2}", content):
+        if content_1b != None and acct == acct_1b:
+            SM.update(acct, 'func')
+            if re.search(r"(:nicoru[0-9]{0,3}:.?){3}", content_1b):
+                SM.update(acct, 'func')
+                if rnd <= 6:
+                    #toot_now = '　　(˃̵ᴗ˂̵っ )三 通りまーす！'
+                    toot_now = ':nicoru180:'
+                    vis_now = 'public'
+                    id_now = None
+    elif re.search(r"^貞$", content):
+        if content_1b != None and acct == acct_1b:
+            SM.update(acct, 'func',score=-1)
+            if re.search(r"^治$", content_1b):
+                toot_now = '%s　　三(  っ˃̵ᴗ˂̵) 通りまーす！'%username
+                vis_now = 'direct'
+                SM.update(acct, 'func')
+                if rnd <= 7:
+                    toot_now = '　　三(  っ˃̵ᴗ˂̵) 通りまーす！'
+                    vis_now = 'public'
+                    id_now = None
+
+    if acct == acct_1b:
+        return
+
     if statuses_count != 0 and  statuses_count%10000 == 0:
         interval = 180
         toot_now = username + "\n"
@@ -294,20 +333,20 @@ def quick_rtn(status):
             toot_now = '🌪🌪🌪🌪＜ごぉ〜〜っ！'
             vis_now = 'public'
             id_now = None
-        if rnd <= 3:
-            toot_now = '💨💨💨🍃＜ふわ〜っ！'
+        elif rnd <= 3:
+            toot_now = '💨💨💨🍃＜ぴゅ〜〜っ！'
             vis_now = 'public'
             id_now = None
     elif re.search(r"^凍らせて$", content):
         SM.update(acct, 'func')
         if rnd <= 3:
-            toot_now = '❄❄❄❄❄＜カチコチ−！'
+            toot_now = '❄❄❄❄❄＜カチコチ〜ッ！'
             vis_now = 'public'
             id_now = None
     elif re.search(r"^雷$", content):
         SM.update(acct, 'func')
         if rnd <= 3:
-            toot_now = '⚡️⚡️⚡️⚡️＜ビリビリ−！'
+            toot_now = '⚡️⚡️⚡️⚡️＜ゴロゴロ〜ッ！'
             vis_now = 'public'
             id_now = None
     elif re.search(r"^ぬるぽ$", content):
@@ -368,36 +407,6 @@ def quick_rtn(status):
         elif rnd == 6:
             toot_now = '@%s\nつい〜……'%acct
             vis_now = 'direct'
-    elif re.search(r"(:nicoru[0-9]{0,3}:.?){4}", content):
-        if content_1b != None and acct == acct_1b:
-            if re.search(r"(:nicoru[0-9]{0,3}:.?){3}", content_1b):
-                SM.update(acct, 'func')
-                if rnd <= 6:
-                    #toot_now = '　　三(  っ˃̵ᴗ˂̵) 通りまーす！'
-                    toot_now = ':nicoru180: :nicoru180: :nicoru180: :nicoru180: :nicoru180: '
-                    vis_now = 'public'
-                    id_now = None
-    elif re.search(r"(:nicoru[0-9]{0,3}:.?){2}", content):
-        if content_1b != None and acct == acct_1b:
-            SM.update(acct, 'func')
-            if re.search(r"(:nicoru[0-9]{0,3}:.?){3}", content_1b):
-                SM.update(acct, 'func')
-                if rnd <= 6:
-                    #toot_now = '　　(˃̵ᴗ˂̵っ )三 通りまーす！'
-                    toot_now = ':nicoru180:'
-                    vis_now = 'public'
-                    id_now = None
-    elif re.search(r"^貞$", content):
-        if content_1b != None and acct == acct_1b:
-            SM.update(acct, 'func',score=-1)
-            if re.search(r"^治$", content_1b):
-                toot_now = '%s　　三(  っ˃̵ᴗ˂̵) 通りまーす！'%username
-                vis_now = 'direct'
-                SM.update(acct, 'func')
-                if rnd <= 7:
-                    toot_now = '　　三(  っ˃̵ᴗ˂̵) 通りまーす！'
-                    vis_now = 'public'
-                    id_now = None
     elif "*´ω｀*" in content+spoiler_text:
         SM.update(acct, 'func',score=-1)
         if rnd <= 6:
@@ -635,6 +644,7 @@ def th_worker():
             media_attachments = status["media_attachments"]
             sensitive = status['sensitive']
             application = status['application']['name']
+            a = int(CM.get_coolingtime())
             if  acct in BOTS:
                 continue
             #ももながbotの場合もスルー
@@ -675,10 +685,6 @@ def th_worker():
                 SM.update(acct, 'func')
             elif len(media_attachments) > 0:
                 toot_now = ''
-                a = int(CM.get_coolingtime())
-                if random.randint(0,10+a) > 5:
-                    print('   画像スルーしたよ！')
-                    continue
                 for media in media_attachments:
                     filename = download(media["url"] , "media")
                     if '.mp' in filename or '.webm' in filename:
@@ -757,12 +763,38 @@ def th_worker():
                 toot_now = "@%s\n"%acct
                 toot_now += kiri_deep.lstm_gentxt(content,num=1)
                 toot(toot_now, g_vis, id, None,interval=5)
+            elif re.search(r"めいめい", content + spoiler_text):
+                if random.randint(0,10+a) > 2:
+                    continue
+                fav_now(id)
+                toot_now = "@%s\n:@mei23:＜「"%acct
+                toot_now += kiri_deep.lstm_gentxt(content,num=1,sel_model='mei23').strip() + '」'
+                toot(toot_now, g_vis, id, None,interval=5)
+                SM.update(acct, 'func')
+            elif re.search(r"神埼|お兄さん|おにいさん|なか[卯う]|100db|ダンボッチ|騒音", content + spoiler_text):
+                if random.randint(0,10+a) > 2:
+                    continue
+                fav_now(id)
+                toot_now = "@%s\n:@Knzk:＜「"%acct
+                toot_now += kiri_deep.lstm_gentxt(content,num=1,sel_model='knzk').strip() + '😋😋😋」'
+                toot(toot_now, g_vis, id, None,interval=5)
+                SM.update(acct, 'func')
             else:
                 continue
 
             stm = CM.get_coolingtime()
             print('worker sleep :%fs'%stm )
             sleep(stm)
+        except Exception:
+            kiri_util.error_log()
+
+#######################################################
+# 即時応答処理のスレッド
+def th_quick():
+    while True:
+        try:
+            status = QQ.get() #キューからトゥートを取り出すよー！なかったら待機してくれるはずー！
+            quick_rtn(status)
         except Exception:
             kiri_util.error_log()
 
@@ -995,6 +1027,8 @@ def th_saver():
         sleep(30)
         th_saver()
 
+#######################################################
+# ローカルタイムライン監視スレッド
 def t_local():
     try:
         mastodon.stream_public(res_toot())
@@ -1004,6 +1038,8 @@ def t_local():
         sleep(30)
         t_local()
 
+#######################################################
+# ローカルタイムライン監視スレッド（認証なし）
 def t_sub():
     try:
         publicdon.stream_local(public_listener())
@@ -1012,6 +1048,8 @@ def t_sub():
         sleep(30)
         t_sub()
 
+#######################################################
+# ホームタイムライン監視スレッド
 def t_user():
     try:
         mastodon.stream_user(men_toot())
@@ -1042,6 +1080,7 @@ def main():
     threads.append( threading.Thread(target=th_delete) )
     threads.append( threading.Thread(target=th_saver) )
     threads.append( threading.Thread(target=th_gettingnum) )
+    threads.append( threading.Thread(target=th_quick) )
     #スケジュール起動系
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(summarize_tooter,['02'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(bottlemail_sending,['05'])) )

@@ -12,7 +12,7 @@ import tensorflow as tf
 from keras.backend import tensorflow_backend
 #config = tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True, visible_device_list="1"))
 config = tf.ConfigProto(device_count={"GPU":0},
-                        gpu_options=tf.GPUOptions(allow_growth=True, visible_device_list="1"))
+                        gpu_options=tf.GPUOptions(allow_growth=True, visible_device_list="0"))
 session = tf.Session(config=config)
 tensorflow_backend.set_session(session)
 
@@ -25,10 +25,14 @@ for label,i in labels_index.items():
 STANDARD_SIZE = (299, 299)
 
 model_path = 'db/lstm_toot_v7.h5'
+me23_path = 'db/lstm_toot_mei23.h5'
+knzk_path = 'db/lstm_toot_knzk.h5'
 takomodel_path = 'db/tako5.h5'
-print('******* lstm load model %s,%s*******' %(model_path,takomodel_path))
+#print('******* lstm load model %s,%s*******' %(model_path,takomodel_path))
 # モデルを読み込む
 model = load_model(model_path)
+mei23model = load_model(me23_path)
+knzkmodel = load_model(knzk_path)
 takomodel = load_model(takomodel_path)
 graph = tf.get_default_graph()
 
@@ -56,8 +60,15 @@ def sample(preds, temperature=1.2):
     probas = np.random.multinomial(1, preds, 1)
     return np.argmax(probas)
 
-def lstm_gentxt(text,num=0):
+def lstm_gentxt(text,num=0,sel_model=None):
     generated = ''
+    if sel_model == None:
+        tmp_model = model
+    elif sel_model == 'mei23':
+        tmp_model = mei23model
+    elif sel_model == 'knzk':
+        tmp_model = knzkmodel
+
     rnd = random.sample(adaptr, 1)[0]
     tmp = text + '\n' + rnd + '、'
 
@@ -80,13 +91,13 @@ def lstm_gentxt(text,num=0):
                 #print('error:char=',t,char)
                 pass
         with graph.as_default():
-            preds = model.predict(x_pred, verbose=0)[0]
+            preds = tmp_model.predict(x_pred, verbose=0)[0]
         next_index = sample(preds, diver)
         next_char = indices_char[next_index]
 
         generated += next_char
         sentence = sentence[1:] + next_char
-        if generated.count('\n') + generated.count('。') > vol:
+        if generated.count('\n') + generated.count('。') >= vol:
             break
 
     rtn_text = generated
@@ -105,7 +116,7 @@ def takoramen(filepath):
     print("*** image:", filepath.split('/')[-1], "\n*** result:", rslt_dict)
     with open('image.log','a') as f:
         f.write("*** image:" + filepath.split('/')[-1] +  "  *** result:%s\n"%str(rslt_dict))
-    if max(result[0]) > 0.8:
+    if max(result[0]) > 0.9:
         return labels[np.where(result[0] == max(result[0]) )[0][0]]
     else:
         return 'other'

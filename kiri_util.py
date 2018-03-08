@@ -12,8 +12,6 @@ from datetime import datetime,timedelta
 from bs4 import BeautifulSoup
 import warnings, traceback
 BOT_ID = 'kiri_bot01'
-#NGワード
-ng_words = set(word.strip() for word in open('.ng_words').readlines())
 
 #######################################################
 # エラー時のログ書き込み
@@ -48,8 +46,10 @@ def content_cleanser(content):
     rtext = rtext.replace("#","")
     rtext = re.sub(r'(___R___)\1{2,}', r'\1', rtext)
     rtext = re.sub(r'___R___', r'\n', rtext)
+    #NGワード
+    ng_words = set(word.strip() for word in open('.ng_words').readlines())
     for ng_word in ng_words:
-        rtext.replace(ng_word,'■■■')
+        rtext = rtext.replace(ng_word,'■■■')
     if hashtag != "":
         return rtext + " #" + hashtag
     else:
@@ -258,14 +258,12 @@ class DAO_statuses():
     def __init__(self):
         #path
         self.STATUSES_DB_PATH = "db/statuses.db"
-        #NGワード
-        self.ng_words = set(word.strip() for word in open('.ng_words').readlines())
         #トゥート先NGの人たちー！
         self.ng_user_set = set('friends_nico')
 
     #######################################################
     # 指定された時間内から一人ユーザを選ぶ
-    def sample_acct(self,delta=None):
+    def sample_acct(self):
         acct_list = set([])
         con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 60*1000)
         c = con.cursor()
@@ -287,14 +285,9 @@ class DAO_statuses():
         ids = []
         con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 6*1000)
         c = con.cursor()
-        if random.randint(0,100) % 2 == 0:
-            sql = r"select id from statuses where acct = ?  order by id asc"
-        else:
-            sql = r"select id from statuses where acct = ?  order by id desc"
+        sql = r"select id from statuses where acct = ?  order by id asc"
         for row in c.execute( sql, (acct,)):
             ids.append(row[0])
-            if len(ids) >= 3000:
-                break
         con.close()
         return random.sample(ids,1)[0]
 
@@ -332,7 +325,7 @@ class DAO_statuses():
     #######################################################
     # 数取りゲーム用 人数カウント
     def get_gamenum(self):
-        #過去１５分のアクティブユーザ数をベース
+        #過去５分のアクティブユーザ数をベース
         jst_now = datetime.now(timezone('Asia/Tokyo'))
         ymd = int(jst_now.strftime("%Y%m%d"))
         hh0000 = int((jst_now - timedelta(minutes=5)).strftime("%H%M%S"))
