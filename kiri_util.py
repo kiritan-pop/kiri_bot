@@ -24,6 +24,15 @@ def error_log():
     print("###%s 例外情報\n"%ymdhms + traceback.format_exc())
 
 #######################################################
+# ハッシュタグ抽出
+def hashtag(content):
+    tmp = BeautifulSoup(content.replace("<br />","___R___").strip(),'lxml')
+    hashtag = []
+    for x in tmp.find_all("a",rel="tag"):
+        hashtag.append(x.span.text)
+    return ','.join(hashtag)
+
+#######################################################
 # トゥート内容の標準化・クレンジング
 def content_cleanser(content):
     tmp = BeautifulSoup(content.replace("<br />","___R___").strip(),'lxml')
@@ -270,7 +279,7 @@ class DAO_statuses():
         sql = r"select acct from statuses where acct <> ? order by id desc"
         for row in c.execute(sql , [BOT_ID,] ) :
             acct_list.add(row[0])
-            if len(acct_list)>10:
+            if len(acct_list)>30:
                 break
         acct_list -= self.ng_user_set
         con.close()

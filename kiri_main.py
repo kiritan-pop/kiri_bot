@@ -10,12 +10,13 @@ from datetime import datetime,timedelta
 import warnings, traceback
 from os.path import join, dirname
 from dotenv import load_dotenv
+import wikipedia
 import Toot_summary, GenerateText, PrepareChain, bottlemail
 import kiri_util, kiri_deep, kiri_game
 
 MASTER_ID = 'kiritan'
 BOT_ID = 'kiri_bot01'
-BOTS = [BOT_ID,'12222222','friends_booster','5']
+BOTS = [BOT_ID,'friends_booster','5']
 DELAY = 2
 pat1 = re.compile(r' ([!-~ぁ-んァ-ン] )+|^([!-~ぁ-んァ-ン] )+| [!-~ぁ-んァ-ン]$',flags=re.MULTILINE)  #[!-~0-9a-zA-Zぁ-んァ-ン０-９ａ-ｚ]
 pat2 = re.compile(r'[ｗ！？!\?]')
@@ -189,6 +190,8 @@ def vote_check(status):
     acct = status["account"]["acct"]
     id = status["id"]
     if re.search(r'[^:]@kiri_bot01', status['content']):
+        if len(kiri_util.hashtag(status['content'])) > 0:
+            return
         content = kiri_util.content_cleanser(status['content'])
         if len(content) == 0:
             return
@@ -213,6 +216,8 @@ def quick_rtn(status):
     acct = status["account"]["acct"]
     username = "@" +  acct
     g_vis = status["visibility"]
+    if len(kiri_util.hashtag(status['content'])) > 0:
+        return
     content = kiri_util.content_cleanser(status['content'])
     if status['application']:
         application = status['application']['name']
@@ -445,6 +450,12 @@ def quick_rtn(status):
         SM.update(acct, 'func')
         if rnd <= 3:
             recipe_service(content=content, acct=acct, id=id, g_vis=g_vis)
+    elif re.search(r"止まるんじゃね[ぇえ]ぞ", content+spoiler_text):
+        SM.update(acct, 'func')
+        if rnd <= 4:
+            toot_now = '止まるんじゃぞ……💃'
+            vis_now = 'public'
+            id_now = None
     else:
         return
     #
@@ -471,7 +482,7 @@ def business_contact(status):
         toot(toot_now)
     elif ymdhms + diff < created_at:
         toot_now = '@%s 帰ってきたよ−！(前回書込：%s)\n:@%s:(%s)＜「%s」'%(MASTER_ID, ymdhms.strftime("%Y.%m.%d %H:%M:%S"), acct, display_name, content)
-        toot(toot_now)
+        #toot(toot_now)
 
     watch_list = set([kansi_acct.strip() for kansi_acct in open('.watch_list').readlines()])
     if acct in watch_list:
@@ -552,60 +563,32 @@ def recipe_service(content=None, acct=MASTER_ID, id=None, g_vis='unlisted'):
 #######################################################
 # ランク表示
 def show_rank(acct, id, g_vis):
-    if not os.path.exists("db/users_size_today.json") :
+    if not os.path.exists("db/statuses_today.json") :
         return
 
     fav_now(id)
-    dt = datetime.fromtimestamp(os.stat("db/users_size_today.json").st_mtime)
+    dt = datetime.fromtimestamp(os.stat("db/statuses_today.json").st_mtime)
     today_str = dt.strftime('%Y/%m/%d')
-    users_size = {}
-    users_size_today = {}
     users_cnt = {}
-    users_cnt_today = {}
-    rank_ruikei = {}
-    rank_ruikei_rev = {}
-    rank_today = {}
-    rank_today_rev = {}
-    with open("db/users_size.json", 'r') as f:
-        users_size = json.load(f)
-    with open("db/users_size_today.json", 'r') as f:
-        users_size_today = json.load(f)
     with open("db/users_cnt.json", 'r') as f:
         users_cnt = json.load(f)
-    with open("db/users_cnt_today.json", 'r') as f:
-        users_cnt_today = json.load(f)
+    users_size = {}
+    with open("db/users_size.json", 'r') as f:
+        users_size = json.load(f)
 
-    #print(users_size)
-    for i,(k, size) in enumerate(sorted(users_size.items(), key=lambda x: -x[1])):
-        rank_ruikei[k] = i+1
-        rank_ruikei_rev[i+1] = k
-    for i,(k, size) in enumerate(sorted(users_size_today.items(), key=lambda x: -x[1])):
-        rank_today[k] = i+1
-        rank_today_rev[i+1] = k
+    users_ranking = {}
+    for i,(k_acct, cnt) in enumerate(sorted(users_cnt.items(), key=lambda x: -x[1])):
+        users_ranking[k_acct] = [i+1, cnt, users_size[k_acct]]
+        #print(users_ranking[k_acct])
 
-    if acct not in users_size_today:
+    if acct not in users_cnt:
         toot('@%s …ランク外だよー！どんまい！'%acct, g_vis ,id, None)
         return
 
-    spoiler = ":@{0}: のランクだよー！（※{1} 時点）".format(acct,today_str)
-    toot_now = "@{0} :@{1}: のランクは……\n".format(acct,acct)
-    toot_now += "{0:>3}位 {1:,}字/avg{2:.1f}\n".format(rank_today[acct], users_size_today[acct], users_size_today[acct]/users_cnt_today[acct])
-    toot_now += "（累計 {0:>3}位 {1:,}字/avg{2:.1f}）\n\n".format(rank_ruikei[acct], users_size[acct], users_size[acct]/users_cnt[acct])
-    toot_now += "前後のランクの人は……\n"
-
-    #１ランク上の人ー！
-    if rank_today[acct] > 1:
-        acct_1b =  rank_today_rev[rank_today[acct] -1 ]
-        toot_now += "　:@{3}: {0:>3}位 {1:,}字/avg{2:.1f}\n".format(rank_today[acct_1b], users_size_today[acct_1b], users_size_today[acct_1b]/users_cnt_today[acct_1b], acct_1b)
-        toot_now += "（累計 {0:>3}位 {1:,}字/avg{2:.1f}）\n\n".format(rank_ruikei[acct_1b], users_size[acct_1b], users_size[acct_1b]/users_cnt[acct_1b])
-
-    #１ランク下の人ー！
-    if rank_today[acct] < len(rank_today):
-        acct_1b =  rank_today_rev[rank_today[acct] +1 ]
-        toot_now += "　:@{3}: {0:>3}位 {1:,}字/avg{2:.1f}\n".format(rank_today[acct_1b], users_size_today[acct_1b], users_size_today[acct_1b]/users_cnt_today[acct_1b], acct_1b)
-        toot_now += "（累計 {0:>3}位 {1:,}字/avg{2:.1f}）\n\n".format(rank_ruikei[acct_1b], users_size[acct_1b], users_size[acct_1b]/users_cnt[acct_1b])
-
-    toot(toot_now, g_vis ,id, spoiler)
+    toot_now = "@{0}\n:@{1}: のランクだよー！\n（※{2} 時点）\n".format(acct,acct,today_str)
+    toot_now += "{0:>3}位 {1:>4} toots({2:.1f}文字/toot)".format(users_ranking[acct][0], users_ranking[acct][1],
+                                                               users_ranking[acct][2]/users_ranking[acct][1])
+    toot(toot_now, g_vis ,id)
 
 #######################################################
 # ボトルメールサービス　メッセージ登録
@@ -639,11 +622,18 @@ def th_worker():
             id = status["id"]
             acct = status["account"]["acct"]
             g_vis = status["visibility"]
+            if len(kiri_util.hashtag(status['content'])) > 0:
+                continue
             content = kiri_util.content_cleanser(status['content'])
             spoiler_text = kiri_util.content_cleanser(status["spoiler_text"])
             media_attachments = status["media_attachments"]
             sensitive = status['sensitive']
-            application = status['application']['name']
+            if 'application' in status:
+                if 'name' in status['application']:
+                    application = status['application']['name']
+            else:
+                application = 'Web'
+                print(status)
             a = int(CM.get_coolingtime())
             if  acct in BOTS:
                 continue
@@ -671,10 +661,26 @@ def th_worker():
             elif re.search(r"(きょう|今日)の.?(料理|りょうり)", content):
                 recipe_service(content=content, acct=acct, id=id, g_vis=g_vis)
                 SM.update(acct, 'func')
+            elif re.search(r"\s?(.+)って(何|なに|ナニ)\?$", content):
+                word = re.search(r"\s?(.+)って(何|なに|ナニ)\?$", str(content)).group(1)
+                SM.update(acct, 'func')
+                try:
+                    wikipedia.set_lang("ja")
+                    page = wikipedia.page(word)
+                except  wikipedia.exceptions.DisambiguationError as e:
+                    toot('@%s 「%s」にはいくつか意味があるみたいだな〜'%(acct,word), g_vis, id, None, interval=3)
+                except Exception:
+                    toot('@%s え？「%s」ってなーに？'%(acct,word), g_vis, id, None, interval=3)
+                else:
+                    summary_text = page.summary
+                    if len(acct) + len(summary_text) + len(page.url) > 450:
+                        summary_text = summary_text[0:450-len(acct)-len(page.url)] + '……'
+                    toot('@%s %s\n%s'%(acct, summary_text, page.url), g_vis, id, 'なになに？「%s」とは……'%word, interval=3)
+
             elif re.search(r"(私|わたし|わたくし|自分|僕|俺|朕|ちん|余|あたし|ミー|あちき|あちし|\
                 わい|わっち|おいどん|わし|うち|おら|儂|おいら|あだす|某|麿|拙者|小生|あっし|手前|吾輩|我輩|マイ)の(ランク|ランキング|順位)", content):
-                toot('@%s このサービスは終了したよ〜(৹ᵒ̴̶̷᷄﹏ᵒ̴̶̷᷅৹)'%acct, g_vis, id, None,interval=3)
-                #show_rank(acct=acct, id=id, g_vis=g_vis)
+                #toot('@%s このサービスは終了したよ〜(৹ᵒ̴̶̷᷄﹏ᵒ̴̶̷᷅৹)'%acct, g_vis, id, None,interval=3)
+                show_rank(acct=acct, id=id, g_vis=g_vis)
                 SM.update(acct, 'func')
             elif re.search(r"(数取りゲーム).*(おねがい|お願い)", content):
                 print('数取りゲーム受信')
@@ -709,8 +715,10 @@ def th_worker():
                         toot_now += '🙏ろびすてとうとい！'
                     elif result == '漫画':
                         toot_now += 'それなんて漫画ー？'
-                    elif result in  ['スクショ','汚部屋','部屋','自撮り']:
+                    elif result in  ['スクショ','汚部屋','部屋','自撮り','太もも']:
                         toot_now += result + 'だー！'
+                    elif result == 'kent':
+                        toot_now += 'ケント丸だー！'
                     elif sensitive:
                         if 'ラーメン' in result or '麺' in result or result == 'うどｎ' or  result == 'そば' or result == 'パスタ':
                             toot_now += '🍜%sちゅるちゅるーっ！'%result
@@ -763,20 +771,36 @@ def th_worker():
                 toot_now = "@%s\n"%acct
                 toot_now += kiri_deep.lstm_gentxt(content,num=1)
                 toot(toot_now, g_vis, id, None,interval=5)
-            elif re.search(r"めいめい", content + spoiler_text):
-                if random.randint(0,10+a) > 2:
+            elif re.search(r"めいめい|めーめー", content + spoiler_text):
+                if random.randint(0,10+a) > 3:
                     continue
                 fav_now(id)
                 toot_now = "@%s\n:@mei23:＜「"%acct
                 toot_now += kiri_deep.lstm_gentxt(content,num=1,sel_model='mei23').strip() + '」'
                 toot(toot_now, g_vis, id, None,interval=5)
                 SM.update(acct, 'func')
+            elif re.search(r"きりたん|きりきり|きりっち", content + spoiler_text):
+                if random.randint(0,10+a) > 3:
+                    continue
+                fav_now(id)
+                toot_now = "@%s\n:@kiritan:＜「"%acct
+                toot_now += kiri_deep.lstm_gentxt(content,num=1,sel_model='kiritan').strip() + '」'
+                toot(toot_now, g_vis, id, None,interval=5)
+                SM.update(acct, 'func')
             elif re.search(r"神埼|お兄さん|おにいさん|なか[卯う]|100db|ダンボッチ|騒音", content + spoiler_text):
-                if random.randint(0,10+a) > 2:
+                if random.randint(0,10+a) > 3:
                     continue
                 fav_now(id)
                 toot_now = "@%s\n:@Knzk:＜「"%acct
                 toot_now += kiri_deep.lstm_gentxt(content,num=1,sel_model='knzk').strip() + '😋😋😋」'
+                toot(toot_now, g_vis, id, None,interval=5)
+                SM.update(acct, 'func')
+            elif re.search(r"チノ|ラマーズ", content + spoiler_text):
+                if random.randint(0,10+a) > 3:
+                    continue
+                fav_now(id)
+                toot_now = "@%s\n:@lamazeP:＜「"%acct
+                toot_now += kiri_deep.lstm_gentxt(content,num=1,sel_model='chino').strip() + '」'
                 toot(toot_now, g_vis, id, None,interval=5)
                 SM.update(acct, 'func')
             else:
@@ -802,14 +826,15 @@ def th_quick():
 # 定期ものまねさーびす！
 def monomane_tooter():
     spoiler = "勝手にものまねサービス"
-    random_acct = DAO.sample_acct(timedelta(minutes=15))
+    random_acct = DAO.sample_acct()
     toots = ""
     for row in DAO.get_user_toots(random_acct):
+        if len(kiri_util.hashtag(row[0])) > 0:
+            continue
         content = kiri_util.content_cleanser(row[0])
         if len(content) == 0:
-            pass
-        else:
-            toots += content + "。\n"
+            continue
+        toots += content + "。\n"
     chain = PrepareChain.PrepareChain("user_toots",toots)
     triplet_freqs = chain.make_triplet_freqs()
     chain.save(triplet_freqs, True)
@@ -828,12 +853,13 @@ def summarize_tooter():
     spoiler = "ＬＴＬここ1時間の自動まとめ"
     toots = ""
     for row in DAO.get_toots_1hour():
+        if len(kiri_util.hashtag(row[0])) > 0:
+            continue
         content = kiri_util.content_cleanser(row[0])
         if len(content) == 0:
-            pass
-        else:
-            content = re.sub(r"(.+)\1{3,}","",content, flags=(re.DOTALL))
-            toots += content + "\n"
+            continue
+        content = re.sub(r"(.+)\1{3,}","",content, flags=(re.DOTALL))
+        toots += content + "\n"
     gen_txt = Toot_summary.summarize(pat1.sub("",pat2.sub("",toots)),limit=90, lmtpcs=5, m=1, f=4)
     if gen_txt[-1:1] == '#':
         gen_txt = gen_txt[:len(gen_txt)-1]
@@ -848,7 +874,7 @@ def bottlemail_sending():
     for id,acct,msg,reply_id in sendlist:
         sleep(DELAY)
         spoiler = ":@" + acct + ": から🍾ボトルメール💌届いたよー！"
-        random_acct = DAO.sample_acct(timedelta(hours=1))
+        random_acct = DAO.sample_acct()
         #お届け！
         toots = "@" + random_acct + "\n:@" + acct + ":＜「" + msg + "」"
         toots +=  "\n※ボトルメールサービス：＜メッセージ＞　であなたも送れるよー！試してみてね！"
@@ -876,7 +902,7 @@ def bottlemail_sending():
 #######################################################
 # 初めてのトゥートを探してぶーすとするよー！
 def timer_bst1st():
-    random_acct = DAO.sample_acct(timedelta(minutes=15))
+    random_acct = DAO.sample_acct()
     boost_now(DAO.get_random_1id(random_acct))
     SM.update(random_acct, 'func')
 

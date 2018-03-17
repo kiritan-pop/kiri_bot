@@ -24,15 +24,19 @@ for label,i in labels_index.items():
 
 STANDARD_SIZE = (299, 299)
 
-model_path = 'db/lstm_toot_v7.h5'
-me23_path = 'db/lstm_toot_mei23.h5'
-knzk_path = 'db/lstm_toot_knzk.h5'
-takomodel_path = 'db/tako5.h5'
+model_path = 'db/lstm_toot_v8.h5'
+me23_path = 'db/lstm_toot_mei23v2.h5'
+kiritan_path = 'db/lstm_toot_kiritanv2.h5'
+lamaze_path = 'db/lstm_toot_lamazePv2.h5'
+knzk_path = 'db/lstm_toot_knzkv2.h5'
+takomodel_path = 'db/tako7.h5'
 #print('******* lstm load model %s,%s*******' %(model_path,takomodel_path))
 # モデルを読み込む
 model = load_model(model_path)
 mei23model = load_model(me23_path)
+kiritanmodel = load_model(kiritan_path)
 knzkmodel = load_model(knzk_path)
+chinomodel = load_model(lamaze_path)
 takomodel = load_model(takomodel_path)
 graph = tf.get_default_graph()
 
@@ -46,6 +50,7 @@ adaptr = ['だから','それで','しかし','けど','また','さらに',\
         'つまり','さて','そして','で','でね','そんで','でも']
 #辞書読み込み
 wl_chars = list(open('dic/wl.txt').read())
+#wl_chars = list(open('dic/wl2400.txt').read())
 wl_chars.append(r'\n')
 wl_chars.sort()
 char_indices = dict((c, i) for i, c in enumerate(wl_chars))
@@ -68,6 +73,10 @@ def lstm_gentxt(text,num=0,sel_model=None):
         tmp_model = mei23model
     elif sel_model == 'knzk':
         tmp_model = knzkmodel
+    elif sel_model == 'kiritan':
+        tmp_model = kiritanmodel
+    elif sel_model == 'chino':
+        tmp_model = chinomodel
 
     rnd = random.sample(adaptr, 1)[0]
     tmp = text + '\n' + rnd + '、'
@@ -116,7 +125,7 @@ def takoramen(filepath):
     print("*** image:", filepath.split('/')[-1], "\n*** result:", rslt_dict)
     with open('image.log','a') as f:
         f.write("*** image:" + filepath.split('/')[-1] +  "  *** result:%s\n"%str(rslt_dict))
-    if max(result[0]) > 0.9:
+    if max(result[0]) > 0.85:
         return labels[np.where(result[0] == max(result[0]) )[0][0]]
     else:
         return 'other'
