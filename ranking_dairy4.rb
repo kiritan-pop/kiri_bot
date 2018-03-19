@@ -19,6 +19,7 @@ DB_PATH = "db/statuses.db"
 
 # --- debug switch  true false
 VERB = false
+# VERB = true
 
 ############################################################
 #
@@ -108,10 +109,12 @@ handler do |job|
     spoiler_text = "ここ１時間のトゥート数ランキング（勝手にブースター代理）"
     body = ""
     users_cnt.sort_by {|k, v| -v }.each_with_index{|(acct,cnt),i|
-      break if i > 2
+      break if i > 4
       body += "🥇 " if i == 0
       body += "🥈 " if i == 1
       body += "🥉 " if i == 2
+      body += "🏅 " if i == 3
+      body += "🏅 " if i == 4
       body += ":@#{acct}: #{sprintf("%4d",cnt)} toots（#{sprintf("%3.1f", users_size[acct].to_f/cnt.to_f)}字/toot） \n"
     }
     body += "#きりランキング #きりぼっと"
@@ -182,6 +185,7 @@ handler do |job|
     users_size= {}
     fav_cnt = {}
     boost_cnt = {}
+    faboo_cnt = {}
     statuses_json = {}
 
     File.open("db/statuses_today.json", "r"){|f|
@@ -194,9 +198,11 @@ handler do |job|
       if users_size.has_key?(acct)
         users_size[acct] += text.size
         users_cnt[acct] += 1
+        faboo_cnt[acct] += f_c + r_c
       else
         users_size[acct] = text.size
         users_cnt[acct] = 1
+        faboo_cnt[acct] = f_c + r_c
       end
     }
 
@@ -211,16 +217,33 @@ handler do |job|
     spoiler_text = "今日のトゥート数ランキング（勝手にブースター代理）"
     body = ""
     users_cnt.sort_by {|k, v| -v }.each_with_index{|(acct,cnt),i|
-      break if i > 2
+      break if i > 4
       body += "🥇 " if i == 0
       body += "🥈 " if i == 1
       body += "🥉 " if i == 2
+      body += "🏅 " if i == 3
+      body += "🏅 " if i == 4
       body += ":@#{acct}: #{sprintf("%4d",cnt)} toots（#{sprintf("%3.1f", users_size[acct].to_f/cnt.to_f)}字/toot） \n"
     }
     body += "#きりランキング #きりぼっと"
     exe_toot(body,visibility = "public",acct = nil,spoiler_text = spoiler_text,rep_id = nil)
 
-    sleep(60)
+    sleep(60) unless VERB
+    spoiler_text = "今日の影響力（？）ランキング"
+    body = ""
+    faboo_cnt.sort_by {|k, v| -v }.each_with_index{|(acct,cnt),i|
+      break if i > 4
+      body += "🥇 " if i == 0
+      body += "🥈 " if i == 1
+      body += "🥉 " if i == 2
+      body += "🏅 " if i == 3
+      body += "🏅 " if i == 4
+      body += ":@#{acct}: #{sprintf("%4d",cnt)} pts（ニコる＋ブースト）\n"
+    }
+    body += "#きりランキング #きりぼっと"
+    exe_toot(body,visibility = "public",acct = nil,spoiler_text = spoiler_text,rep_id = nil)
+
+    sleep(60) unless VERB
     spoiler_text = "今日最もニコられたトゥートは……"
     body = ""
     fav_cnt.sort_by {|k, v| -v }.each_with_index{|(id,cnt),i|

@@ -14,6 +14,23 @@ import warnings, traceback
 BOT_ID = 'kiri_bot01'
 
 #######################################################
+# ネイティオ語翻訳
+def two2jp(twotwo_text):
+    twotwodic = {}
+    twotwo_text = unicodedata.normalize("NFKC", twotwo_text)
+    for line in open('dic/twotwo.dic'):
+        tmp = line.strip().split(',')
+        twotwodic[tmp[1]] = tmp[0]
+    text = ""
+    for two in twotwo_text.split(' '):
+        if two in twotwodic:
+            text += twotwodic[two]
+        else:
+            text += two
+    return text
+    # return unicodedata.normalize("NFKC", text)
+
+#######################################################
 # エラー時のログ書き込み
 def error_log():
     jst_now = datetime.now(timezone('Asia/Tokyo'))

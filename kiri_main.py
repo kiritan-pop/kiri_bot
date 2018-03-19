@@ -76,7 +76,6 @@ class men_toot(StreamListener):
             status = notification["status"]
             QQ.put(status)
             vote_check(status)
-            #quick_rtn(status)
             TQ.put(status)
             SM.update(notification["status"]["account"]["acct"], 'reply')
         elif notification["type"] == "favourite":
@@ -105,7 +104,6 @@ class res_toot(StreamListener):
                     TQ.put(status)
             return
         else:
-            #quick_rtn(status)
             TQ.put(status)
 
 #######################################################
@@ -114,7 +112,6 @@ class public_listener(StreamListener):
     def on_update(self, status):
             QQ.put(status)
             StatusQ.put(status)
-            #quick_rtn(status)
             CM.count(status['created_at'])
 
     def on_delete(self, status_id):
@@ -226,6 +223,11 @@ def quick_rtn(status):
     print('===%s\t「%s」'%(acct, '\n    '.join(content.split('\n'))))
     statuses_count = status["account"]["statuses_count"]
     spoiler_text = status["spoiler_text"]
+    ac_created_at = status["account"]["created_at"]
+    ac_created_at = ac_created_at.astimezone(timezone('Asia/Tokyo'))
+    ac_ymd = ac_created_at.strftime("%Y%m%d")
+    jst_now = datetime.now(timezone('Asia/Tokyo'))
+    now_ymd = jst_now.strftime("%Y%m%d")
     #botはスルー
     if  acct in BOTS:
         return
@@ -251,11 +253,9 @@ def quick_rtn(status):
 
     a = int(CM.get_coolingtime())
     #a = int(a*a / 2)
-    rnd = random.randint(-1,10+a)
+    rnd = random.randint(0,8+a*2)
     if acct == MASTER_ID:
         rnd = 0
-    if rnd == -1:
-        return
     toot_now = ''
     id_now = id
     vis_now = g_vis
@@ -267,7 +267,6 @@ def quick_rtn(status):
                 if rnd <= 6:
                     #toot_now = '　　三(  っ˃̵ᴗ˂̵) 通りまーす！'
                     toot_now = ':nicoru180: :nicoru180: :nicoru180: :nicoru180: :nicoru180: '
-                    vis_now = 'public'
                     id_now = None
     elif re.search(r"(:nicoru[0-9]{0,3}:.?){2}", content):
         if content_1b != None and acct == acct_1b:
@@ -277,30 +276,31 @@ def quick_rtn(status):
                 if rnd <= 6:
                     #toot_now = '　　(˃̵ᴗ˂̵っ )三 通りまーす！'
                     toot_now = ':nicoru180:'
-                    vis_now = 'public'
                     id_now = None
     elif re.search(r"^貞$", content):
         if content_1b != None and acct == acct_1b:
             SM.update(acct, 'func',score=-1)
             if re.search(r"^治$", content_1b):
-                toot_now = '%s　　三(  っ˃̵ᴗ˂̵) 通りまーす！'%username
-                vis_now = 'direct'
                 SM.update(acct, 'func')
                 if rnd <= 7:
                     toot_now = '　　三(  っ˃̵ᴗ˂̵) 通りまーす！'
-                    vis_now = 'public'
                     id_now = None
 
     if acct == acct_1b:
         return
 
-    if statuses_count != 0 and  statuses_count%10000 == 0:
+    #ネイティオが半角スペース区切りで５つ以上あれば翻訳
+    if (acct == 'kiritan' or acct == 'twotwo') and len(content.split(' ')) > 4:
+        toot_now = ':@%s: ＜「'%acct + kiri_util.two2jp(content) + '」'
+        id_now = None
+        SM.update(acct, 'func')
+    elif statuses_count != 0 and  statuses_count%10000 == 0:
         interval = 180
         toot_now = username + "\n"
         toot_now += "あ！そういえばさっき{0:,}トゥートだったよー！".format(statuses_count)
-        vis_now = 'unlisted'
+        id_now = None
         SM.update(acct, 'func')
-    elif statuses_count == 1:
+    elif statuses_count == 1 and ac_ymd == now_ymd:
         interval = 5
         toot_now = username + "\n"
         toot_now += "新規さんいらっしゃーい！🍵🍡どうぞー！"
@@ -309,56 +309,48 @@ def quick_rtn(status):
     elif re.search(r"草", content+spoiler_text):
         SM.update(acct, 'func',score=-1)
         if rnd <= 1:
-            toot_now = ":" + username + ": " + username + " "
+            toot_now = ":" + username + ": "
             random.shuffle(hanalist)
             toot_now += hanalist[0]
+            id_now = None
     elif re.search(r"^:twitter:.+🔥$", content, flags=(re.MULTILINE | re.DOTALL)):
         SM.update(acct, 'func')
-        if rnd <= 3:
-            toot_now = ":" + username + ": " + username + " "
-            toot_now += '\n:twitter: ＜ﾊﾟﾀﾊﾟﾀｰ\n川\n\n🔥'
-            vis_now = 'direct'
-        elif rnd <= 6:
-            toot_now = ":" + username + ": " + username + " "
-            toot_now += '\n(ﾉ・_・)ﾉ ﾆｹﾞﾃ!⌒:twitter: ＜ｱﾘｶﾞﾄｩ!\n🔥'
-            vis_now = 'direct'
-        elif rnd <= 7:
-            toot_now = ":" + username + ": " + username + " "
-            toot_now += '\n(ﾉ・_・)ﾉ ﾆｹﾞﾃ!⌒🍗 ＜ｱﾘｶﾞﾄｩ!\n🔥'
-            vis_now = 'direct'
+        if rnd <= 2:
+            toot_now = ':twitter: ＜ﾊﾟﾀﾊﾟﾀｰ\n川\n\n🔥'
+            id_now = None
+        elif rnd == 6:
+            toot_now = '(ﾉ・_・)ﾉ ﾆｹﾞﾃ!⌒:twitter: ＜ｱﾘｶﾞﾄｩ!\n🔥'
+            id_now = None
+        elif rnd == 7:
+            toot_now = '(ﾉ・_・)ﾉ ﾆｹﾞﾃ!⌒🍗 ＜ｱﾘｶﾞﾄｩ!\n🔥'
+            id_now = None
     elif re.search(r"ブリブリ|ぶりぶり|うん[ちこ]|💩|^流して$", content+spoiler_text):
         SM.update(acct, 'func',score=-1)
-        if rnd <= 3:
+        if rnd <= 2:
             toot_now = '🌊🌊🌊🌊 ＜ざばーっ！'
-            vis_now = 'public'
             id_now = None
     elif re.search(r"^ふきふき$|^竜巻$", content):
         SM.update(acct, 'func')
         if rnd <= 1:
             toot_now = '🌪🌪🌪🌪＜ごぉ〜〜っ！'
-            vis_now = 'public'
             id_now = None
-        elif rnd <= 3:
+        elif rnd <= 2:
             toot_now = '💨💨💨🍃＜ぴゅ〜〜っ！'
-            vis_now = 'public'
             id_now = None
     elif re.search(r"^凍らせて$", content):
         SM.update(acct, 'func')
-        if rnd <= 3:
+        if rnd <= 2:
             toot_now = '❄❄❄❄❄＜カチコチ〜ッ！'
-            vis_now = 'public'
             id_now = None
     elif re.search(r"^雷$", content):
         SM.update(acct, 'func')
-        if rnd <= 3:
+        if rnd <= 2:
             toot_now = '⚡️⚡️⚡️⚡️＜ゴロゴロ〜ッ！'
-            vis_now = 'public'
             id_now = None
     elif re.search(r"^ぬるぽ$", content):
         SM.update(acct, 'func',score=-1)
-        if rnd <= 6:
+        if rnd <= 4:
             toot_now = 'ｷﾘｯ'
-            vis_now = 'public'
             id_now = None
     elif re.search(r"^通過$", content):
         toot_now = '%s ( ⊂๑˃̵᎑˂̵)⊃＜阻止！'%username
@@ -366,85 +358,70 @@ def quick_rtn(status):
         SM.update(acct, 'func')
         if rnd <= 4:
             toot_now = '⊂(˃̵᎑˂̵๑⊃ )＜阻止！'
-            vis_now = 'public'
             id_now = None
     elif re.search(r"3.{0,1}3.{0,1}4", content):
         SM.update(acct, 'func',score=-1)
         if rnd <= 6:
             toot_now = 'ﾅﾝ'
-            vis_now = 'public'
             id_now = None
     elif re.search(r"^ちくわ大明神$", content):
         SM.update(acct, 'func',score=-1)
         if rnd <= 6:
             toot_now = 'ﾀﾞｯ'
-            vis_now = 'public'
             id_now = None
     elif re.search(r"ボロン$|ぼろん$", content):
         SM.update(acct, 'func',score=-2)
-        if rnd <= 3:
-            toot_now = '@%s\n✂️チョキン！！'%acct
-            vis_now = 'direct'
+        if rnd <= 2:
+            toot_now = ':@%s: ✂️チョキン！！'%acct
+            id_now = None
     elif re.search(r"さむい$|寒い$", content):
         SM.update(acct, 'func',score=-1)
-        if rnd <= 3:
-            toot_now = '@%s\n🔥🔥🔥\n🔥:@%s:🔥\n🔥🔥🔥 '%(acct,acct)
-            vis_now = 'direct'
+        if rnd <= 2:
+            toot_now = '🔥🔥🔥\n🔥:@%s:🔥\n🔥🔥🔥 '%acct
+            id_now = None
     elif re.search(r"あつい$|暑い$", content):
         SM.update(acct, 'func',score=-1)
-        if rnd <= 3:
-            toot_now = '@%s\n❄❄❄\n❄:@%s:❄\n❄❄❄ '%(acct,acct)
-            vis_now = 'direct'
+        if rnd <= 2:
+            toot_now = '❄❄❄\n❄:@%s:❄\n❄❄❄ '%acct
+            id_now = None
     elif re.search(r"^(今|いま)の[な|無|ナ][し|シ]$", content):
         SM.update(acct, 'func',score=-1)
-        if rnd <= 6:
-            toot_now = '@%s\n:@%s: 🚓🚓🚓＜う〜う〜！いまのなし警察でーす！'%(acct,acct)
-            vis_now = 'direct'
-        if rnd <= 3:
+        if rnd <= 2:
             toot_now = ':@%s: 🚓🚓🚓＜う〜う〜！いまのなし警察でーす！'%acct
-            vis_now = 'public'
             id_now = None
     elif re.search(r"ツイッター|ツイート|[tT]witter", content):
         SM.update(acct, 'func',score=-1)
-        if rnd <= 3:
-            toot_now = '@%s\nつ、つつつ、つい〜〜！！？！？？！？！'%acct
-            vis_now = 'direct'
+        if rnd <= 1:
+            toot_now = 'つ、つつつ、つい〜〜！！？！？？！？！'
+            id_now = None
         elif rnd == 6:
-            toot_now = '@%s\nつい〜……'%acct
-            vis_now = 'direct'
-    elif "*´ω｀*" in content+spoiler_text:
-        SM.update(acct, 'func',score=-1)
-        if rnd <= 6:
-            toot_now = '@%s\nその顔は……！！'%acct
-            vis_now = 'direct'
+            toot_now = 'つい〜……'
+            id_now = None
     elif "きりちゃん" in content+spoiler_text or "ニコって" in content+spoiler_text:
         fav_now(id)
         SM.update(acct, 'reply')
     elif re.search(r"なんでも|何でも",content):
         SM.update(acct, 'func',score=-1)
-        if rnd <= 4:
-            toot_now = '@%s\nん？'%acct
-            vis_now = 'direct'
+        if rnd <= 2:
+            toot_now = 'ん？'
+            id_now = None
     elif re.search(r"泣いてる|泣いた|涙が出[るた(そう)]", content):
         SM.update(acct, 'func')
-        if rnd <= 4:
-            toot_now = '@%s\n泣いてるー！ｷｬｯｷｬｯ!'%acct
-            vis_now = 'direct'
+        if rnd <= 2:
+            toot_now = '( *ˊᵕˋ)ﾉ:@%s: ﾅﾃﾞﾅﾃﾞ'%acct
+            id_now = None
     elif re.search(r"^はいじゃないが$", content+spoiler_text):
         SM.update(acct, 'func')
         if rnd <= 6:
             toot_now = 'はいじゃが！'
-            vis_now = 'public'
             id_now = None
     elif re.search(r"惚気|ほっけ|ホッケ|^燃やして$", content+spoiler_text):
         SM.update(acct, 'func',score=-1)
-        if rnd <= 4:
+        if rnd <= 2:
             toot_now = '🔥🔥🔥🔥＜ごぉぉぉっ！'
-            vis_now = 'public'
             id_now = None
     elif "今日もみなさんが素敵な一日を送れますように" in content and acct == 'lamazeP':
         toot_now = '今み素一送！'
-        vis_now = 'public'
         id_now = None
     elif re.search(r"[ご御夕昼朝][食飯][食た]べ[よるた]|(腹|はら)[へ減]った|お(腹|なか)[空す]いた|(何|なに)[食た]べよ", content):
         SM.update(acct, 'func')
@@ -454,7 +431,17 @@ def quick_rtn(status):
         SM.update(acct, 'func')
         if rnd <= 4:
             toot_now = '止まるんじゃぞ……💃'
-            vis_now = 'public'
+            id_now = None
+    elif re.search(r"[おぉ][じぢ]$|[おぉ][じぢ]さん", content+spoiler_text):
+        SM.update(acct, 'func')
+        if rnd <= 1:
+            toot_now = '٩(`^´๑ )۶三٩(๑`^´๑)۶三٩( ๑`^´)۶'
+            id_now = None
+        if rnd == 2:
+            toot_now = '٩(`^´๑ )۶三٩( ๑`^´)۶'
+            id_now = None
+        if rnd == 3:
+            toot_now = ' ₍₍ ٩(๑`^´๑)۶ ⁾⁾おぢおぢダンスーー♪'
             id_now = None
     else:
         return
@@ -473,12 +460,14 @@ def business_contact(status):
     spoiler_text = status["spoiler_text"]
     created_at = status['created_at']
     display_name = status["account"]['display_name']
-
+    ac_created_at = status["account"]["created_at"]
+    ac_created_at = ac_created_at.astimezone(timezone('Asia/Tokyo'))
+    ac_ymd = ac_created_at.strftime("%Y.%m.%d %H:%M:%S")
     #最後にトゥートしてから3時間以上？
     ymdhms = DAO.get_least_created_at(acct)
     diff = timedelta(hours=3)
     if ymdhms == None:
-        toot_now = '@%s 新規さんかも−！\n:@%s:(%s)＜「%s」'%(MASTER_ID, acct, display_name, content)
+        toot_now = '@%s 新規さんかも−！\n:@%s:(%s)＜「%s」(created at %s)'%(MASTER_ID, acct, display_name, content, ac_ymd)
         toot(toot_now)
     elif ymdhms + diff < created_at:
         toot_now = '@%s 帰ってきたよ−！(前回書込：%s)\n:@%s:(%s)＜「%s」'%(MASTER_ID, ymdhms.strftime("%Y.%m.%d %H:%M:%S"), acct, display_name, content)
@@ -668,14 +657,14 @@ def th_worker():
                     wikipedia.set_lang("ja")
                     page = wikipedia.page(word)
                 except  wikipedia.exceptions.DisambiguationError as e:
-                    toot('@%s 「%s」にはいくつか意味があるみたいだな〜'%(acct,word), g_vis, id, None, interval=3)
+                    toot('@%s 「%s」にはいくつか意味があるみたいだな〜'%(acct,word), g_vis, id, None, interval=1)
                 except Exception:
-                    toot('@%s え？「%s」ってなーに？'%(acct,word), g_vis, id, None, interval=3)
+                    toot('@%s え？「%s」ってなーに？'%(acct,word), g_vis, id, None, interval=1)
                 else:
                     summary_text = page.summary
                     if len(acct) + len(summary_text) + len(page.url) > 450:
                         summary_text = summary_text[0:450-len(acct)-len(page.url)] + '……'
-                    toot('@%s %s\n%s'%(acct, summary_text, page.url), g_vis, id, 'なになに？「%s」とは……'%word, interval=3)
+                    toot('@%s %s\n%s'%(acct, summary_text, page.url), g_vis, id, 'なになに？「%s」とは……'%word, interval=1)
 
             elif re.search(r"(私|わたし|わたくし|自分|僕|俺|朕|ちん|余|あたし|ミー|あちき|あちし|\
                 わい|わっち|おいどん|わし|うち|おら|儂|おいら|あだす|某|麿|拙者|小生|あっし|手前|吾輩|我輩|マイ)の(ランク|ランキング|順位)", content):
