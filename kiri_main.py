@@ -290,7 +290,7 @@ def quick_rtn(status):
         return
 
     #ネイティオが半角スペース区切りで５つ以上あれば翻訳
-    if (acct == 'kiritan' or acct == 'twotwo') and len(content.split(' ')) > 4:
+    if (acct == 'kiritan' or acct == 'twotwo') and len(content.split(' ')) > 4 and content.count('トゥ') > 4:
         toot_now = ':@%s: ＜「'%acct + kiri_util.two2jp(content) + '」'
         id_now = None
         SM.update(acct, 'func')
@@ -311,7 +311,7 @@ def quick_rtn(status):
         if rnd <= 1:
             toot_now = ":" + username + ": "
             random.shuffle(hanalist)
-            toot_now += hanalist[0]
+            toot_now += hanalist[0] + ' 三💨 ﾋﾟｭﾝ!!'
             id_now = None
     elif re.search(r"^:twitter:.+🔥$", content, flags=(re.MULTILINE | re.DOTALL)):
         SM.update(acct, 'func')
@@ -564,6 +564,9 @@ def show_rank(acct, id, g_vis):
     users_size = {}
     with open("db/users_size.json", 'r') as f:
         users_size = json.load(f)
+    faboo_cnt = {}
+    with open("db/faboo_cnt.json", 'r') as f:
+        faboo_cnt = json.load(f)
 
     users_ranking = {}
     for i,(k_acct, cnt) in enumerate(sorted(users_cnt.items(), key=lambda x: -x[1])):
@@ -575,8 +578,8 @@ def show_rank(acct, id, g_vis):
         return
 
     toot_now = "@{0}\n:@{1}: のランクだよー！\n（※{2} 時点）\n".format(acct,acct,today_str)
-    toot_now += "{0:>3}位 {1:>4} toots({2:.1f}文字/toot)".format(users_ranking[acct][0], users_ranking[acct][1],
-                                                               users_ranking[acct][2]/users_ranking[acct][1])
+    toot_now += "{0:>3}位 {1:>4} toots/ニコブ率{2:.1f}％".format(users_ranking[acct][0], users_ranking[acct][1],
+                                                               faboo_cnt[acct]*100/users_ranking[acct][1])
     toot(toot_now, g_vis ,id)
 
 #######################################################

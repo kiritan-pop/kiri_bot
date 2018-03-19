@@ -55,6 +55,7 @@ handler do |job|
     client = Mastodon::REST::Client.new(base_url: ENV["MASTODON_URL"])
     time_b1h = DateTime.now - Rational(1,24)
     statuses_json = {}
+    sleep(60*10)
     while true do
       sleep(0.5)
       statuses = exe_get_nona(client, id)
@@ -65,10 +66,6 @@ handler do |job|
         if time_b1h > created_at
           break_sw = true
           break
-        end
-        if statuses_json.size > 1000
-          break_sw = true   if VERB
-          break             if VERB
         end
         contents = Nokogiri::HTML.parse(status.content)
         text = ''
@@ -93,6 +90,7 @@ handler do |job|
     users_size= {}
     fav_cnt = {}
     boost_cnt = {}
+    faboo_cnt = {}
 
     statuses_json.each{|id,(created_at,text,f_c,r_c,acct)|
       fav_cnt[id] = f_c
@@ -100,22 +98,30 @@ handler do |job|
       if users_size.has_key?(acct)
         users_size[acct] += text.size
         users_cnt[acct] += 1
+        faboo_cnt[acct] += f_c + r_c
       else
         users_size[acct] = text.size
         users_cnt[acct] = 1
+        faboo_cnt[acct] = f_c + r_c
       end
     }
 
     spoiler_text = "ここ１時間のトゥート数ランキング（勝手にブースター代理）"
     body = ""
     users_cnt.sort_by {|k, v| -v }.each_with_index{|(acct,cnt),i|
-      break if i > 4
+      break if i > 9
       body += "🥇 " if i == 0
       body += "🥈 " if i == 1
       body += "🥉 " if i == 2
       body += "🏅 " if i == 3
       body += "🏅 " if i == 4
-      body += ":@#{acct}: #{sprintf("%4d",cnt)} toots（#{sprintf("%3.1f", users_size[acct].to_f/cnt.to_f)}字/toot） \n"
+      body += ":blank: " if i == 5
+      body += ":blank: " if i == 6
+      body += ":blank: " if i == 7
+      body += ":blank: " if i == 8
+      body += ":blank: " if i == 9
+      body += ":@#{acct}: #{sprintf("%4d",cnt)} toots/ニコブ率 #{sprintf("%3.1f", faboo_cnt[acct].to_f*100/cnt.to_f)}％\n"
+      # body += ":@#{acct}: #{sprintf("%4d",cnt)} toots（#{sprintf("%3.1f", users_size[acct].to_f/cnt.to_f)}字/toot） \n"
     }
     body += "#きりランキング #きりぼっと"
     exe_toot(body,visibility = "public",acct = nil,spoiler_text = spoiler_text,rep_id = nil)
@@ -145,7 +151,7 @@ handler do |job|
     today = Date.today
     statuses_json = {}
     while true do
-      sleep(0.5)
+      sleep(0.2)
       statuses = exe_get_nona(client, id)
       statuses.each{|status|
         id = status.id.to_i if id > status.id.to_i
@@ -205,6 +211,10 @@ handler do |job|
         faboo_cnt[acct] = f_c + r_c
       end
     }
+    faboo_rate = {}
+    users_cnt.each{|acct,cnt|
+      faboo_rate[acct] = faboo_cnt[acct] * 100 / cnt if cnt >= 10
+    }
 
     File.open("db/users_size.json", "w") do |f|
       f.puts(JSON.pretty_generate(users_size))
@@ -212,18 +222,28 @@ handler do |job|
     File.open("db/users_cnt.json", "w") do |f|
       f.puts(JSON.pretty_generate(users_cnt))
     end
-
+    File.open("db/faboo_cnt.json", "w") do |f|
+      f.puts(JSON.pretty_generate(faboo_cnt))
+    end
+    File.open("db/faboo_rate.json", "w") do |f|
+      f.puts(JSON.pretty_generate(faboo_rate))
+    end
 
     spoiler_text = "今日のトゥート数ランキング（勝手にブースター代理）"
     body = ""
     users_cnt.sort_by {|k, v| -v }.each_with_index{|(acct,cnt),i|
-      break if i > 4
+      break if i > 9
       body += "🥇 " if i == 0
       body += "🥈 " if i == 1
       body += "🥉 " if i == 2
       body += "🏅 " if i == 3
       body += "🏅 " if i == 4
-      body += ":@#{acct}: #{sprintf("%4d",cnt)} toots（#{sprintf("%3.1f", users_size[acct].to_f/cnt.to_f)}字/toot） \n"
+      body += ":blank: " if i == 5
+      body += ":blank: " if i == 6
+      body += ":blank: " if i == 7
+      body += ":blank: " if i == 8
+      body += ":blank: " if i == 9
+      body += ":@#{acct}: #{sprintf("%4d",cnt)} toots/ニコブ率 #{sprintf("%3.1f", faboo_cnt[acct].to_f*100/cnt.to_f)}％\n"
     }
     body += "#きりランキング #きりぼっと"
     exe_toot(body,visibility = "public",acct = nil,spoiler_text = spoiler_text,rep_id = nil)
@@ -231,16 +251,21 @@ handler do |job|
     sleep(60) unless VERB
     spoiler_text = "今日の影響力（？）ランキング"
     body = ""
-    faboo_cnt.sort_by {|k, v| -v }.each_with_index{|(acct,cnt),i|
-      break if i > 4
+    faboo_rate.sort_by {|k, v| -v }.each_with_index{|(acct,cnt),i|
+      break if i > 9
       body += "🥇 " if i == 0
       body += "🥈 " if i == 1
       body += "🥉 " if i == 2
       body += "🏅 " if i == 3
       body += "🏅 " if i == 4
-      body += ":@#{acct}: #{sprintf("%4d",cnt)} pts（ニコる＋ブースト）\n"
+      body += ":blank: " if i == 5
+      body += ":blank: " if i == 6
+      body += ":blank: " if i == 7
+      body += ":blank: " if i == 8
+      body += ":blank: " if i == 9
+      body += ":@#{acct}:ニコブ率 #{sprintf("%4d",cnt)}％\n"
     }
-    body += "#きりランキング #きりぼっと"
+    body += "※10トゥート未満の人は除外\n#きりランキング #きりぼっと"
     exe_toot(body,visibility = "public",acct = nil,spoiler_text = spoiler_text,rep_id = nil)
 
     sleep(60) unless VERB
@@ -260,7 +285,8 @@ handler do |job|
   end
 end
 
-every(1.day, 'daily1', at: '22:45')      unless VERB
-every(1.day, 'daily2', at: '23:05')      unless VERB
+every(1.day, 'daily1', at: '23:12')      unless VERB
+every(1.day, 'daily2', at: '23:30')      unless VERB
 every(1.hour, 'hourly', at: '**:00')      unless VERB
 every(1.week, 'daily2')   if VERB
+# every(1.week, 'hourly')
