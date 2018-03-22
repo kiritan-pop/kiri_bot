@@ -207,6 +207,61 @@ def vote_check(status):
                     toot('@%s\n₍₍ ◝(◍•ᴗ•◍)◟⁾⁾また後でねー！'%acct, 'direct', id, None)
 
 #######################################################
+# 画像判定
+def ana_image(media_attachments,sensitive):
+    toot_now = ''
+    for media in media_attachments:
+        filename = download(media["url"] , "media")
+        if '.mp' in filename or '.webm' in filename:
+            continue
+        result = kiri_deep.takoramen(filename)
+        print('   ',result)
+        if result == 'other':
+            continue
+        elif result == 'ねこ':
+            toot_now += 'にゃーん'
+        elif result == 'ダーツ':
+            toot_now += '🎯ダーツ！'
+        elif result == 'にじえろ':
+            toot_now += 'えっち！'
+        elif result == 'イラスト女の子':
+            toot_now += 'かわいい！'
+        elif result == 'イラスト男':
+            toot_now += 'かっこいい！'
+        elif result == 'イラスト線画':
+            toot_now += '色塗ってー！'
+        elif result == 'ろびすて':
+            toot_now += '🙏ろびすてとうとい！'
+        elif result == '漫画':
+            toot_now += 'それなんて漫画ー？'
+        elif result in  ['スクショ','汚部屋','部屋','自撮り','太もも']:
+            toot_now += result + 'だー！'
+        elif result == 'kent':
+            toot_now += 'ケント丸だー！'
+        elif sensitive:
+            if 'ラーメン' in result or '麺' in result or result == 'うどｎ' or  result == 'そば' or result == 'パスタ':
+                toot_now += '🍜%sちゅるちゅるーっ！'%result
+            elif 'バーガー' in result:
+                toot_now += '🍔%sもぐもぐー！'%result
+            elif result == 'からあげ':
+                toot_now += 'かけるよね？っ🍋'
+            elif result == 'サラダ':
+                toot_now += '🥗さくさくー！'
+            elif result == '冷凍チャーハン':
+                toot_now += '焦がしにんにくのマー油と葱油が香るザ★チャーハン600g！？！？！？'
+            elif result == '焼き鳥':
+                toot_now += '鳥貴族ーー！！！！'
+            elif result == 'ピザ':
+                toot_now += 'ぽざ！'
+            else:
+                toot_now += result + 'だー！おいしそうー！'
+        else:
+            toot_now += ':@%s: 🚓🚓🚓＜う〜う〜！飯テロ警察 %s係でーす！\n'%(acct,result)
+            break
+
+    return toot_now
+
+#######################################################
 # 即時応答処理ー！
 def quick_rtn(status):
     id = status["id"]
@@ -216,10 +271,10 @@ def quick_rtn(status):
     if len(kiri_util.hashtag(status['content'])) > 0:
         return
     content = kiri_util.content_cleanser(status['content'])
-    if status['application']:
-        application = status['application']['name']
-    else:
+    if status['application'] == None:
         application = ''
+    else:
+        application = status['application']['name']
     print('===%s\t「%s」'%(acct, '\n    '.join(content.split('\n'))))
     statuses_count = status["account"]["statuses_count"]
     spoiler_text = status["spoiler_text"]
@@ -228,6 +283,8 @@ def quick_rtn(status):
     ac_ymd = ac_created_at.strftime("%Y%m%d")
     jst_now = datetime.now(timezone('Asia/Tokyo'))
     now_ymd = jst_now.strftime("%Y%m%d")
+    media_attachments = status["media_attachments"]
+    sensitive = status['sensitive']
     #botはスルー
     if  acct in BOTS:
         return
@@ -290,7 +347,7 @@ def quick_rtn(status):
         return
 
     #ネイティオが半角スペース区切りで５つ以上あれば翻訳
-    if (acct == 'kiritan' or acct == 'twotwo') and len(content.split(' ')) > 4 and content.count('トゥ') > 4:
+    if (acct == 'kiritan' or acct == 'twotwo') and len(content.split(' ')) > 4 and content.count('トゥ') > 4 and content.count('ー') > 0:
         toot_now = ':@%s: ＜「'%acct + kiri_util.two2jp(content) + '」'
         id_now = None
         SM.update(acct, 'func')
@@ -443,6 +500,10 @@ def quick_rtn(status):
         if rnd == 3:
             toot_now = ' ₍₍ ٩(๑`^´๑)۶ ⁾⁾おぢおぢダンスーー♪'
             id_now = None
+    elif len(media_attachments) > 0:
+        toot_now = ana_image(media_attachments,sensitive)
+        id_now = None
+        # interval = 3
     else:
         return
     #
@@ -618,14 +679,10 @@ def th_worker():
                 continue
             content = kiri_util.content_cleanser(status['content'])
             spoiler_text = kiri_util.content_cleanser(status["spoiler_text"])
-            media_attachments = status["media_attachments"]
-            sensitive = status['sensitive']
-            if 'application' in status:
-                if 'name' in status['application']:
-                    application = status['application']['name']
+            if status['application'] == None:
+                application = ''
             else:
-                application = 'Web'
-                print(status)
+                application = status['application']['name']
             a = int(CM.get_coolingtime())
             if  acct in BOTS:
                 continue
@@ -662,7 +719,7 @@ def th_worker():
                 except  wikipedia.exceptions.DisambiguationError as e:
                     toot('@%s 「%s」にはいくつか意味があるみたいだな〜'%(acct,word), g_vis, id, None, interval=1)
                 except Exception:
-                    toot('@%s え？「%s」ってなーに？'%(acct,word), g_vis, id, None, interval=1)
+                    toot('@%s え？「%s」しらなーい！'%(acct,word), g_vis, id, None, interval=1)
                 else:
                     summary_text = page.summary
                     if len(acct) + len(summary_text) + len(page.url) > 450:
@@ -681,61 +738,6 @@ def th_worker():
             elif  '?トゥトゥトゥ' in content and acct == 'twotwo': #ネイティオ専用
                 GetNumQ.put([acct,id])
                 SM.update(acct, 'func')
-            elif len(media_attachments) > 0:
-                toot_now = ''
-                for media in media_attachments:
-                    filename = download(media["url"] , "media")
-                    if '.mp' in filename or '.webm' in filename:
-                        continue
-                    result = kiri_deep.takoramen(filename)
-                    print('   ',result)
-                    if result == 'other':
-                        continue
-                    elif result == 'ねこ':
-                        toot_now += 'にゃーん'
-                    elif result == 'ダーツ':
-                        toot_now += '🎯ダーツ！'
-                    elif result == 'にじえろ':
-                        toot_now += 'えっち！'
-                    elif result == 'イラスト女の子':
-                        toot_now += 'かわいい！'
-                    elif result == 'イラスト男':
-                        toot_now += 'かっこいい！'
-                    elif result == 'イラスト線画':
-                        toot_now += '色塗ってー！'
-                    elif result == 'ろびすて':
-                        toot_now += '🙏ろびすてとうとい！'
-                    elif result == '漫画':
-                        toot_now += 'それなんて漫画ー？'
-                    elif result in  ['スクショ','汚部屋','部屋','自撮り','太もも']:
-                        toot_now += result + 'だー！'
-                    elif result == 'kent':
-                        toot_now += 'ケント丸だー！'
-                    elif sensitive:
-                        if 'ラーメン' in result or '麺' in result or result == 'うどｎ' or  result == 'そば' or result == 'パスタ':
-                            toot_now += '🍜%sちゅるちゅるーっ！'%result
-                        elif 'バーガー' in result:
-                            toot_now += '🍔%sもぐもぐー！'%result
-                        elif result == 'からあげ':
-                            toot_now += 'かけるよね？っ🍋'
-                        elif result == 'サラダ':
-                            toot_now += '🥗さくさくー！'
-                        elif result == '冷凍チャーハン':
-                            toot_now += '焦がしにんにくのマー油と葱油が香るザ★チャーハン600g！？！？！？'
-                        elif result == '焼き鳥':
-                            toot_now += '鳥貴族ーー！！！！'
-                        elif result == 'ピザ':
-                            toot_now += 'ぽざ！'
-                        else:
-                            toot_now += result + 'だー！おいしそうー！'
-                    else:
-                        toot_now += ':@%s: 🚓🚓🚓＜う〜う〜！飯テロ警察 %s係でーす！\n'%(acct,result)
-                        break
-                if len(toot_now) > 0:
-                    toot_now = "@%s\n"%acct + toot_now
-                    fav_now(id)
-                    sleep(DELAY)
-                    toot(toot_now, g_vis, id, None,interval=8)
             elif len(content) > 140 and spoiler_text == None:
                 content = re.sub(r"(.)\1{3,}",r"\1",content, flags=(re.DOTALL))
                 gen_txt = Toot_summary.summarize(pat1.sub("",pat2.sub("",content)),limit=10,lmtpcs=1, m=1, f=4)

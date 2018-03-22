@@ -122,7 +122,7 @@ def takoramen(filepath):
     rslt_dict = {}
     for i,rslt in enumerate(result[0]):
         rslt_dict[labels[i]] = '{0:.2%}'.format(rslt)
-    print("*** image:", filepath.split('/')[-1], "\n*** result:", rslt_dict)
+    # print("*** image:", filepath.split('/')[-1], "\n*** result:", rslt_dict)
     with open('image.log','a') as f:
         f.write("*** image:" + filepath.split('/')[-1] +  "  *** result:%s\n"%str(rslt_dict))
     if max(result[0]) > 0.85:

@@ -75,7 +75,8 @@ def content_cleanser(content):
     #NGワード
     ng_words = set(word.strip() for word in open('.ng_words').readlines())
     for ng_word in ng_words:
-        rtext = rtext.replace(ng_word,'■■■')
+        # rtext = rtext.replace(ng_word,'■■■')
+        rtext = re.sub(ng_word, '■■■', rtext)
     if hashtag != "":
         return rtext + " #" + hashtag
     else:
