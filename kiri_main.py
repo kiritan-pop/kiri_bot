@@ -208,7 +208,7 @@ def vote_check(status):
 
 #######################################################
 # 画像判定
-def ana_image(media_attachments,sensitive):
+def ana_image(media_attachments,sensitive,acct):
     toot_now = ''
     for media in media_attachments:
         filename = download(media["url"] , "media")
@@ -501,9 +501,11 @@ def quick_rtn(status):
             toot_now = ' ₍₍ ٩(๑`^´๑)۶ ⁾⁾おぢおぢダンスーー♪'
             id_now = None
     elif len(media_attachments) > 0:
-        toot_now = ana_image(media_attachments,sensitive)
+        toot_now = ana_image(media_attachments,sensitive,acct)
         id_now = None
         # interval = 3
+    elif acct == MASTER_ID:
+        fav_now(id_now)
     else:
         return
     #

@@ -39,7 +39,12 @@ def exe_toot(body,visibility = "public",acct = nil,spoiler_text = nil,rep_id = n
   acct = "@"+acct if acct != nil
   #トゥート！
   puts "#{body},#{acct},#{visibility},#{spoiler_text},#{rep_id},#{media_ids}"    if VERB
-  client.create_status_kiri( "#{body[0,460]}#{acct}" , visibility ,spoiler_text,rep_id, media_ids = media_ids)  unless VERB
+  begin
+    # client.create_status_kiri( "#{body[0,460]}#{acct}" , 'private' ,spoiler_text,rep_id, media_ids = media_ids)  unless VERB
+    client.create_status_kiri( "#{body[0,460]}#{acct}" , visibility ,spoiler_text,rep_id, media_ids = media_ids)  unless VERB
+  rescue => e
+    pp "exe_toot error!",e
+  end
 end
 
 ############################################################
@@ -48,7 +53,11 @@ def exe_boost(id)
   #おまじないー！
   client = Mastodon::REST::Client.new(base_url: ENV["MASTODON_URL"],
                                       bearer_token: ENV["MASTODON_ACCESS_TOKEN"])
-  client.reblog(id)
+  begin
+    client.reblog(id)
+  rescue => e
+    pp "exe_boost error!",e
+  end
 end
 
 ############################################################
@@ -212,6 +221,7 @@ handler do |job|
 ############################################################
 # ランキングをトゥート
   when "daily2"
+    asikiri = 25
     users_cnt= {}
     users_size= {}
     fav_cnt = {}
@@ -238,7 +248,7 @@ handler do |job|
     }
     faboo_rate = {}
     users_cnt.each{|acct,cnt|
-      faboo_rate[acct] = faboo_cnt[acct] * 100 / cnt if cnt >= 10
+      faboo_rate[acct] = faboo_cnt[acct].to_f * 100.0 / cnt.to_f if cnt >= asikiri
     }
 
     File.open("db/users_size.json", "w") do |f|
@@ -276,24 +286,20 @@ handler do |job|
     exe_toot(body,visibility = "public",acct = nil,spoiler_text = spoiler_text,rep_id = nil)
 
     sleep(60) unless VERB
-    spoiler_text = "今日の影響力（？）ランキング"
+    spoiler_text = "今日のニコブ率ランキング"
     body = ""
-    faboo_rate.sort_by {|k, v| -v }.each_with_index{|(acct,cnt),i|
-      break if i > 9
+    faboo_rate.sort_by {|k, v| -v }.each_with_index{|(acct,rate),i|
+      break if i > 14
       body += "🥇 " if i == 0
       body += "🥈 " if i == 1
       body += "🥉 " if i == 2
       body += "🏅 " if i == 3
       body += "🏅 " if i == 4
-      body += ":blank: " if i == 5
-      body += ":blank: " if i == 6
-      body += ":blank: " if i == 7
-      body += ":blank: " if i == 8
-      body += ":blank: " if i == 9
-      body += ":@#{acct}:ニコブ率 #{sprintf("%4d",cnt)}％\n"
+      body += "　 " if i >= 5
+      body += ":@#{acct}:#{sprintf("%3.1f",rate)} ％\n"
     }
-    body += "※ニコブ率：（ニコられ数＋ブーストされ数）÷トゥート数\n"
-    body += "※10トゥート未満の人は除外\n#きりランキング #きりぼっと"
+    # body += "※ニコブ率：（ニコられ数＋ブーストされ数）÷トゥート数\n"
+    body += "※#{asikiri}トゥート未満の人は除外\n#きりランキング #きりぼっと"
     exe_toot(body,visibility = "public",acct = nil,spoiler_text = spoiler_text,rep_id = nil)
 
     sleep(60) unless VERB
