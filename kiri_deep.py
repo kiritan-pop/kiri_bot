@@ -24,11 +24,11 @@ for label,i in labels_index.items():
 
 STANDARD_SIZE = (299, 299)
 
-model_path = 'db/lstm_toot_v8.h5'
-me23_path = 'db/lstm_toot_mei23v2.h5'
-kiritan_path = 'db/lstm_toot_kiritanv2.h5'
-lamaze_path = 'db/lstm_toot_lamazePv2.h5'
-knzk_path = 'db/lstm_toot_knzkv2.h5'
+model_path = 'db/lstm_toot_v3.h5'
+me23_path = 'db/lstm_toot_mei23v3.h5'
+kiritan_path = 'db/lstm_toot_kiritanv3.h5'
+lamaze_path = 'db/lstm_toot_lamazePv3.h5'
+knzk_path = 'db/lstm_toot_knzkv3.h5'
 takomodel_path = 'db/tako7.h5'
 #print('******* lstm load model %s,%s*******' %(model_path,takomodel_path))
 # モデルを読み込む

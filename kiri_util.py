@@ -211,7 +211,7 @@ class ScoreManager():
     def show(self):
         con = sqlite3.connect(self.DB_PATH)
         rows = con.execute('select * from scoremanager')
-        return rows
+        return rows.fetchall()
         con.close()
 
 #######################################################
@@ -449,4 +449,12 @@ class DAO_statuses():
             return None
 
 if __name__ == '__main__':
-    pass
+    sm = ScoreManager()
+    score = {}
+    for row in sm.show():
+        score[row[0]] = row[2] + row[4] + row[6] + row[7]
+
+    for i,row in enumerate( sorted(score.items(), key=lambda x: x[1])):
+        print("%2d位:@%s: %d"%(i+1,row[0],row[1]))
+        if i > 20:
+            break

@@ -16,7 +16,7 @@ import kiri_util, kiri_deep, kiri_game
 
 MASTER_ID = 'kiritan'
 BOT_ID = 'kiri_bot01'
-BOTS = [BOT_ID,'friends_booster','5']
+BOTS = [BOT_ID,'friends_booster','5','JC','neruru','12222222']
 DELAY = 2
 pat1 = re.compile(r' ([!-~ぁ-んァ-ン] )+|^([!-~ぁ-んァ-ン] )+| [!-~ぁ-んァ-ン]$',flags=re.MULTILINE)  #[!-~0-9a-zA-Zぁ-んァ-ン０-９ａ-ｚ]
 pat2 = re.compile(r'[ｗ！？!\?]')
@@ -287,12 +287,15 @@ def quick_rtn(status):
     sensitive = status['sensitive']
     #botはスルー
     if  acct in BOTS:
-        return
-    #ももながbotの場合もスルー
-    if  acct == 'JC' and application == '女子会':
-        return
-    if  acct == 'neruru' and application == 'Futomomodaisuki':
-        return
+        #ももながbotの場合もスルー
+        if  acct == 'JC' and application != '女子会':
+            pass
+        elif  acct == 'neruru' and application != 'Futomomodaisuki':
+            pass
+        elif acct == '12222222' and 'ふきふき' in content:
+            pass
+        else:
+            return
     if len(content) <= 0:
         return
     if  Toot1bQ.empty():
@@ -367,32 +370,33 @@ def quick_rtn(status):
         SM.update(acct, 'func',score=-1)
         if rnd <= 1:
             toot_now = ":" + username + ": "
-            random.shuffle(hanalist)
-            toot_now += hanalist[0] + ' 三💨 ﾋﾟｭﾝ!!'
+            toot_now += random.choice(hanalist) + ' 三💨 ﾋﾟｭﾝ!!'
             id_now = None
     elif re.search(r"^:twitter:.+🔥$", content, flags=(re.MULTILINE | re.DOTALL)):
         SM.update(acct, 'func')
-        if rnd <= 2:
-            toot_now = ':twitter: ＜ﾊﾟﾀﾊﾟﾀｰ\n川\n\n🔥'
-            id_now = None
-        elif rnd == 6:
-            toot_now = '(ﾉ・_・)ﾉ ﾆｹﾞﾃ!⌒:twitter: ＜ｱﾘｶﾞﾄｩ!\n🔥'
-            id_now = None
-        elif rnd == 7:
-            toot_now = '(ﾉ・_・)ﾉ ﾆｹﾞﾃ!⌒🍗 ＜ｱﾘｶﾞﾄｩ!\n🔥'
+        if rnd <= 4:
+            tmp = []
+            tmp.append(':twitter: ＜ﾊﾟﾀﾊﾟﾀｰ\n川\n\n🔥')
+            tmp.append('(ﾉ・_・)ﾉ ﾆｹﾞﾃ!⌒:twitter: ＜ｱﾘｶﾞﾄｩ!\n🔥')
+            tmp.append('(ﾉ・_・)ﾉ ﾆｹﾞﾃ!⌒🍗 ＜ｱﾘｶﾞﾄｩ!\n🔥')
+            toot_now = random.choice(tmp)
             id_now = None
     elif re.search(r"ブリブリ|ぶりぶり|うん[ちこ]|💩|^流して$", content+spoiler_text):
         SM.update(acct, 'func',score=-1)
-        if rnd <= 2:
-            toot_now = '🌊🌊🌊🌊 ＜ざばーっ！'
+        if rnd <= 4:
+            tmp = []
+            tmp.append( '🌊🌊🌊🌊 ＜ざばーっ！')
+            tmp.append('( •́ฅ•̀ )ｸｯｻ')
+            tmp.append('っ🚽')
+            toot_now = random.choice(tmp)
             id_now = None
     elif re.search(r"^ふきふき$|^竜巻$", content):
         SM.update(acct, 'func')
-        if rnd <= 1:
-            toot_now = '🌪🌪🌪🌪＜ごぉ〜〜っ！'
-            id_now = None
-        elif rnd <= 2:
-            toot_now = '💨💨💨🍃＜ぴゅ〜〜っ！'
+        if rnd <= 4:
+            tmp = []
+            tmp.append('🌪🌪🌪🌪＜ごぉ〜〜っ！')
+            tmp.append('💨💨💨🍃＜ぴゅ〜〜っ！')
+            toot_now = random.choice(tmp)
             id_now = None
     elif re.search(r"^凍らせて$", content):
         SM.update(acct, 'func')
@@ -410,11 +414,12 @@ def quick_rtn(status):
             toot_now = 'ｷﾘｯ'
             id_now = None
     elif re.search(r"^通過$", content):
-        toot_now = '%s ( ⊂๑˃̵᎑˂̵)⊃＜阻止！'%username
-        vis_now = 'direct'
         SM.update(acct, 'func')
-        if rnd <= 4:
-            toot_now = '⊂(˃̵᎑˂̵๑⊃ )＜阻止！'
+        if rnd <= 6:
+            tmp = []
+            tmp.append('⊂(˃̵᎑˂̵๑⊃ )彡　阻止！')
+            tmp.append('　ミ(  っ˃̵ᴗ˂̵)っ　阻止！')
+            toot_now = random.choice(tmp)
             id_now = None
     elif re.search(r"3.{0,1}3.{0,1}4", content):
         SM.update(acct, 'func',score=-1)
@@ -491,22 +496,22 @@ def quick_rtn(status):
             id_now = None
     elif re.search(r"[おぉ][じぢ]$|[おぉ][じぢ]さん", content+spoiler_text):
         SM.update(acct, 'func')
-        if rnd <= 1:
-            toot_now = '٩(`^´๑ )۶三٩(๑`^´๑)۶三٩( ๑`^´)۶'
-            id_now = None
-        if rnd == 2:
-            toot_now = '٩(`^´๑ )۶三٩( ๑`^´)۶'
-            id_now = None
-        if rnd == 3:
-            toot_now = ' ₍₍ ٩(๑`^´๑)۶ ⁾⁾おぢおぢダンスーー♪'
+        if rnd <= 4:
+            tmp = []
+            tmp.append('٩(`^´๑ )۶三٩(๑`^´๑)۶三٩( ๑`^´)۶')
+            tmp.append('٩(`^´๑ )۶三٩( ๑`^´)۶')
+            tmp.append(' ₍₍ ٩(๑`^´๑)۶ ⁾⁾おぢおぢダンスーー♪')
+            tmp.append('٩(٩`^´๑ )三( ๑`^´۶)۶')
+            toot_now = random.choice(tmp)
             id_now = None
     elif len(media_attachments) > 0:
         toot_now = ana_image(media_attachments,sensitive,acct)
         id_now = None
         # interval = 3
-    elif acct == MASTER_ID:
-        fav_now(id_now)
     else:
+        nicolist = set([tmp.strip() for tmp in open('.nicolist').readlines()])
+        if acct in nicolist:
+            fav_now(id_now)
         return
     #
     if len(toot_now) > 0:
@@ -532,9 +537,11 @@ def business_contact(status):
     if ymdhms == None:
         toot_now = '@%s 新規さんかも−！\n:@%s:(%s)＜「%s」(created at %s)'%(MASTER_ID, acct, display_name, content, ac_ymd)
         toot(toot_now)
+        fav_now(id)
     elif ymdhms + diff < created_at:
         toot_now = '@%s 帰ってきたよ−！(前回書込：%s)\n:@%s:(%s)＜「%s」'%(MASTER_ID, ymdhms.strftime("%Y.%m.%d %H:%M:%S"), acct, display_name, content)
-        #toot(toot_now)
+        toot(toot_now)
+        fav_now(id)
 
     watch_list = set([kansi_acct.strip() for kansi_acct in open('.watch_list').readlines()])
     if acct in watch_list:
@@ -788,7 +795,7 @@ def th_worker():
                     continue
                 fav_now(id)
                 toot_now = "@%s\n:@Knzk:＜「"%acct
-                toot_now += kiri_deep.lstm_gentxt(content,num=1,sel_model='knzk').strip() + '😋😋😋」'
+                toot_now += kiri_deep.lstm_gentxt(content,num=1,sel_model='knzk').strip() + '」'
                 toot(toot_now, g_vis, id, None,interval=5)
                 SM.update(acct, 'func')
             elif re.search(r"チノ|ラマーズ", content + spoiler_text):
