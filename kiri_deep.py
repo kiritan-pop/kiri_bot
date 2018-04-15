@@ -12,7 +12,7 @@ import tensorflow as tf
 from keras.backend import tensorflow_backend
 #config = tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True, visible_device_list="1"))
 config = tf.ConfigProto(device_count={"GPU":0},
-                        gpu_options=tf.GPUOptions(allow_growth=True, visible_device_list="0"))
+                        gpu_options=tf.GPUOptions(allow_growth=True, visible_device_list="3"))
 session = tf.Session(config=config)
 tensorflow_backend.set_session(session)
 
@@ -29,7 +29,7 @@ me23_path = 'db/lstm_toot_mei23v3.h5'
 kiritan_path = 'db/lstm_toot_kiritanv3.h5'
 lamaze_path = 'db/lstm_toot_lamazePv3.h5'
 knzk_path = 'db/lstm_toot_knzkv3.h5'
-takomodel_path = 'db/tako7.h5'
+takomodel_path = 'db/tako9.h5'
 #print('******* lstm load model %s,%s*******' %(model_path,takomodel_path))
 # モデルを読み込む
 model = load_model(model_path)
@@ -122,10 +122,10 @@ def takoramen(filepath):
     rslt_dict = {}
     for i,rslt in enumerate(result[0]):
         rslt_dict[labels[i]] = '{0:.2%}'.format(rslt)
-    # print("*** image:", filepath.split('/')[-1], "\n*** result:", rslt_dict)
+    print("*** image:", filepath.split('/')[-1], "\n*** result:", rslt_dict)
     with open('image.log','a') as f:
         f.write("*** image:" + filepath.split('/')[-1] +  "  *** result:%s\n"%str(rslt_dict))
-    if max(result[0]) > 0.85:
+    if max(result[0]) > 0.97:
         return labels[np.where(result[0] == max(result[0]) )[0][0]]
     else:
         return 'other'

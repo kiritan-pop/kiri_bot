@@ -1,5 +1,6 @@
 # coding: utf-8
 require 'mastodon'
+require 'net/http'
 require 'nokogiri'
 require 'json'
 require 'dotenv'
@@ -23,7 +24,8 @@ VERB = false
 
 ############################################################
 #
-def exe_get_nona(client, max_id = nil)
+def exe_get_nona(max_id = nil)
+  client = Mastodon::REST::Client.new(base_url: ENV["MASTODON_URL"])
   if max_id == nil
     return client.public_timeline({:local => true, :limit => 40})
   else
@@ -46,7 +48,6 @@ def exe_toot(body,visibility = "public",acct = nil,spoiler_text = nil,rep_id = n
     pp "exe_toot error!",e
   end
 end
-
 ############################################################
 #トゥートメソッド
 def exe_boost(id)
@@ -57,6 +58,18 @@ def exe_boost(id)
     client.reblog(id)
   rescue => e
     pp "exe_boost error!",e
+  end
+end
+############################################################
+#メディアアップロード
+def exe_upload_media(path)
+  #おまじないー！
+  client = Mastodon::REST::Client.new(base_url: ENV["MASTODON_URL"],
+                                      bearer_token: ENV["MASTODON_ACCESS_TOKEN"])
+  begin
+    return client.upload_media(data)
+  rescue => e
+    pp "exe_upload_media error!",e
   end
 end
 
@@ -70,18 +83,18 @@ handler do |job|
     pp "スタート"
     break_sw = false
     id =  99999999999999999
-    client = Mastodon::REST::Client.new(base_url: ENV["MASTODON_URL"])
-    time_b1h = DateTime.now - Rational(1,24)
+    time_now = DateTime.now
+    time_b1h = time_now - Rational(1,24)
     statuses_json = {}
-    sleep(60*10)
+    sleep(60*5)  unless VERB
     while true do
       sleep(0.2)
-      statuses = exe_get_nona(client, id)
+      statuses = exe_get_nona(id)
       statuses.each{|status|
         id = status.id.to_i if id > status.id.to_i
-        media_ids = []
+        media_urls = []
         status.media_attachments.each{|media|
-          media_ids.push(media.id)
+          media_urls.push(media.url)
         }
         created_at = Time.parse(status.created_at).localtime
         #昨日のトゥートになったら終了
@@ -89,16 +102,18 @@ handler do |job|
           break_sw = true
           break
         end
-        contents = Nokogiri::HTML.parse(status.content)
-        text = ''
-        contents.search('p').children.each{|item|
-          text += " " + item.text.strip  + " "   if item.text?
-        }
-        contents.search('span').children.each{|item|
-          text += item.text.strip if item.text?
-          # text += item.text.strip if item.text?
-        }
-        statuses_json[status.id] = [created_at, text, status.favourites_count, status.reblogs_count, status.account.acct, media_ids]
+        if created_at <= time_now
+          contents = Nokogiri::HTML.parse(status.content)
+          text = ''
+          contents.search('p').children.each{|item|
+            text += " " + item.text.strip  + " "   if item.text?
+          }
+          contents.search('span').children.each{|item|
+            text += item.text.strip if item.text?
+            # text += item.text.strip if item.text?
+          }
+          statuses_json[status.id] = [created_at, text, status.favourites_count, status.reblogs_count, status.account.acct, media_urls]
+        end
       }
       pp statuses_json.size,statuses_json[id.to_s]
       if break_sw == true
@@ -121,7 +136,7 @@ handler do |job|
       statuses_json= JSON.load(f)
     }
 
-    statuses_json.each{|id,(created_at,text,f_c,r_c,acct,media_ids)|
+    statuses_json.each{|id,(created_at,text,f_c,r_c,acct,media_urls)|
       fav_cnt[id] = f_c
       boost_cnt[id] = r_c
       if users_size.has_key?(acct)
@@ -165,10 +180,21 @@ handler do |job|
       f_c = statuses_json[id][2]
       r_c = statuses_json[id][3]
       acct = statuses_json[id][4]
+      urls = statuses_json[id][5]
+      media_ids = []
+      # urls.each{|url|
+        # media_path = "./media/" + url.split("/").last
+        # media = exe_upload_media(media_path)
+        # p "url=#{url}"
+        # p "media_path=#{media_path}"
+        # p "media=#{media}"
+        # media_ids.push(media.id) if media != nil
+      # }
+
       body = ":@#{acct}:＜「#{text} 」\n#{sprintf("%2d",f_c)}ニコる／#{sprintf("%2d",r_c)}ブースト"
       body += "\n https://friends.nico/web/statuses/#{id}"
       body += "\n#きりランキング #きりぼっと"
-      exe_toot(body,visibility = "public",acct = nil,spoiler_text = "ここ１時間で最もニコられたトゥートは……",rep_id = nil)
+      exe_toot(body,visibility = "public",acct = nil,spoiler_text = "ここ１時間で最もニコられたトゥートは……",rep_id = nil,media_ids=media_ids)
     }
 
   ############################################################
@@ -177,12 +203,11 @@ handler do |job|
     pp "スタート"
     break_sw = false
     id =  99999999999999999
-    client = Mastodon::REST::Client.new(base_url: ENV["MASTODON_URL"])
     today = Date.today
     statuses_json = {}
     while true do
       sleep(0.2)
-      statuses = exe_get_nona(client, id)
+      statuses = exe_get_nona(id)
       statuses.each{|status|
         id = status.id.to_i if id > status.id.to_i
         media_ids = []
@@ -296,7 +321,7 @@ handler do |job|
       body += "🏅 " if i == 3
       body += "🏅 " if i == 4
       body += "　 " if i >= 5
-      body += ":@#{acct}:#{sprintf("%3.1f",rate)} ％\n"
+      body += ":@#{acct}:#{sprintf("%3.1f",rate)} ％ #{sprintf("%3d",faboo_cnt[acct])}/#{sprintf("%3d",users_cnt[acct])}\n"
     }
     # body += "※ニコブ率：（ニコられ数＋ブーストされ数）÷トゥート数\n"
     body += "※#{asikiri}トゥート未満の人は除外\n#きりランキング #きりぼっと"
@@ -324,4 +349,4 @@ every(1.hour, 'hourly2', at: '**:12')    unless VERB
 every(1.day, 'daily1', at: '23:15')      unless VERB
 every(1.day, 'daily2', at: '23:35')      unless VERB
 every(1.week, 'daily2')   if VERB
-# every(1.week, 'daily2')
+# every(1.week, 'hourly2')
