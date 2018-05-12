@@ -4,10 +4,12 @@ from keras.models import Sequential,load_model
 import numpy as np
 import random,json
 import sys,io,re,gc
-import MeCab
+# import MeCab
+from liner import kiri_coloring_model
 from time import sleep
 import unicodedata
-from PIL import Image
+# from PIL import Image
+from PIL import Image, ImageOps, ImageFile, ImageChops, ImageFilter, ImageEnhance
 import tensorflow as tf
 from keras.backend import tensorflow_backend
 #config = tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True, visible_device_list="1"))
@@ -23,13 +25,26 @@ for label,i in labels_index.items():
     labels[i] = label
 
 STANDARD_SIZE = (299, 299)
+STANDARD_SIZE2 = (512, 512)
+Colors = {}
+Colors['red'] = [1,0,0,0,0,0,0,0,0]
+Colors['blue'] = [0,1,0,0,0,0,0,0,0]
+Colors['green'] = [0,0,1,0,0,0,0,0,0]
+Colors['purple'] = [0,0,0,1,0,0,0,0,0]
+Colors['brown'] = [0,0,0,0,1,0,0,0,0]
+Colors['pink'] = [0,0,0,0,0,1,0,0,0]
+Colors['blonde'] = [0,0,0,0,0,0,1,0,0]
+Colors['white'] = [0,0,0,0,0,0,0,1,0]
+Colors['black'] = [0,0,0,0,0,0,0,0,1]
 
-model_path = 'db/lstm_toot_v3.h5'
+
+model_path = 'db/test.h5'
 me23_path = 'db/lstm_toot_mei23v3.h5'
 kiritan_path = 'db/lstm_toot_kiritanv3.h5'
 lamaze_path = 'db/lstm_toot_lamazePv3.h5'
 knzk_path = 'db/lstm_toot_knzkv3.h5'
-takomodel_path = 'db/tako9.h5'
+takomodel_path = 'db/tako6.h5'
+g_model_path = 'liner/colorize.model'
 #print('******* lstm load model %s,%s*******' %(model_path,takomodel_path))
 # モデルを読み込む
 model = load_model(model_path)
@@ -38,12 +53,15 @@ kiritanmodel = load_model(kiritan_path)
 knzkmodel = load_model(knzk_path)
 chinomodel = load_model(lamaze_path)
 takomodel = load_model(takomodel_path)
+g_model = kiri_coloring_model.Generator_model()
+
 graph = tf.get_default_graph()
+
+takomodel.save_weights(takomodel_path+'w')
 
 #いろいろなパラメータ
 maxlen = 15           #モデルに合わせて！
 diver = 0.5         #ダイバーシティ：大きくすると想起の幅が大きくなるっぽいー！
-
 pat3 = re.compile(r'^\n')
 pat4 = re.compile(r'\n')
 adaptr = ['だから','それで','しかし','けど','また','さらに',\
@@ -121,14 +139,43 @@ def takoramen(filepath):
 
     rslt_dict = {}
     for i,rslt in enumerate(result[0]):
-        rslt_dict[labels[i]] = '{0:.2%}'.format(rslt)
-    print("*** image:", filepath.split('/')[-1], "\n*** result:", rslt_dict)
+        rslt_dict[labels[i]] = rslt
+    print("*** image:", filepath.split('/')[-1])  #, "\n*** result:", rslt_dict)
+    for k, v in sorted(rslt_dict.items(), key=lambda x: -x[1]):
+        print('{0}:{1:.2%}'.format(k,v))
+        if v < 0.01:
+            break
+
     with open('image.log','a') as f:
         f.write("*** image:" + filepath.split('/')[-1] +  "  *** result:%s\n"%str(rslt_dict))
-    if max(result[0]) > 0.97:
+    if max(result[0]) > 0.925:
         return labels[np.where(result[0] == max(result[0]) )[0][0]]
     else:
         return 'other'
+
+def colorize(image_path):
+    img = Image.open(image_path)
+    img = img.convert('RGB')
+    line_image = np.asarray(img)
+    line_size = (line_image.shape[0],line_image.shape[1])
+    img = img.resize(STANDARD_SIZE2,Image.LANCZOS)
+    gray = img.convert("L") #グレイスケール
+    gray2 = gray.filter(ImageFilter.MaxFilter(5))
+    senga_inv = ImageChops.difference(gray, gray2)
+    img = ImageOps.invert(senga_inv)
+    img = img.point(lambda x: 255 if x > 230 else x)
+    img = img.convert("RGB")  #フォーマット戻し
+    img = np.asarray(img)
+    img = (img-127.5)/127.5
+    with graph.as_default():
+        g_model.load_weights(g_model_path, by_name=False)
+        selcol = random.choice(list(Colors.keys()))
+        colorvec = Colors[selcol]
+        image = g_model.predict([np.array([img]), np.array([colorvec]) ])[0]
+        image = (image*127.5+127.5).clip(0, 255).astype(np.uint8)
+        filename = 'media/__coloring.png'
+        Image.fromarray(image).resize((line_size[1],line_size[0]),Image.LANCZOS ).save(filename, optimize=True)
+        return filename
 
 if __name__ == '__main__':
 #    text = ''

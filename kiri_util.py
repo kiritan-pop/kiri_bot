@@ -461,7 +461,12 @@ def kiri_trans_ja2en(text):
 
 def kiri_trans_detect(text):
     tor = Translator()
-    return tor.detect(text).lang
+    try:
+        la = tor.detect(text).lang
+        return la
+    except json.decoder.JSONDecodeError as e:
+        print(e)
+        return 'ja'
 
 
 def face_search(image_path):
@@ -509,7 +514,7 @@ def face_search(image_path):
     except Exception as e:
         print(e)
         return None
-        
+
 if __name__ == '__main__':
     images = []
     for f in os.listdir('media/'):

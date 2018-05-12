@@ -82,7 +82,8 @@ handler do |job|
   when "hourly1"
     pp "スタート"
     break_sw = false
-    id =  99999999999999999
+    # id =  999999999999999999
+    id =  nil
     time_now = DateTime.now
     time_b1h = time_now - Rational(1,24)
     statuses_json = {}
@@ -91,7 +92,7 @@ handler do |job|
       sleep(0.2)
       statuses = exe_get_nona(id)
       statuses.each{|status|
-        id = status.id.to_i if id > status.id.to_i
+        id = status.id.to_i if id == nil or id > status.id.to_i
         media_urls = []
         status.media_attachments.each{|media|
           media_urls.push(media.url)
@@ -202,14 +203,17 @@ handler do |job|
   when "daily1"
     pp "スタート"
     break_sw = false
-    id =  99999999999999999
+    id =  nil
     today = Date.today
+    # today = today - Rational(1,1)
+
     statuses_json = {}
     while true do
       sleep(0.2)
       statuses = exe_get_nona(id)
       statuses.each{|status|
-        id = status.id.to_i if id > status.id.to_i
+        id = status.id.to_i if id == nil or id > status.id.to_i
+        # id = status.id.to_i if id > status.id.to_i
         media_ids = []
         status.media_attachments.each{|media|
           media_ids.push(media.id)
@@ -348,5 +352,5 @@ every(1.hour, 'hourly1', at: '**:00')    unless VERB
 every(1.hour, 'hourly2', at: '**:12')    unless VERB
 every(1.day, 'daily1', at: '23:15')      unless VERB
 every(1.day, 'daily2', at: '23:35')      unless VERB
-every(1.week, 'daily2')   if VERB
-# every(1.week, 'hourly2')
+every(1.week, 'hourly1')   if VERB
+# every(1.week, 'daily1')

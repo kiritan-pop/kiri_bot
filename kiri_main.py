@@ -12,7 +12,7 @@ from os.path import join, dirname
 from dotenv import load_dotenv
 import wikipedia
 import Toot_summary, GenerateText, PrepareChain, bottlemail
-import kiri_util, kiri_deep, kiri_game, kiri_coloring
+import kiri_util, kiri_deep, kiri_game , kiri_coloring
 
 MASTER_ID = 'kiritan'
 BOT_ID = 'kiri_bot01'
@@ -216,12 +216,17 @@ def ana_image(media_attachments,sensitive,acct,g_vis,id,content):
             continue
         result = kiri_deep.takoramen(filename)
         print('   ',result)
-        if result == 'other' or result == '風景' or result == '夜景' :
-            if random.randint(0,10) % 2 == 0:
+        if result == 'other':
+            if random.randint(0,50)  == 0:
                 if face_search(filename,acct,g_vis,id):
                     return ''
                 else:
                     pass
+        elif result == '風景' or result == '夜景':
+            if face_search(filename,acct,g_vis,id):
+                return ''
+            else:
+                pass
         elif result == 'ねこ':
             toot_now += 'にゃーん'
         elif result == 'ダーツ':
@@ -248,10 +253,14 @@ def ana_image(media_attachments,sensitive,acct,g_vis,id,content):
             toot_now += 'ケント丸だー！'
         elif result == 'ポプテピピック':
             toot_now += 'それポプテピピックー？'
+        elif result == 'ボブ':
+            toot_now += 'ボブだー！'
         elif result == 'ローゼンメイデン 真紅':
             toot_now += 'めいめいなのだわ！'
         elif result == '結月ゆかり':
             toot_now += 'ゆかりさん！'
+        elif result == '真中らぁら':
+            toot_now += 'かしこま！'
         elif sensitive:
             if 'ラーメン' in result or '麺' in result or result == 'うどｎ' or  result == 'そば' or result == 'パスタ':
                 toot_now += '🍜%sちゅるちゅるーっ！'%result
@@ -281,6 +290,7 @@ def coloring_image(filename, acct, g_vis, id):
     username = "@" +  acct
     media_files = []
     tmp_file = painter.colorize(filename)
+    # tmp_file = kiri_deep.colorize(filename)
     try:
         result = kiri_deep.takoramen(tmp_file)
         if result == 'にじえろ':
@@ -305,8 +315,8 @@ def face_search(filename, acct, g_vis, id):
             else:
                 ex = tmp.rsplit('.')[-1]
             media_files.append(mastodon.media_post(tmp, 'image/' + ex))
-            toot_now = "@%s 顔だー！"%acct
-            toot(toot_now, g_vis=g_vis, rep=id, media_ids=media_files)
+            toot_now = "@%s"%acct
+            toot(toot_now, g_vis=g_vis, rep=None, spo='おわかりいただけるだろうか……', media_ids=media_files, interval=5)
     except Exception as e:
         kiri_util.error_log()
 
@@ -413,11 +423,11 @@ def quick_rtn(status):
         toot_now += "新規さんいらっしゃーい！🍵🍡どうぞー！"
         vis_now = 'unlisted'
         SM.update(acct, 'func')
-    elif re.search(r"草", content+spoiler_text):
+    elif re.search(r"草$", content+spoiler_text):
         SM.update(acct, 'func',score=-1)
         if rnd <= 1:
-            toot_now = ":" + username + ": "
-            toot_now += random.choice(hanalist) + ' 三💨 ﾋﾟｭﾝ!!'
+            # toot_now = ":" + username + ": "
+            toot_now = random.choice(hanalist) #+ ' 三💨 ﾋﾟｭﾝ!!'
             id_now = None
     elif re.search(r"^:twitter:.+🔥$", content, flags=(re.MULTILINE | re.DOTALL)):
         SM.update(acct, 'func')
@@ -495,7 +505,7 @@ def quick_rtn(status):
             id_now = None
     elif re.search(r"^(今|いま)の[な|無|ナ][し|シ]$", content):
         SM.update(acct, 'func',score=-1)
-        if rnd <= 2:
+        if rnd <= 4:
             toot_now = ':@%s: 🚓🚓🚓＜う〜う〜！いまのなし警察でーす！'%acct
             id_now = None
     elif re.search(r"ツイッター|ツイート|[tT]witter", content):
@@ -555,6 +565,16 @@ def quick_rtn(status):
         toot_now = ana_image(media_attachments, sensitive, acct, g_vis, id_now, content)
         id_now = None
         # interval = 3
+    elif re.search(r"^い$", content+spoiler_text):
+        SM.update(acct, 'func')
+        if rnd <= 8:
+            toot_now = 'う'
+            id_now = None
+    elif re.search(r"^いっ$", content+spoiler_text):
+        SM.update(acct, 'func')
+        if rnd <= 8:
+            toot_now = 'うっ'
+            id_now = None
     else:
         nicolist = set([tmp.strip() for tmp in open('.nicolist').readlines()])
         if acct in nicolist:
@@ -585,9 +605,13 @@ def business_contact(status):
         toot_now = '@%s 新規さんかも−！\n:@%s:(%s)＜「%s」(created at %s)'%(MASTER_ID, acct, display_name, content, ac_ymd)
         toot(toot_now, rep=id)
         fav_now(id)
+        # toot_now = ':@%s: ご新規さんかもー！(๑•᎑•๑)♬*゜\n #ももな代理 #ニコフレ挨拶部'%(acct,)
+        # toot(toot_now, g_vis='public')
     elif ymdhms + diff < created_at:
         toot_now = '@%s 帰ってきたよ−！(前回書込：%s)\n:@%s:(%s)＜「%s」'%(MASTER_ID, ymdhms.strftime("%Y.%m.%d %H:%M:%S"), acct, display_name, content)
         toot(toot_now, rep=id)
+        # toot_now = ':@%s: おかえりー！(๑́ºㅿº๑̀)💦\n #ももな代理 #ニコフレ挨拶部'%(acct,)
+        # toot(toot_now, g_vis='public')
         # fav_now(id)
 
     watch_list = set([kansi_acct.strip() for kansi_acct in open('.watch_list').readlines()])
@@ -778,7 +802,7 @@ def th_worker():
             elif re.search(r"(きょう|今日)の.?(料理|りょうり)", content):
                 recipe_service(content=content, acct=acct, id=id, g_vis=g_vis)
                 SM.update(acct, 'func')
-            elif re.search(r"\s?(.+)って(何|なに|ナニ)\?$", content):
+            elif re.search(r"\s?(.+)って(何|なに|ナニ|誰|だれ|ダレ|いつ|どこ)\?$", content):
                 word = re.search(r"\s?(.+)って(何|なに|ナニ)\?$", str(content)).group(1)
                 SM.update(acct, 'func')
                 try:
@@ -1000,6 +1024,7 @@ def timer_bst1st():
 #######################################################
 # きりぼっとのつぶやき
 def lstm_tooter():
+    # kiri_deep.reload_model()
     seeds = DAO.get_least_10toots()
     #print('seeds',seeds)
     if len(seeds) <= 2:
