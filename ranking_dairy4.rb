@@ -1,3 +1,4 @@
+#!/usr/bin/env ruby
 # coding: utf-8
 require 'mastodon'
 require 'net/http'
@@ -5,7 +6,7 @@ require 'nokogiri'
 require 'json'
 require 'dotenv'
 require 'pp'
-#require 'clockwork'
+require 'clockwork'
 require 'fileutils'
 require 'sqlite3'
 require 'date'
@@ -21,6 +22,9 @@ DB_PATH = "db/statuses.db"
 # --- debug switch  true false
 VERB = false
 # VERB = true
+
+asikiri_h = 10
+asikiri_d = 40
 
 ############################################################
 #
@@ -132,6 +136,7 @@ handler do |job|
     fav_cnt = {}
     boost_cnt = {}
     faboo_cnt = {}
+    faboo_rate = {}
 
     File.open("db/statuses_hour.json", "r"){|f|
       statuses_json= JSON.load(f)
@@ -149,6 +154,7 @@ handler do |job|
         users_cnt[acct] = 1
         faboo_cnt[acct] = f_c + r_c
       end
+      faboo_rate[acct] = faboo_cnt[acct].to_f * 100.0 / users_cnt[acct].to_f if users_cnt[acct] >= asikiri_h
     }
 
     spoiler_text = "ここ１時間のトゥート数ランキング（勝手にブースター代理）"
@@ -170,6 +176,23 @@ handler do |job|
     }
     body = "📝全体 #{total_cnt} toots/平均ニコブ率#{sprintf("%3.1f", total_faboo_cnt.to_f*100/total_cnt.to_f)}％\n" + body
     body += "※ニコブ率：（ニコられ数＋ブーストされ数）÷トゥート数\n#きりランキング #きりぼっと"
+    exe_toot(body,visibility = "public",acct = nil,spoiler_text = spoiler_text,rep_id = nil)
+
+    sleep(60) unless VERB
+    spoiler_text = "ここ１時間のニコブ率ランキング"
+    body = ""
+    faboo_rate.sort_by {|k, v| -v }.each_with_index{|(acct,rate),i|
+      break if i > 14
+      body += "🥇 " if i == 0
+      body += "🥈 " if i == 1
+      body += "🥉 " if i == 2
+      body += "🏅 " if i == 3
+      body += "🏅 " if i == 4
+      body += "　 " if i >= 5
+      body += ":@#{acct}:#{sprintf("%3.1f",rate)} ％ #{sprintf("%3d",faboo_cnt[acct])}/#{sprintf("%3d",users_cnt[acct])}\n"
+    }
+    # body += "※ニコブ率：（ニコられ数＋ブーストされ数）÷トゥート数\n"
+    body += "※#{asikiri_h}トゥート未満の人は除外\n#きりランキング #きりぼっと"
     exe_toot(body,visibility = "public",acct = nil,spoiler_text = spoiler_text,rep_id = nil)
 
     sleep(60) unless VERB
@@ -250,13 +273,13 @@ handler do |job|
 ############################################################
 # ランキングをトゥート
   when "daily2"
-    asikiri = 25
     users_cnt= {}
     users_size= {}
     fav_cnt = {}
     boost_cnt = {}
     faboo_cnt = {}
     statuses_json = {}
+    faboo_rate = {}
 
     File.open("db/statuses_today.json", "r"){|f|
       statuses_json= JSON.load(f)
@@ -274,10 +297,7 @@ handler do |job|
         users_cnt[acct] = 1
         faboo_cnt[acct] = f_c + r_c
       end
-    }
-    faboo_rate = {}
-    users_cnt.each{|acct,cnt|
-      faboo_rate[acct] = faboo_cnt[acct].to_f * 100.0 / cnt.to_f if cnt >= asikiri
+      faboo_rate[acct] = faboo_cnt[acct].to_f * 100.0 / users_cnt[acct].to_f if users_cnt[acct] >= asikiri_d
     }
 
     File.open("db/users_size.json", "w") do |f|
@@ -328,7 +348,7 @@ handler do |job|
       body += ":@#{acct}:#{sprintf("%3.1f",rate)} ％ #{sprintf("%3d",faboo_cnt[acct])}/#{sprintf("%3d",users_cnt[acct])}\n"
     }
     # body += "※ニコブ率：（ニコられ数＋ブーストされ数）÷トゥート数\n"
-    body += "※#{asikiri}トゥート未満の人は除外\n#きりランキング #きりぼっと"
+    body += "※#{asikiri_d}トゥート未満の人は除外\n#きりランキング #きりぼっと"
     exe_toot(body,visibility = "public",acct = nil,spoiler_text = spoiler_text,rep_id = nil)
 
     sleep(60) unless VERB
@@ -352,5 +372,5 @@ every(1.hour, 'hourly1', at: '**:00')    unless VERB
 every(1.hour, 'hourly2', at: '**:12')    unless VERB
 every(1.day, 'daily1', at: '23:15')      unless VERB
 every(1.day, 'daily2', at: '23:35')      unless VERB
-every(1.week, 'hourly1')   if VERB
+every(1.week, 'daily2')   if VERB
 # every(1.week, 'daily1')

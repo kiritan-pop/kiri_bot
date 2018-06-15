@@ -516,12 +516,26 @@ def face_search(image_path):
         return None
 
 if __name__ == '__main__':
-    images = []
-    for f in os.listdir('media/'):
-        # print('media/' + f)
-        images.append('media/' + f)
+    sm = ScoreManager()
+    score = {}
+    # sm.update(acct='kiritan',key='getnum',i_datetime=None,score=901)
 
-    print(face_search(random.choice(images)))
+    for row in sm.show():
+        # score[row[0]] = row[2] + row[4] + row[6] + row[7]
+        score[row[0]] = row[1]
+
+    for i,row in enumerate( sorted(score.items(), key=lambda x: -x[1])):
+        print("%2d位:@%s: %d"%(i+1,row[0],row[1]))
+        if i > 100:
+            break
+
+
+    # images = []
+    # for f in os.listdir('media/'):
+    #     # print('media/' + f)
+    #     images.append('media/' + f)
+    #
+    # print(face_search(random.choice(images)))
 
     # while True:
     #     s = input()
@@ -536,15 +550,3 @@ if __name__ == '__main__':
     #         print(t1)
     #         t2 = kiri_trans_en2ja(t1)
     #         print(t2)
-
-"""
-    sm = ScoreManager()
-    score = {}
-    for row in sm.show():
-        score[row[0]] = row[2] + row[4] + row[6] + row[7]
-
-    for i,row in enumerate( sorted(score.items(), key=lambda x: x[1])):
-        print("%2d位:@%s: %d"%(i+1,row[0],row[1]))
-        if i > 20:
-            break
-"""
