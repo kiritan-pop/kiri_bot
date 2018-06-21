@@ -2,7 +2,7 @@ from keras.preprocessing.image import ImageDataGenerator, load_img, img_to_array
 from keras.applications.vgg16 import VGG16
 from keras.models import Sequential,Model,load_model
 from keras.layers import Input, Dense, Dropout, Activation, Flatten
-from keras.optimizers import SGD
+from keras.optimizers import SGD, Adam
 from keras.utils.np_utils import to_categorical
 from keras.callbacks import TensorBoard, LambdaCallback
 from keras.utils.training_utils import multi_gpu_model
@@ -13,8 +13,8 @@ from PIL import Image
 
 import tensorflow as tf
 from keras.backend import tensorflow_backend
-config = tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True
-                                                  #visible_device_list="3"
+config = tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=False,
+                                                  visible_device_list='2'
                                                   ))
 session = tf.Session(config=config)
 tensorflow_backend.set_session(session)
@@ -22,11 +22,11 @@ tensorflow_backend.set_session(session)
 # 同時実行プロセス数
 process_count = multiprocessing.cpu_count()
 
-GPUs = 4
+GPUs = 1
 STANDARD_SIZE = (299, 299)
 #STANDARD_SIZE = (224, 224)
 batch_size = 8*GPUs
-epochs = 50
+epochs = 100000
 path_list = []
 image_list = []
 label_list = []
@@ -34,7 +34,7 @@ img_dir = 'images/'
 test_dir = 'test_images/'
 
 # モデルを読み込む
-model = load_model('../db/tako5.h5')
+model = load_model(sys.argv[1])
 #model.summary()
 
 start_idx = 0
@@ -69,28 +69,32 @@ validation_generator = train_datagen.flow_from_directory(
 
 print(type(train_generator.class_indices))
 print(train_generator.class_indices)
-with open('../.cnn_labels','w') as fw:
+with open('.cnn_labels','w') as fw:
     json.dump(train_generator.class_indices,fw,indent=4)
 
 def on_epoch_end(epoch, logs):
-    model.save('../db/tako5.h5')
+    model.save(sys.argv[1])
 
 print_callback = LambdaCallback(on_epoch_end=on_epoch_end)
-multi_model = multi_gpu_model(model, gpus=GPUs)
-multi_model.compile(loss='categorical_crossentropy',
-              #optimizer=SGD(lr=1e-3, decay=1e-6, momentum=0.9, nesterov=True),
-              optimizer=SGD(),
+# if GPUs > 1:
+#     t_model = multi_gpu_model(model, gpus=GPUs)
+# else:
+#     t_model = model
+model.compile(loss='categorical_crossentropy',
+              # optimizer=SGD(lr=1e-3, decay=1e-6, momentum=0.9, nesterov=True),
+              # optimizer=SGD(),
+              # optimizer=Adam(),
+              optimizer=Adam(lr=1e-5, beta_1=0.5),
               metrics=['accuracy'])
-
-#model.fit_generator(
-multi_model.fit_generator(
+model.summary()
+model.fit_generator(
         train_generator,
         callbacks=[print_callback],
-        steps_per_epoch=500,
+        # steps_per_epoch=512,
         epochs=epochs,
         validation_data=validation_generator,
-        validation_steps=10,
+        validation_steps=20,
         initial_epoch=start_idx,
-        max_queue_size=process_count *8,
-        #workers=2,
+        max_queue_size=process_count,
+        workers=1,
         use_multiprocessing=False)

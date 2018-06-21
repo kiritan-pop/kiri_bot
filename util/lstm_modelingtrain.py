@@ -3,7 +3,7 @@
 from __future__ import print_function
 from keras.models import Sequential,load_model
 from keras.callbacks import LambdaCallback
-from keras.layers import Dense, Activation, LSTM, Embedding, Conv1D, MaxPooling1D, Dropout, Flatten, Input
+from keras.layers import Dense, Activation, CuDNNLSTM, Dropout #, Embedding, Conv1D, MaxPooling1D, Flatten, Input
 from keras.optimizers import RMSprop
 from keras.utils.data_utils import get_file
 from keras.utils import Sequence
@@ -16,18 +16,20 @@ from time import sleep
 
 import tensorflow as tf
 from keras.backend import tensorflow_backend
-config = tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True))
+config = tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=False,
+                                                  visible_device_list='2'
+                                                  ))
 session = tf.Session(config=config)
 tensorflow_backend.set_session(session)
 graph = tf.get_default_graph()
 
 #変更するとモデル再構築必要
 maxlen = 15
-GPUs = 4
+GPUs = 1
 
 #いろいろなパラメータ
-batch_size = 2048*GPUs     #大きくすると精度が上がるけど、モデル更新が遅くなるよー！
-epochs = 50         #トレーニングの回数
+batch_size = (1024*2)*GPUs     #大きくすると精度が上がるけど、モデル更新が遅くなるよー！
+epochs = 10000
 # 同時実行プロセス数
 process_count = multiprocessing.cpu_count() - 1
 
@@ -126,7 +128,8 @@ class TextGenerator(Sequence):
 
 if __name__ == '__main__':
     #辞書読み込み
-    wl_chars = list(open('../dic/wl.txt').read())
+    wl_chars = list(open('wl.txt').read())
+    # wl_chars = list(open('../dic/wl.txt').read())
     wl_chars.append(r'\n')
     wl_chars.sort()
     p_model = None
@@ -147,22 +150,24 @@ if __name__ == '__main__':
         # build the model: a single LSTM
         print('Build model...')
         model = Sequential()
-        model.add(LSTM(256, return_sequences=True, input_shape=(maxlen, len(wl_chars))))
+        # model.add(CuDNNLSTM(512, input_shape=(maxlen, len(wl_chars)), return_sequences=True, return_state=True, stateful=True))
+        model.add(CuDNNLSTM(512, return_sequences=True, input_shape=(maxlen, len(wl_chars))))
         model.add(Dropout(0.1))
-        model.add(LSTM(64, return_sequences=True))
+        model.add(CuDNNLSTM(256, return_sequences=True))
         model.add(Dropout(0.1))
-        model.add(LSTM(32))
+        model.add(CuDNNLSTM(128, return_sequences=True))
         model.add(Dropout(0.1))
-        model.add(Dense(len(wl_chars)))
-        model.add(Activation('softmax'))
+        model.add(CuDNNLSTM(64))
+        model.add(Dropout(0.1))
+        model.add(Dense(len(wl_chars), activation='softmax'))
+        model.compile(loss='categorical_crossentropy', optimizer=optimizer)
 
         if GPUs > 1:
             p_model = multi_gpu_model(model, gpus=GPUs)
             p_model.compile(loss='categorical_crossentropy', optimizer=optimizer)
 
-        model.compile(loss='categorical_crossentropy', optimizer=optimizer)
-
     model.summary()
+    print(model.inputs)
     if GPUs > 1:
         p_model.summary()
 
@@ -173,16 +178,16 @@ if __name__ == '__main__':
 
     #print_callback = LambdaCallback(on_epoch_end=on_epoch_end)
     generator = TextGenerator(sys.argv[1], batch_size, maxlen, wl_chars)
-    with graph.as_default():
-        if GPUs > 1:
-            m = p_model
-        else:
-            m = model
+    # with graph.as_default():
+    if GPUs > 1:
+        m = p_model
+    else:
+        m = model
 
-        m.fit_generator(generator,
-                        epochs=epochs,
-                        verbose=1,
-                        initial_epoch=start_idx,
-                        max_queue_size=process_count ,
-                        workers=2,
-                        use_multiprocessing=True)
+    m.fit_generator(generator,
+                    epochs=epochs,
+                    verbose=1,
+                    initial_epoch=start_idx,
+                    max_queue_size=process_count,
+                    workers=2,
+                    use_multiprocessing=True)
