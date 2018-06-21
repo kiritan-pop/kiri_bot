@@ -2,6 +2,9 @@
 
 import random,json
 import os,sys,io,re
+import requests
+import http.client
+import urllib.parse
 from time import sleep
 import unicodedata
 import sqlite3
@@ -14,6 +17,7 @@ import warnings, traceback
 from googletrans import Translator
 import cv2
 BOT_ID = 'kiri_bot01'
+count = 0
 
 #######################################################
 # ネイティオ語翻訳
@@ -514,6 +518,101 @@ def face_search(image_path):
     except Exception as e:
         print(e)
         return None
+
+
+def make_dir(path):
+    if not os.path.isdir(path):
+        os.mkdir(path)
+
+def make_img_path(save_dir_path, url, term):
+    save_img_path = os.path.join(save_dir_path, term)
+    make_dir(save_img_path)
+    global count
+    count += 1
+
+    file_extension = os.path.splitext(url)[-1]
+    if file_extension.lower() in ('.jpg', '.jpeg', '.gif', '.png', '.bmp'):
+        full_path = os.path.join(save_img_path, str(count)+file_extension.lower())
+        return full_path
+    else:
+        raise ValueError('Not applicable file extension')
+
+def save_image(filename, image):
+    with open(filename, "wb") as fout:
+        fout.write(image)
+
+def download_image(url, timeout=10):
+    response = requests.get(url, allow_redirects=True, timeout=timeout)
+    if response.status_code != 200:
+        error = Exception("HTTP status: " + response.status_code)
+        raise error
+
+    content_type = response.headers["content-type"]
+    if 'image' not in content_type:
+        error = Exception("Content-Type: " + content_type)
+        raise error
+
+    return response.content
+
+class get_images:
+    def __init__(self,key):
+        if len(key) != 32:
+            print("Invalid Bing Search API subscription key!")
+            print("Please paste yours into the source code.")
+            raise ValueError('Invalid Bing Search API subscription key!')
+
+        self.key = key
+        self.host = "api.cognitive.microsoft.com"
+        self.path = "/bing/v7.0/images/search"
+        self.save_dir_path = "media/"
+
+    def BingImageSearch(self, search):
+        "Performs a Bing image search and returns the results."
+        headers = {'Ocp-Apim-Subscription-Key': self.key}
+        conn = http.client.HTTPSConnection(self.host)
+        query = urllib.parse.quote(search)
+        conn.request("GET", self.path + "?q=" + query + '&count=15', headers=headers)
+        response = conn.getresponse()
+        headers = [k + ": " + v for (k, v) in response.getheaders()
+                       if k.startswith("BingAPIs-") or k.startswith("X-MSEdge-")]
+        data = response.read()
+        conn.close()
+        return headers, data.decode("utf8")
+
+    def get_images_forQ(self, term):
+        make_dir(self.save_dir_path)
+        url_list = []
+        try:
+            print('Searching images for: ', term)
+            headers, result = self.BingImageSearch(term)
+        except Exception as err:
+            print(err)
+        else:
+            data = json.loads(result)
+
+            if 'value' in data:
+                for values in data['value']:
+                    unquoted_url = urllib.parse.unquote(
+                            values['contentUrl'])
+                    url_list.append(unquoted_url)
+
+        img_paths = []
+        for url in url_list:
+            try:
+                img_path = make_img_path(self.save_dir_path, url, term)
+                img_paths.append(img_path)
+                image = download_image(url)
+                save_image(img_path, image)
+                print('saved image... {}'.format(url))
+            except KeyboardInterrupt:
+                break
+            except Exception as err:
+                print("%s" % (err))
+
+        return img_paths
+
+
+
 
 if __name__ == '__main__':
     sm = ScoreManager()

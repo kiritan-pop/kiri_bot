@@ -104,9 +104,8 @@ class ImageAndRefDataset(chainer.dataset.DatasetMixin):
         path_ref = os.path.join(self._root1, self._paths[i])
 
         if minimize:
-            print(path_ref)
-            print(cv2.IMREAD_UNCHANGED)
-            image_ref = cv2.imread(path_ref, cv2.IMREAD_UNCHANGED)
+            # image_ref = cv2.imread(path_ref, cv2.IMREAD_UNCHANGED) aaa
+            image_ref = cv2.imread(path_ref, cv2.IMREAD_COLOR)
             image_ref = cv2.resize(image_ref, (image1.shape[1], image1.shape[
                                    0]), interpolation=cv2.INTER_NEAREST)
             if image_ref.shape[2] == 4:
@@ -136,7 +135,7 @@ class ImageAndRefDataset(chainer.dataset.DatasetMixin):
 
 class Painter:
 
-    def __init__(self, gpu=3):
+    def __init__(self, gpu=-1):
 
         print("start")
         self.root = "./"

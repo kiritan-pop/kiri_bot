@@ -13,6 +13,8 @@ from dotenv import load_dotenv
 import wikipedia
 import Toot_summary, GenerateText, PrepareChain, bottlemail
 import kiri_util, kiri_deep, kiri_game , kiri_coloring
+from PIL import Image, ImageOps, ImageFile, ImageChops, ImageFilter, ImageEnhance
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 MASTER_ID = 'kiritan'
 BOT_ID = 'kiri_bot01'
@@ -32,6 +34,7 @@ dotenv_path = join(dirname(__file__), '.env')
 load_dotenv(dotenv_path)
 MASTODON_URL = os.environ.get("MASTODON_URL")
 MASTODON_ACCESS_TOKEN = os.environ.get("MASTODON_ACCESS_TOKEN")
+BING_KEY = os.environ.get("BING_KEY")
 
 publicdon = Mastodon(api_base_url=MASTODON_URL)  # インスタンス
 
@@ -47,6 +50,9 @@ DelQ = queue.Queue()
 GetNumQ = queue.Queue()
 GetNumVoteQ = queue.Queue()
 GetNum_flg = []
+HintPintoQ = queue.Queue()
+HintPinto_ansQ = queue.Queue()
+HintPinto_flg = []
 
 # 花宅配サービス用の花リスト
 hanalist = []
@@ -85,6 +91,8 @@ class notification_listener(StreamListener):
         elif notification["type"] == "follow":
             SM.update(notification["account"]["acct"], 'boost', ymdhms)
             follow(notification["account"]["id"])
+    def on_update(self, status):
+        HintPinto_ans_check(status)
 
 #######################################################
 # マストドンＡＰＩ用部品を継承して、ローカルタイムライン受信時の処理を実装ー！
@@ -212,6 +220,17 @@ def vote_check(status):
             else:
                 if content.strip().isdigit():
                     toot('@%s\n₍₍ ◝(◍•ᴗ•◍)◟⁾⁾また後でねー！'%acct, 'direct', id, None)
+
+#######################################################
+# ヒントでピント回答受付チェック
+def HintPinto_ans_check(status):
+    acct = status["account"]["acct"]
+    id = status["id"]
+    content = kiri_util.content_cleanser(status['content'])
+    if len(content) == 0 or acct == BOT_ID:
+        return
+    if len(HintPinto_flg) > 0:
+        HintPinto_ansQ.put([acct, id, content.strip()])
 
 #######################################################
 # 画像判定
@@ -825,10 +844,13 @@ def th_worker():
                     pass
                 else:
                     continue
-            if re.search(r"(連想|れんそう)([サさ]ー[ビび][スす])[：:]", content):
-                toot('@%s このサービスは終了したよ〜(৹ᵒ̴̶̷᷄﹏ᵒ̴̶̷᷅৹)'%acct, g_vis, id, None,interval=3)
-                #rensou_game(content=content, acct=acct, id=id, g_vis=g_vis)
-                #SM.update(acct, 'func')
+            if re.search(r"(ヒントでピント)[：:]", content):
+                if g_vis == 'direct':
+                    word = re.search(r"(ヒントでピント)[：:](.+)", str(content)).group(2)
+                    HintPintoQ.put([acct,id,word])
+                    SM.update(acct, 'func')
+                else:
+                    toot('@%s ＤＭで依頼してねー！周りの人に答え見えちゃうよー！'%acct, 'direct', None, None,interval=2)
             elif enquete != None:
                 if enquete['type'] == 'enquete':     #enquete_result
                     x = len(enquete['items'])
@@ -843,14 +865,6 @@ def th_worker():
                     enquete_vote(id, i)
                     toot(toot_now, g_vis, None, None,interval=5)
 
-            elif re.search(r"(画像検索)([サさ]ー[ビび][スす])[：:]", content):
-                toot('@%s このサービスは終了したよ〜(৹ᵒ̴̶̷᷄﹏ᵒ̴̶̷᷅৹)'%acct, g_vis, id, None,interval=3)
-                #search_image(content=content, acct=acct, id=id, g_vis=g_vis)
-                #SM.update(acct, 'func')
-            elif re.search(r"(スパウザー)([サさ]ー[ビび][スす])[：:]", content):
-                toot('@%s このサービスは終了したよ〜(৹ᵒ̴̶̷᷄﹏ᵒ̴̶̷᷅৹)'%acct, g_vis, id, None,interval=3)
-                #supauza(content=content, acct=acct, id=id, g_vis=g_vis)
-                #SM.update(acct, 'func')
             elif re.search(r"([ぼボ][とト][るル][メめ]ー[るル])([サさ]ー[ビび][スす])[：:]", content):
                 print("★ボトルメールサービス")
                 bottlemail_service(content=content, acct=acct, id=id, g_vis=g_vis)
@@ -914,7 +928,7 @@ def th_worker():
                     toot_now +=  "\n#きり翻訳 #きりぼっと"
                     toot(toot_now, 'public', id, '翻訳したよ〜！ :@%s:＜'%acct ,interval=5)
                     SM.update(acct, 'func')
-            elif len(content) > 140 and spoiler_text == None:
+            elif len(content) > 140 and (spoiler_text == None or spoiler_text == ''):
                 content = re.sub(r"(.)\1{3,}",r"\1",content, flags=(re.DOTALL))
                 gen_txt = Toot_summary.summarize(pat1.sub("",pat2.sub("",content)),limit=10,lmtpcs=1, m=1, f=4)
                 if gen_txt[-1:1] == '#':
@@ -933,38 +947,38 @@ def th_worker():
                 toot_now = "@%s\n"%acct
                 toot_now += kiri_deep.lstm_gentxt(content,num=1)
                 toot(toot_now, g_vis, id, None,interval=5)
-            elif re.search(r"めいめい|めーめー", content + spoiler_text):
-                if random.randint(0,10+a) > 3:
-                    continue
-                fav_now(id)
-                toot_now = "@%s\n:@mei23:＜「"%acct
-                toot_now += kiri_deep.lstm_gentxt(content,num=1,sel_model='mei23').strip() + '」'
-                toot(toot_now, g_vis, id, None,interval=5)
-                SM.update(acct, 'func')
-            elif re.search(r"きりたん|きりきり|きりっち", content + spoiler_text):
-                if random.randint(0,10+a) > 3:
-                    continue
-                fav_now(id)
-                toot_now = "@%s\n:@kiritan:＜「"%acct
-                toot_now += kiri_deep.lstm_gentxt(content,num=1,sel_model='kiritan').strip() + '」'
-                toot(toot_now, g_vis, id, None,interval=5)
-                SM.update(acct, 'func')
-            elif re.search(r"神埼|お兄さん|おにいさん|なか[卯う]|100db|ダンボッチ|騒音", content + spoiler_text):
-                if random.randint(0,10+a) > 3:
-                    continue
-                fav_now(id)
-                toot_now = "@%s\n:@Knzk:＜「"%acct
-                toot_now += kiri_deep.lstm_gentxt(content,num=1,sel_model='knzk').strip() + '」'
-                toot(toot_now, g_vis, id, None,interval=5)
-                SM.update(acct, 'func')
-            elif re.search(r"チノ|ラマーズ", content + spoiler_text):
-                if random.randint(0,10+a) > 3:
-                    continue
-                fav_now(id)
-                toot_now = "@%s\n:@lamazeP:＜「"%acct
-                toot_now += kiri_deep.lstm_gentxt(content,num=1,sel_model='chino').strip() + '」'
-                toot(toot_now, g_vis, id, None,interval=5)
-                SM.update(acct, 'func')
+            # elif re.search(r"めいめい|めーめー", content + spoiler_text):
+            #     if random.randint(0,10+a) > 3:
+            #         continue
+            #     fav_now(id)
+            #     toot_now = "@%s\n:@mei23:＜「"%acct
+            #     toot_now += kiri_deep.lstm_gentxt(content,num=1,sel_model='mei23').strip() + '」'
+            #     toot(toot_now, g_vis, id, None,interval=5)
+            #     SM.update(acct, 'func')
+            # elif re.search(r"きりたん|きりきり|きりっち", content + spoiler_text):
+            #     if random.randint(0,10+a) > 3:
+            #         continue
+            #     fav_now(id)
+            #     toot_now = "@%s\n:@kiritan:＜「"%acct
+            #     toot_now += kiri_deep.lstm_gentxt(content,num=1,sel_model='kiritan').strip() + '」'
+            #     toot(toot_now, g_vis, id, None,interval=5)
+            #     SM.update(acct, 'func')
+            # elif re.search(r"神埼|お兄さん|おにいさん|なか[卯う]|100db|ダンボッチ|騒音", content + spoiler_text):
+            #     if random.randint(0,10+a) > 3:
+            #         continue
+            #     fav_now(id)
+            #     toot_now = "@%s\n:@Knzk:＜「"%acct
+            #     toot_now += kiri_deep.lstm_gentxt(content,num=1,sel_model='knzk').strip() + '」'
+            #     toot(toot_now, g_vis, id, None,interval=5)
+            #     SM.update(acct, 'func')
+            # elif re.search(r"チノ|ラマーズ", content + spoiler_text):
+            #     if random.randint(0,10+a) > 3:
+            #         continue
+            #     fav_now(id)
+            #     toot_now = "@%s\n:@lamazeP:＜「"%acct
+            #     toot_now += kiri_deep.lstm_gentxt(content,num=1,sel_model='chino').strip() + '」'
+            #     toot(toot_now, g_vis, id, None,interval=5)
+            #     SM.update(acct, 'func')
             elif re.search(r"(きり|キリ).*(ぼっと|ボット|[bB][oO][tT])|[きキ][りリ][ぼボ]", content + spoiler_text):
                 fav_now(id)
                 if random.randint(0,10+a) > 9:
@@ -1126,6 +1140,81 @@ def th_delete():
                     SM.update(row[0], 'func', score=-1)
         except Exception:
             kiri_util.error_log()
+
+
+#######################################################
+# ヒントでピントゲーム
+def th_hint_de_pinto():
+    def th_shududai(acct,id,term):
+        paths = gi.get_images_forQ(term)
+        if len(paths) > 0:
+            path = random.choice(paths)
+        else:
+            toot('@%s 画像が見つからなかったー！'%acct, g_vis='direct', rep=id)
+            junbiTM.reset(0)
+            return
+        img = Image.open(path).convert('RGB')
+        if path.rsplit('.')[-1] == 'jpg':
+            ex = 'jpeg'
+        else:
+            ex = path.rsplit('.')[-1]
+
+        y = int(img.height/10)
+        for i in range(y,1,- int(y*3/10)):
+            if len(break_flg) == 0:
+                tmp = img.resize((int(img.width/i), int(img.height/i)),Image.NEAREST)  #LANCZOS BICUBIC NEAREST
+                tmp = tmp.resize((img.width, img.height),Image.NEAREST)
+                filename = path.split('.')[0] + '_{0}.png'.format(y)
+                tmp.save(filename,ex, optimize=True)
+                media_files = []
+                media_files.append(mastodon.media_post(filename, 'image/' + ex))
+                toot_now = "さて、これは何/誰でしょうか？ #きりたんのヒントでピント"
+                toot(toot_now, g_vis='private', rep=None, spo=None, media_ids=media_files)
+                sleep(60)
+                # sleep(5)
+            else:
+                break
+
+        sleep(5)
+        media_files = []
+        media_files.append(mastodon.media_post(path, 'image/' + ex))
+        toot_now = "正解は{0}でした".format(term)
+        toot(toot_now, g_vis='private', rep=None, spo=None, media_ids=media_files)
+
+    gi = kiri_util.get_images(BING_KEY)
+    junbiTM = kiri_util.KiriTimer(600)
+    junbiTM.reset(0)
+    while True:
+        tmp_list = HintPintoQ.get()
+        g_acct,g_id,term = tmp_list[0], tmp_list[1], tmp_list[2]
+
+        if junbiTM.check() > 0:
+            sleep(3)
+            toot('@%s\n開催準備中だよー！あと%d分待ってねー！'%(g_acct,int(junbiTM.check()/60)), 'direct', g_id, None)
+            sleep(27)
+            continue
+
+        HintPinto_flg.append('ON')
+        break_flg = []
+        th = threading.Thread(target=th_shududai, args=(g_acct,g_id,term))
+        th.start()
+        while True:
+            tmp_list = HintPinto_ansQ.get()
+            acct, id, ans = tmp_list[0], tmp_list[1], tmp_list[2]
+            print('ans=',ans)
+            if g_acct != acct and term in ans:
+                toot(':@{0}: 正解〜！'.format(acct), g_vis='private', rep=None, spo=None)
+                SM.update(acct, 'getnum', score=50)
+                break_flg.append('ON')
+                break
+            if not th.is_alive():
+                break
+
+        th.join()
+        #ゲーム終了後、次回開始までの準備期間
+        HintPinto_flg.remove('ON')
+        junbiTM.reset()
+        junbiTM.start()
 
 #######################################################
 # 数取りゲーム
@@ -1329,6 +1418,7 @@ def main():
     threads.append( threading.Thread(target=th_delete) )
     threads.append( threading.Thread(target=th_saver) )
     threads.append( threading.Thread(target=th_gettingnum) )
+    threads.append( threading.Thread(target=th_hint_de_pinto) )
     threads.append( threading.Thread(target=th_quick) )
     #スケジュール起動系
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(summarize_tooter,['02'])) )

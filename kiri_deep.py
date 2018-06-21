@@ -12,7 +12,7 @@ import cv2
 import tensorflow as tf
 from keras.backend import tensorflow_backend
 config = tf.ConfigProto(device_count={"GPU":1},
-                        gpu_options=tf.GPUOptions(allow_growth=True, visible_device_list="3"))
+                        gpu_options=tf.GPUOptions(allow_growth=False, visible_device_list="3"))
 session = tf.Session(config=config)
 tensorflow_backend.set_session(session)
 
@@ -38,19 +38,19 @@ Colors['black'] = [0,0,0,0,0,0,0,0,1]
 
 # model_path = 'db/test.h5'
 model_path = 'lstm/lstm2.h5'
-me23_path = 'db/lstm_toot_mei23v3.h5'
-kiritan_path = 'db/lstm_toot_kiritanv3.h5'
-lamaze_path = 'db/lstm_toot_lamazePv3.h5'
-knzk_path = 'db/lstm_toot_knzkv3.h5'
+# me23_path = 'db/lstm_toot_mei23v3.h5'
+# kiritan_path = 'db/lstm_toot_kiritanv3.h5'
+# lamaze_path = 'db/lstm_toot_lamazePv3.h5'
+# knzk_path = 'db/lstm_toot_knzkv3.h5'
 takomodel_path = 'db/tako7.h5'
 # g_model_path = 'liner/colorize.model'
 #print('******* lstm load model %s,%s*******' %(model_path,takomodel_path))
 # モデルを読み込む
 model = load_model(model_path)
-mei23model = load_model(me23_path)
-kiritanmodel = load_model(kiritan_path)
-knzkmodel = load_model(knzk_path)
-chinomodel = load_model(lamaze_path)
+# mei23model = load_model(me23_path)
+# kiritanmodel = load_model(kiritan_path)
+# knzkmodel = load_model(knzk_path)
+# chinomodel = load_model(lamaze_path)
 takomodel = load_model(takomodel_path)
 # g_model = kiri_coloring_model.Generator_model()
 
@@ -86,14 +86,14 @@ def lstm_gentxt(text,num=0,sel_model=None):
     generated = ''
     if sel_model == None:
         tmp_model = model
-    elif sel_model == 'mei23':
-        tmp_model = mei23model
-    elif sel_model == 'knzk':
-        tmp_model = knzkmodel
-    elif sel_model == 'kiritan':
-        tmp_model = kiritanmodel
-    elif sel_model == 'chino':
-        tmp_model = chinomodel
+    # elif sel_model == 'mei23':
+    #     tmp_model = mei23model
+    # elif sel_model == 'knzk':
+    #     tmp_model = knzkmodel
+    # elif sel_model == 'kiritan':
+    #     tmp_model = kiritanmodel
+    # elif sel_model == 'chino':
+    #     tmp_model = chinomodel
 
     rnd = random.choice(adaptr)
     tmp = text + '\n' + rnd + '、'
