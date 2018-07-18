@@ -1,6 +1,11 @@
 # coding: utf-8
 
-from keras.models import Sequential,load_model
+# from keras.models import load_model as keras_load_model
+# from keras.backend import tensorflow_backend
+from tensorflow.python.keras.models import load_model
+from tensorflow.python.keras import backend
+from cnn.cnn_model import cnn_model
+from lstm.lstm_modelingtrain import lstm_model
 import numpy as np
 import random,json
 import sys,io,re,gc
@@ -10,11 +15,11 @@ import unicodedata
 from PIL import Image, ImageOps, ImageFile, ImageChops, ImageFilter, ImageEnhance
 import cv2
 import tensorflow as tf
-from keras.backend import tensorflow_backend
 config = tf.ConfigProto(device_count={"GPU":1},
                         gpu_options=tf.GPUOptions(allow_growth=False, visible_device_list="3"))
 session = tf.Session(config=config)
-tensorflow_backend.set_session(session)
+# tensorflow_backend.set_session(session)
+backend.set_session(session)
 
 labels = {}
 with open('.cnn_labels','r') as f:
@@ -35,43 +40,34 @@ Colors['blonde'] = [0,0,0,0,0,0,1,0,0]
 Colors['white'] = [0,0,0,0,0,0,0,1,0]
 Colors['black'] = [0,0,0,0,0,0,0,0,1]
 
-
-# model_path = 'db/test.h5'
-model_path = 'lstm/lstm2.h5'
-# me23_path = 'db/lstm_toot_mei23v3.h5'
-# kiritan_path = 'db/lstm_toot_kiritanv3.h5'
-# lamaze_path = 'db/lstm_toot_lamazePv3.h5'
-# knzk_path = 'db/lstm_toot_knzkv3.h5'
-takomodel_path = 'db/tako7.h5'
-# g_model_path = 'liner/colorize.model'
-#print('******* lstm load model %s,%s*******' %(model_path,takomodel_path))
-# モデルを読み込む
-model = load_model(model_path)
-# mei23model = load_model(me23_path)
-# kiritanmodel = load_model(kiritan_path)
-# knzkmodel = load_model(knzk_path)
-# chinomodel = load_model(lamaze_path)
-takomodel = load_model(takomodel_path)
-# g_model = kiri_coloring_model.Generator_model()
-
-graph = tf.get_default_graph()
-
-takomodel.save_weights(takomodel_path+'w')
-
 #いろいろなパラメータ
-maxlen = 15           #モデルに合わせて！
+maxlen = 25           #モデルに合わせて！
 diver = 0.55         #ダイバーシティ：大きくすると想起の幅が大きくなるっぽいー！
 pat3 = re.compile(r'^\n')
 pat4 = re.compile(r'\n')
 adaptr = ['だから','それで','しかし','けど','また','さらに',\
-        'つまり','さて','そして','で','でね','そんで','でも']
+        'つまり','さて','そして','で','でね','そんで','でも','ところで','まあ','なるほど','']
 #辞書読み込み
 wl_chars = list(open('dic/wl.txt').read())
-#wl_chars = list(open('dic/wl2400.txt').read())
 wl_chars.append(r'\n')
 wl_chars.sort()
 char_indices = dict((c, i) for i, c in enumerate(wl_chars))
 indices_char = dict((i, c) for i, c in enumerate(wl_chars))
+
+model_path = 'db/lstm_toot_v4.h5w'
+takomodel_path = 'db/cnn_v6.h5w'
+# model = keras_load_model(model_path)
+# takomodel = load_model(takomodel_path)
+model = lstm_model(maxlen, wl_chars)
+# model.load_weights(model_path, by_name=False)
+
+takomodel = cnn_model(labels)
+# takomodel.load_weights(takomodel_path, by_name=False)
+
+graph = tf.get_default_graph()
+
+# takomodel.save_weights(takomodel_path+'w')
+
 
 def sample(preds, temperature=1.2):
     # helper function to sample an index from a probability array
@@ -86,17 +82,12 @@ def lstm_gentxt(text,num=0,sel_model=None):
     generated = ''
     if sel_model == None:
         tmp_model = model
-    # elif sel_model == 'mei23':
-    #     tmp_model = mei23model
-    # elif sel_model == 'knzk':
-    #     tmp_model = knzkmodel
-    # elif sel_model == 'kiritan':
-    #     tmp_model = kiritanmodel
-    # elif sel_model == 'chino':
-    #     tmp_model = chinomodel
 
     rnd = random.choice(adaptr)
-    tmp = text + '\n' + rnd + '、'
+    if rnd == '':
+        tmp = text
+    else:
+        tmp = text + '\n' + rnd + '、'
 
     if len(tmp) > maxlen:
         sentence = tmp[-maxlen:]
@@ -117,6 +108,7 @@ def lstm_gentxt(text,num=0,sel_model=None):
                 #print('error:char=',t,char)
                 pass
         with graph.as_default():
+            model.load_weights(model_path, by_name=False)
             preds = tmp_model.predict(x_pred, verbose=0)[0]
         next_index = sample(preds, diver)
         next_char = indices_char[next_index]
@@ -146,6 +138,7 @@ def takoramen(filepath):
         return 'other'
 
     with graph.as_default():
+        takomodel.load_weights(takomodel_path, by_name=False)
         result = takomodel.predict(np.array([image/255.0]))
 
     rslt_dict = {}
@@ -157,8 +150,9 @@ def takoramen(filepath):
 
     with open('image.log','a') as f:
         f.write("*** image:" + filepath.split('/')[-1] +  "  *** result:%s\n"%str(rslt_dict))
-    if max(result[0]) > 0.85:
-        return labels[np.where(result[0] == max(result[0]) )[0][0]]
+    if max(result[0]) > 0.90:
+        # return labels[np.where(result[0] == max(result[0]) )[0][0]]
+        return labels[np.argmax(result[0])]
     else:
         return 'other'
 

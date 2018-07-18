@@ -271,7 +271,7 @@ def ana_image(media_attachments,sensitive,acct,g_vis,id,content):
             toot_now += '🙏ろびすてとうとい！'
         elif result == '漫画':
             toot_now += 'それなんて漫画ー？'
-        elif result in  ['スクショ','汚部屋','部屋','自撮り','太もも']:
+        elif result in  ['汚部屋','部屋','自撮り','太もも']:
             toot_now += result + 'だー！'
         elif result == 'kent':
             toot_now += 'ケント丸だー！'
@@ -285,6 +285,11 @@ def ana_image(media_attachments,sensitive,acct,g_vis,id,content):
             toot_now += 'ゆかりさん！'
         elif result == '真中らぁら':
             toot_now += 'かしこま！'
+        elif result == '魂魄妖夢':
+            toot_now += 'みょん！'
+        elif result == 'スクショ':
+            if random.randint(0,4) == 0:
+                toot_now += '📷スクショパシャパシャ！'
         elif sensitive:
             if 'ラーメン' in result or '麺' in result or result == 'うどん' or  result == 'そば':
                 toot_now += '🍜%sちゅるちゅるーっ！'%result
@@ -302,6 +307,8 @@ def ana_image(media_attachments,sensitive,acct,g_vis,id,content):
                 toot_now += '鳥貴族ーー！！！！'
             elif result == 'ピザ':
                 toot_now += 'ぽざ！'
+            elif result == 'ビール':
+                toot_now += '🍺しゅわしゅわ〜！'
             elif '緑茶' in result:
                 toot_now += '🍵ずずーっ'
             elif '紅茶' in result or 'コーヒー' in result:
@@ -640,7 +647,7 @@ def business_contact(status):
     #最後にトゥートしてから3時間以上？
     ymdhms = DAO.get_least_created_at(acct)
     diff = timedelta(hours=3)
-    print('===%s\t「%s」'%(acct, '\n    '.join(content.split('\n'))))
+    print('===「%s」by %s'%('\n    '.join(content.split('\n')), acct))
     if ymdhms == None:
         toot_now = '@%s 新規さんかも−！\n:@%s:(%s)＜「%s」(created at %s)'%(MASTER_ID, acct, display_name, content, ac_ymd)
         toot(toot_now, rep=id)
@@ -1146,7 +1153,8 @@ def th_delete():
 # ヒントでピントゲーム
 def th_hint_de_pinto():
     def th_shududai(acct,id,term):
-        paths = gi.get_images_forQ(term)
+        # paths = gi.get_images_forQ(term)
+        paths = kiri_util.fetch_and_save_img(term)
         if len(paths) > 0:
             path = random.choice(paths)
         else:
@@ -1181,7 +1189,7 @@ def th_hint_de_pinto():
         toot_now = "正解は{0}でした".format(term)
         toot(toot_now, g_vis='private', rep=None, spo=None, media_ids=media_files)
 
-    gi = kiri_util.get_images(BING_KEY)
+    # gi = kiri_util.get_images(BING_KEY)
     junbiTM = kiri_util.KiriTimer(600)
     junbiTM.reset(0)
     while True:

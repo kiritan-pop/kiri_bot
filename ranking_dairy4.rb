@@ -91,7 +91,7 @@ handler do |job|
     time_now = DateTime.now
     time_b1h = time_now - Rational(1,24)
     statuses_json = {}
-    sleep(60*5)  unless VERB
+    sleep(60*10)  unless VERB
     while true do
       sleep(0.2)
       statuses = exe_get_nona(id)
@@ -369,8 +369,8 @@ handler do |job|
 end
 
 every(1.hour, 'hourly1', at: '**:00')    unless VERB
-every(1.hour, 'hourly2', at: '**:12')    unless VERB
-every(1.day, 'daily1', at: '23:15')      unless VERB
+every(1.hour, 'hourly2', at: '**:14')    unless VERB
+every(1.day, 'daily1', at: '23:16')      unless VERB
 every(1.day, 'daily2', at: '23:35')      unless VERB
 every(1.week, 'daily2')   if VERB
 # every(1.week, 'daily1')
