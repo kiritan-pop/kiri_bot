@@ -22,7 +22,7 @@ session = tf.Session(config=config)
 backend.set_session(session)
 
 labels = {}
-with open('.cnn_labels','r') as f:
+with open('dic/.cnn_labels','r') as f:
     labels_index = json.load(f)
 for label,i in labels_index.items():
     labels[i] = label
@@ -42,7 +42,7 @@ Colors['black'] = [0,0,0,0,0,0,0,0,1]
 
 #いろいろなパラメータ
 maxlen = 25           #モデルに合わせて！
-diver = 0.55         #ダイバーシティ：大きくすると想起の幅が大きくなるっぽいー！
+diver = 0.65         #ダイバーシティ：大きくすると想起の幅が大きくなるっぽいー！
 pat3 = re.compile(r'^\n')
 pat4 = re.compile(r'\n')
 adaptr = ['だから','それで','しかし','けど','また','さらに',\
@@ -54,15 +54,16 @@ wl_chars.sort()
 char_indices = dict((c, i) for i, c in enumerate(wl_chars))
 indices_char = dict((i, c) for i, c in enumerate(wl_chars))
 
-model_path = 'db/lstm_toot_v4.h5w'
-takomodel_path = 'db/cnn_v6.h5w'
-# model = keras_load_model(model_path)
-# takomodel = load_model(takomodel_path)
+model_path = 'db/lstm_toot_v1.h5w'
+# model = load_model(model_path)
 model = lstm_model(maxlen, wl_chars)
 # model.load_weights(model_path, by_name=False)
 
+takomodel_path = 'db/cnn_v8.h5w'
+# takomodel = load_model(takomodel_path)
 takomodel = cnn_model(labels)
 # takomodel.load_weights(takomodel_path, by_name=False)
+
 
 graph = tf.get_default_graph()
 
@@ -80,8 +81,6 @@ def sample(preds, temperature=1.2):
 
 def lstm_gentxt(text,num=0,sel_model=None):
     generated = ''
-    if sel_model == None:
-        tmp_model = model
 
     rnd = random.choice(adaptr)
     if rnd == '':
@@ -109,7 +108,7 @@ def lstm_gentxt(text,num=0,sel_model=None):
                 pass
         with graph.as_default():
             model.load_weights(model_path, by_name=False)
-            preds = tmp_model.predict(x_pred, verbose=0)[0]
+            preds = model.predict(x_pred, verbose=0)[0]
         next_index = sample(preds, diver)
         next_char = indices_char[next_index]
 

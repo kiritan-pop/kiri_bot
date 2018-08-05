@@ -12,7 +12,7 @@ from os.path import join, dirname
 from dotenv import load_dotenv
 import wikipedia
 import Toot_summary, GenerateText, PrepareChain, bottlemail
-import kiri_util, kiri_deep, kiri_game , kiri_coloring
+import kiri_util, kiri_deep, kiri_game, kiri_coloring, kiri_romasaga
 from PIL import Image, ImageOps, ImageFile, ImageChops, ImageFilter, ImageEnhance
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -287,6 +287,18 @@ def ana_image(media_attachments,sensitive,acct,g_vis,id,content):
             toot_now += 'かしこま！'
         elif result == '魂魄妖夢':
             toot_now += 'みょん！'
+        elif result == '保登心愛':
+            toot_now += 'こころぴょんぴょん！'
+        elif result == '天々座理世':
+            toot_now += 'こころぴょんぴょん！'
+        elif result == '香風智乃':
+            toot_now += 'チノちゃん！'
+        elif result == '桐間紗路':
+            toot_now += 'こころぴょんぴょん！'
+        elif result == '宇治松千夜':
+            toot_now += 'こころぴょんぴょん！'
+        elif result == 'る':
+            toot_now += 'サイレンス芸人だー！'
         elif result == 'スクショ':
             if random.randint(0,4) == 0:
                 toot_now += '📷スクショパシャパシャ！'
@@ -607,7 +619,7 @@ def quick_rtn(status):
     elif len(media_attachments) > 0 and re.search(r"色[ぬ塗]って", content) == None:
         toot_now = ana_image(media_attachments, sensitive, acct, g_vis, id_now, content)
         id_now = None
-        # interval = 3
+        interval = 5
     elif re.search(r"^う$", content):
         SM.update(acct, 'func')
         if rnd <= 6:
@@ -622,6 +634,16 @@ def quick_rtn(status):
         toot_now = 'はい'
         id_now = None
         interval = random.uniform(0.01,0.7)
+    elif "(ง ˆᴗˆ)ว" in content:
+        SM.update(acct, 'func')
+        if rnd <= 6:
+            toot_now = '◝( ・_・)◟ <ﾋﾟﾀｯ!'
+            id_now = None
+    elif re.search(r".+とかけまして.+と[と解]きます|.+とかけて.+と[と解]く$", content):
+        SM.update(acct, 'func',score=2)
+        toot_now = 'その心は？'
+        id_now = None
+        interval = 1
     else:
         nicolist = set([tmp.strip() for tmp in open('.nicolist').readlines()])
         if acct in nicolist:
@@ -1047,6 +1069,23 @@ def monomane_tooter():
         toot(gen_txt, "unlisted", None, spoiler)
 
 #######################################################
+# ○○○○
+def tangrkn_tooter():
+    spoiler = "○○モノマネ"
+    generator = GenerateText.GenerateText(5)
+    gen_txt = generator.generate("tangrkn")
+    if len(gen_txt) > 10:
+        toot(gen_txt, "private", spo=spoiler)
+
+#######################################################
+# 陣形
+def jinkei_tooter():
+    spoiler = "勝手に陣形サービス"
+    gen_txt = kiri_romasaga.gen_jinkei()
+    # gen_txt = '@kiritan\n' + gen_txt
+    toot(gen_txt, "public", spo=spoiler)
+
+#######################################################
 # 定期ここ1時間のまとめ
 def summarize_tooter():
     spoiler = "ＬＴＬここ1時間の自動まとめ"
@@ -1431,11 +1470,13 @@ def main():
     #スケジュール起動系
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(summarize_tooter,['02'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(bottlemail_sending,['05'])) )
-    threads.append( threading.Thread(target=kiri_util.scheduler, args=(monomane_tooter,None,120,0,15,CM)) )
-    threads.append( threading.Thread(target=kiri_util.scheduler, args=(lstm_tooter,None,8,-3,3,CM)) )
-    threads.append( threading.Thread(target=kiri_util.scheduler, args=(timer_bst1st,None,90,0,15,CM)) )
+    # threads.append( threading.Thread(target=kiri_util.scheduler, args=(monomane_tooter,None,120,0,15,CM)) )
+    threads.append( threading.Thread(target=kiri_util.scheduler, args=(lstm_tooter,None,5,-3,2,CM)) )
+    # threads.append( threading.Thread(target=kiri_util.scheduler, args=(timer_bst1st,None,90,0,15,CM)) )
     #threads.append( threading.Thread(target=kiri_util.scheduler, args=(th_nicoru,None,60,0,60,CM)) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(th_follow_mente,None,60*24)) )
+    # threads.append( threading.Thread(target=kiri_util.scheduler, args=(tangrkn_tooter,None,20,-10,10,CM)) )
+    threads.append( threading.Thread(target=kiri_util.scheduler, args=(jinkei_tooter,None,120,-10,10,CM)) )
 
     for th in threads:
         th.start()

@@ -383,6 +383,28 @@ class DAO_statuses():
         return len(acct_list)
 
     #######################################################
+    # 陣形用５人ピックアップ
+    def get_five(self, num=5):
+        #過去n分のアクティブユーザ数をベース
+        jst_now = datetime.now(timezone('Asia/Tokyo'))
+        ymd = int(jst_now.strftime("%Y%m%d"))
+        hh0000 = int((jst_now - timedelta(minutes=30)).strftime("%H%M%S"))
+        hh9999 = int(jst_now.strftime("%H%M%S"))
+        if hh0000 > hh9999:
+            hh0000 = 0
+        #ランダムに人を選ぶよー！（最近いる人から）
+        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 6*1000)
+        c = con.cursor()
+        c.execute( r"select acct from statuses where (date = ?) and time >= ? and time <= ? and acct <> ?",[ymd,hh0000,hh9999,BOT_ID] )
+        acct_list = set([])
+        for row in c.fetchall():
+            acct_list.add(row[0])
+
+        con.close()
+        return random.sample(acct_list,num)
+
+
+    #######################################################
     # モノマネ用
     def get_user_toots(self,acct):
         con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 6*1000)
@@ -670,10 +692,6 @@ def img_url_list(word):
     img_urls = [e.get('href') for e in img_link_elems if e.get('href').startswith('http')]
     img_urls = list(set(img_urls))
     return img_urls
-
-
-
-
 
 if __name__ == '__main__':
     sm = ScoreManager()
