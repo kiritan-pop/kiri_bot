@@ -1,12 +1,5 @@
 # coding: utf-8
 
-# from keras.models import Sequential,load_model
-# from keras.callbacks import LambdaCallback
-# from keras.layers import Dense, Activation, CuDNNLSTM, Dropout #, Embedding, Conv1D, MaxPooling1D, Flatten, Input
-# from keras.optimizers import RMSprop
-# from keras.utils import Sequence
-# from keras.utils.training_utils import multi_gpu_model
-# from keras.backend import tensorflow_backend
 from tensorflow.python.keras.models import Sequential,load_model
 from tensorflow.python.keras.callbacks import LambdaCallback,EarlyStopping
 from tensorflow.python.keras.layers import Dense, Activation, CuDNNLSTM, Dropout #, Embedding, Conv1D, MaxPooling1D, Flatten, Input
@@ -22,11 +15,6 @@ from time import sleep
 import argparse
 
 import tensorflow as tf
-# config = tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=False,
-#                                                   visible_device_list='1'
-#                                                   ))
-# session = tf.Session(config=config)
-# backend.set_session(session)
 
 graph = tf.get_default_graph()
 
@@ -44,11 +32,11 @@ def lstm_model(maxlen, wl_chars):
     # model.add(CuDNNLSTM(512, input_shape=(maxlen, len(wl_chars)), return_sequences=True, return_state=True, stateful=True))
     model.add(CuDNNLSTM(512, return_sequences=True, input_shape=(maxlen, len(wl_chars))))
     model.add(Dropout(0.2))
-    model.add(CuDNNLSTM(256, return_sequences=True))
-    model.add(Dropout(0.2))
     model.add(CuDNNLSTM(128, return_sequences=True))
     model.add(Dropout(0.2))
-    model.add(CuDNNLSTM(64))
+    model.add(CuDNNLSTM(64, return_sequences=True))
+    model.add(Dropout(0.2))
+    model.add(CuDNNLSTM(32))
     model.add(Dropout(0.2))
     model.add(Dense(len(wl_chars), activation='softmax'))
     return model
@@ -208,5 +196,5 @@ if __name__ == '__main__':
                     # steps_per_epoch=60,
                     initial_epoch=start_idx,
                     max_queue_size=process_count,
-                    workers=1,
-                    use_multiprocessing=False)
+                    workers=4,
+                    use_multiprocessing=True)

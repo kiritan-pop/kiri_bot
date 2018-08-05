@@ -13,7 +13,7 @@ ng_words2 = set(['日本酒','friends','時報','toots','スク水','何の日',
 ng_words = ng_words | ng_words2
 aisatsu_words = set(['おや','おは','こん','おか','やっほ','てら','ただいま','おにい'])
 pat3 = re.compile(r'^\n')
-pat4 = re.compile(r'\n')
+pat4 = re.compile(r'^.\n')
 pat5 = re.compile(r'([。、…])\1+')
 pat6 = re.compile(r'(.)\1{4,}')
 WORKERS = 4
@@ -32,7 +32,7 @@ def normalize(num,readQ,writeQ):
             outs = []
             for line in lines:
                 try:
-                    line = re.sub(r'《.*》|\||｜|［.*］|\[.*\]','',line)
+                    line = re.sub(r'《.*》|\||｜|［.*］|\[.*\]|^.\n','',line)
                     for ng_word in ng_words:
                         if ng_word in line:
                             raise Exception
