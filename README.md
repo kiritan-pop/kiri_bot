@@ -27,5 +27,5 @@ lstmによる文章自動生成機能と画像認識だよー！
 ## kiri_game.py
 数取りゲームー！
 
-## ranging_dairy3.rb
+## ranging_dairy5.rb
 ランキング機能だよー！rubyの「clockwork」っていうgemで動かすよー！
