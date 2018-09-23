@@ -54,14 +54,14 @@ wl_chars.sort()
 char_indices = dict((c, i) for i, c in enumerate(wl_chars))
 indices_char = dict((i, c) for i, c in enumerate(wl_chars))
 
-model_path = 'db/lstm_toot_v1.h5w'
+model_path = 'db/lstm_toot_v7.h5w'
 # model = load_model(model_path)
 model = lstm_model(maxlen, wl_chars)
 # model.load_weights(model_path, by_name=False)
 
-takomodel_path = 'db/cnn_v8.h5w'
-# takomodel = load_model(takomodel_path)
-takomodel = cnn_model(labels)
+takomodel_path = 'db/cnn_v13.h5'
+takomodel = load_model(takomodel_path)
+# takomodel = cnn_model(labels)
 # takomodel.load_weights(takomodel_path, by_name=False)
 
 
@@ -82,18 +82,26 @@ def sample(preds, temperature=1.2):
 def lstm_gentxt(text,num=0,sel_model=None):
     generated = ''
 
+    tmp = text.strip()
+    if len(tmp) > maxlen:
+        tmp = tmp[-maxlen:]
+    else:
+        tmp = tmp * maxlen
+        tmp = tmp[-maxlen:]
+
     rnd = random.choice(adaptr)
     if rnd == '':
-        tmp = text
+        tmp += '\n'
     else:
-        tmp = text + '\n' + rnd + '、'
+        tmp += '\n' + rnd + '、'
 
     if len(tmp) > maxlen:
         sentence = tmp[-maxlen:]
     else:
         sentence = tmp * maxlen
         sentence = sentence[-maxlen:]
-    print('seed text= %s ' %sentence)
+
+    print('seed text=%s' %sentence)
     if num == 0:
         vol = random.randint(1,5)
     else:
@@ -127,17 +135,17 @@ def takoramen(filepath):
     extention = filepath.rsplit('.',1)[-1]
     print(filepath,extention)
     if extention in ['png','jpg','jpeg','gif']:
-        image = np.asarray(Image.open(filepath).convert('RGB').resize(STANDARD_SIZE) )
+        image = np.asarray(Image.open(filepath).convert('RGB').resize(STANDARD_SIZE2) )
     elif extention in ['mp4','webm']:
         cap = cv2.VideoCapture(filepath)
         _, image = cap.read()
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        image = np.asarray(Image.fromarray(image).resize(STANDARD_SIZE))
+        image = np.asarray(Image.fromarray(image).resize(STANDARD_SIZE2))
     else:
         return 'other'
 
     with graph.as_default():
-        takomodel.load_weights(takomodel_path, by_name=False)
+        # takomodel.load_weights(takomodel_path, by_name=False)
         result = takomodel.predict(np.array([image/255.0]))
 
     rslt_dict = {}
@@ -149,7 +157,7 @@ def takoramen(filepath):
 
     with open('image.log','a') as f:
         f.write("*** image:" + filepath.split('/')[-1] +  "  *** result:%s\n"%str(rslt_dict))
-    if max(result[0]) > 0.90:
+    if max(result[0]) > 0.85:
         # return labels[np.where(result[0] == max(result[0]) )[0][0]]
         return labels[np.argmax(result[0])]
     else:
