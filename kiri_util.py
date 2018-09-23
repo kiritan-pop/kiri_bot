@@ -415,17 +415,22 @@ class DAO_statuses():
         return rows
 
     #######################################################
-    # ここ1時間の要約
-    def get_toots_1hour(self):
+    # 時間指定トゥート取得
+    def get_toots_hours(self, hours=1):
         jst_now = datetime.now(timezone('Asia/Tokyo'))
-        ymd = int((jst_now - timedelta(hours=1)).strftime("%Y%m%d"))
-        hh = (jst_now - timedelta(hours=1)).strftime("%H")
-        hh0000 = int(hh + "0000")
-        hh9999 = int(hh + "9999")
+        ymd = int((jst_now - timedelta(hours=hours)).strftime("%Y%m%d"))
+        hms = (jst_now - timedelta(hours=hours)).strftime("%H%M%S")
+        ymd2 = int(jst_now.strftime("%Y%m%d"))
+        hms2 = int(jst_now.strftime("%H%M%S"))
         con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 6*1000)
         c = con.cursor()
-        c.execute( r"select content from statuses where (date = ?) and time >= ? and time <= ? and acct <> ?",
-                    (ymd,hh0000,hh9999,BOT_ID) )
+        if ymd == ymd2 and int(hms) <= int(hms2):
+            c.execute( r"select acct,count(content) from statuses where (date = ? and time >= ? and time <= ? ) group by acct",
+                        (ymd,hms,hms2) )
+        else:
+            c.execute( r"select acct,count(content) from statuses where (date = ? and time >= ?) or (date = ? and time <= ? ) or (date > ? and date < ?) group by acct",
+                        (ymd,hms,ymd2,hms2,ymd,ymd2) )
+
         rows = c.fetchall()
         con.close()
         return rows
@@ -497,7 +502,7 @@ def kiri_trans_detect(text):
         la = tor.detect(text).lang
         return la
     except json.decoder.JSONDecodeError as e:
-        print(e)
+        # print(e)
         return 'ja'
 
 
@@ -685,7 +690,7 @@ def img_url_list(word):
     """
     using yahoo (this script can't use at google)
     """
-    url = 'http://image.search.yahoo.co.jp/search?n=5&p={}&search.x=1'.format(quote(word))
+    url = 'http://image.search.yahoo.co.jp/search?n=10&p={}&search.x=1'.format(quote(word))
     byte_content, _ = fetcher.fetch(url)
     structured_page = BeautifulSoup(byte_content.decode('UTF-8'), 'html.parser')
     img_link_elems = structured_page.find_all('a', attrs={'target': 'imagewin'})
@@ -693,21 +698,115 @@ def img_url_list(word):
     img_urls = list(set(img_urls))
     return img_urls
 
+
+#######################################################
+# しりとり用
+class Siritori_game():
+    def __init__(self,MG):
+        self.MG = MG
+        self.zumi = []
+        self.sdict = {}
+        for k,v in random.sample(self.MG.wdict.items(),len(self.MG.wdict)//20):
+            self.sdict[k] = v
+
+    def judge(self,word):
+        print('しりとり＝',word)
+        if word.strip() not in self.MG.wdict:
+            return True,'知らない単語なので別の単語お願い！'
+
+        if word in self.zumi:
+            return False,'それ一回言ったやつー！'
+
+        yomi = self.MG.wdict[word]
+        if len(self.zumi) > 0: #前の言葉と繋がっているか
+            word_1b = self.zumi[-1]
+            yomi_1b = self.MG.wdict[word_1b]
+            tail_1b = yomi_1b[-1]
+            if tail_1b in ['ー','−']:
+                tail_1b = yomi_1b[-2]
+            if tail_1b in self.MG.yure:
+                tail_1b = self.MG.yure[tail_1b]
+            head = yomi[0]
+            if head in self.MG.yure:
+                head = self.MG.yure[head]
+            if tail_1b != head:
+                return False,'繋がってないよー！'
+
+        if yomi[-1] == 'ン':
+            return False,'「ん」で終わったー！'
+
+        self.zumi.append(word)
+
+        if word in self.sdict:
+            del self.sdict[word]
+        return True,'yes'
+
+    def get_word(self,word):
+        yomi = self.MG.wdict[word]
+        tail = yomi[-1]
+        if tail in ['ー','−']:
+            tail = yomi[-2]
+        if tail in self.MG.yure:
+            tail = self.MG.yure[tail]
+
+        kouho = {}
+        for k,v in self.sdict.items():
+            if v[0] == tail:
+                kouho[k] = v
+
+        if len(kouho) > 0:
+            return random.sample(kouho.items(),1)[0]
+        else:
+            return None,None
+
+    def random_choice(self):
+        for a,b in random.sample(self.sdict.items(),100):
+            if b[-1] != 'ン':
+                return a,b
+
+class Siritori_manager():
+#しりとり用
+    def __init__(self):
+        self.wdict = { tmp.strip().split(',')[0]:tmp.strip().split(',')[1] for tmp in open('dic/siritori.csv').readlines() }
+        self.games = {}
+        self.yure = {'ァ':'ア','ィ':'イ','ゥ':'ウ','ェ':'エ','ォ':'オ','ャ':'ヤ','ュ':'ユ','ョ':'ヨ','ッ':'ツ','ヮ':'ワ','ヶ':'ケ'}
+
+    def add_game(self,acct):
+        self.games[acct] = Siritori_game(self)
+
+    def end_game(self,acct):
+        del self.games[acct]
+
+    def is_game(self,acct):
+        if acct in self.games:
+            return True
+        else:
+            return False
+
+
+
 if __name__ == '__main__':
-    sm = ScoreManager()
-    score = {}
-    # sm.update(acct='kiritan',key='getnum',i_datetime=None,score=901)
+    DAO = DAO_statuses()
+    rows = DAO.get_toots_hours(hours=24*31)
+    rows.sort(key=lambda x:(-x[1],x[0]))
+    for i,(acct,content) in enumerate(rows):
+        print(i+1,acct,content)
 
-    for row in sm.show():
-        # score[row[0]] = row[2] + row[4] + row[6] + row[7]
-        score[row[0]] = row[1]
-
-    for i,row in enumerate( sorted(score.items(), key=lambda x: -x[1])):
-        print("%2d位:@%s: %d"%(i+1,row[0],row[1]))
-        if i > 100:
-            break
-
-
+    # sm = ScoreManager()
+    # score = {}
+    # # sm.update(acct='kiritan',key='getnum',i_datetime=None,score=901)
+    #
+    # for row in sm.show():
+    #     # score[row[0]] = (row[2] , row[4] , row[6] , row[7])
+    #     score[row[0]] = row[2] + row[4] + row[6] + row[7]
+    #     # score[row[0]] = row[1]
+    #
+    # for i,row in enumerate( sorted(score.items(), key=lambda x: -x[1])):
+    #     print("%2d位:@%s: %d"%(i+1,row[0],row[1]))
+    #     if i > 100:
+    #         break
+    #
+    #
     # images = []
     # for f in os.listdir('media/'):
     #     # print('media/' + f)
