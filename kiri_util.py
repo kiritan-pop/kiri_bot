@@ -502,6 +502,8 @@ def kiri_trans_detect(text):
         la = tor.detect(text).lang
         return la
     except json.decoder.JSONDecodeError as e:
+        return 'ja'
+    except AttributeError as e:
         # print(e)
         return 'ja'
 
@@ -633,9 +635,9 @@ class get_images:
         for url in url_list:
             try:
                 img_path = make_img_path(self.save_dir_path, url, term)
-                img_paths.append(img_path)
                 image = download_image(url)
                 save_image(img_path, image)
+                img_paths.append(img_path)
                 print('saved image... {}'.format(url))
             except KeyboardInterrupt:
                 break
@@ -698,113 +700,26 @@ def img_url_list(word):
     img_urls = list(set(img_urls))
     return img_urls
 
-
-#######################################################
-# しりとり用
-class Siritori_game():
-    def __init__(self,MG):
-        self.MG = MG
-        self.zumi = []
-        self.sdict = {}
-        for k,v in random.sample(self.MG.wdict.items(),len(self.MG.wdict)//20):
-            self.sdict[k] = v
-
-    def judge(self,word):
-        print('しりとり＝',word)
-        if word.strip() not in self.MG.wdict:
-            return True,'知らない単語なので別の単語お願い！'
-
-        if word in self.zumi:
-            return False,'それ一回言ったやつー！'
-
-        yomi = self.MG.wdict[word]
-        if len(self.zumi) > 0: #前の言葉と繋がっているか
-            word_1b = self.zumi[-1]
-            yomi_1b = self.MG.wdict[word_1b]
-            tail_1b = yomi_1b[-1]
-            if tail_1b in ['ー','−']:
-                tail_1b = yomi_1b[-2]
-            if tail_1b in self.MG.yure:
-                tail_1b = self.MG.yure[tail_1b]
-            head = yomi[0]
-            if head in self.MG.yure:
-                head = self.MG.yure[head]
-            if tail_1b != head:
-                return False,'繋がってないよー！'
-
-        if yomi[-1] == 'ン':
-            return False,'「ん」で終わったー！'
-
-        self.zumi.append(word)
-
-        if word in self.sdict:
-            del self.sdict[word]
-        return True,'yes'
-
-    def get_word(self,word):
-        yomi = self.MG.wdict[word]
-        tail = yomi[-1]
-        if tail in ['ー','−']:
-            tail = yomi[-2]
-        if tail in self.MG.yure:
-            tail = self.MG.yure[tail]
-
-        kouho = {}
-        for k,v in self.sdict.items():
-            if v[0] == tail:
-                kouho[k] = v
-
-        if len(kouho) > 0:
-            return random.sample(kouho.items(),1)[0]
-        else:
-            return None,None
-
-    def random_choice(self):
-        for a,b in random.sample(self.sdict.items(),100):
-            if b[-1] != 'ン':
-                return a,b
-
-class Siritori_manager():
-#しりとり用
-    def __init__(self):
-        self.wdict = { tmp.strip().split(',')[0]:tmp.strip().split(',')[1] for tmp in open('dic/siritori.csv').readlines() }
-        self.games = {}
-        self.yure = {'ァ':'ア','ィ':'イ','ゥ':'ウ','ェ':'エ','ォ':'オ','ャ':'ヤ','ュ':'ユ','ョ':'ヨ','ッ':'ツ','ヮ':'ワ','ヶ':'ケ'}
-
-    def add_game(self,acct):
-        self.games[acct] = Siritori_game(self)
-
-    def end_game(self,acct):
-        del self.games[acct]
-
-    def is_game(self,acct):
-        if acct in self.games:
-            return True
-        else:
-            return False
-
-
-
 if __name__ == '__main__':
-    DAO = DAO_statuses()
-    rows = DAO.get_toots_hours(hours=24*31)
-    rows.sort(key=lambda x:(-x[1],x[0]))
-    for i,(acct,content) in enumerate(rows):
-        print(i+1,acct,content)
+    # DAO = DAO_statuses()
+    # rows = DAO.get_toots_hours(hours=24*31)
+    # rows.sort(key=lambda x:(-x[1],x[0]))
+    # for i,(acct,content) in enumerate(rows):
+    #     print(i+1,acct,content)
 
-    # sm = ScoreManager()
-    # score = {}
-    # # sm.update(acct='kiritan',key='getnum',i_datetime=None,score=901)
-    #
-    # for row in sm.show():
-    #     # score[row[0]] = (row[2] , row[4] , row[6] , row[7])
-    #     score[row[0]] = row[2] + row[4] + row[6] + row[7]
-    #     # score[row[0]] = row[1]
-    #
-    # for i,row in enumerate( sorted(score.items(), key=lambda x: -x[1])):
-    #     print("%2d位:@%s: %d"%(i+1,row[0],row[1]))
-    #     if i > 100:
-    #         break
+    sm = ScoreManager()
+    # sm.update(acct='kiritan',key='getnum',i_datetime=None,score=-3273)
+    score = {}
+
+    for row in sm.show():
+        # score[row[0]] = (row[2] , row[4] , row[6] , row[7])
+        # score[row[0]] = row[2] + row[4] + row[6] + row[7]
+        score[row[0]] = row[1]
+
+    for i,row in enumerate( sorted(score.items(), key=lambda x: -x[1])):
+        print("%2d位:@%s: %d"%(i+1,row[0],row[1]))
+        if i > 100:
+            break
     #
     #
     # images = []

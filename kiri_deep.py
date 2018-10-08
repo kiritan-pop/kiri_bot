@@ -41,8 +41,8 @@ Colors['white'] = [0,0,0,0,0,0,0,1,0]
 Colors['black'] = [0,0,0,0,0,0,0,0,1]
 
 #いろいろなパラメータ
-maxlen = 25           #モデルに合わせて！
-diver = 0.65         #ダイバーシティ：大きくすると想起の幅が大きくなるっぽいー！
+maxlen = 15           #モデルに合わせて！
+diver = 0.55         #ダイバーシティ：大きくすると想起の幅が大きくなるっぽいー！
 pat3 = re.compile(r'^\n')
 pat4 = re.compile(r'\n')
 adaptr = ['だから','それで','しかし','けど','また','さらに',\
@@ -54,7 +54,7 @@ wl_chars.sort()
 char_indices = dict((c, i) for i, c in enumerate(wl_chars))
 indices_char = dict((i, c) for i, c in enumerate(wl_chars))
 
-model_path = 'db/lstm_toot_v7.h5w'
+model_path = 'db/lstm_toot_v3.h5w'
 # model = load_model(model_path)
 model = lstm_model(maxlen, wl_chars)
 # model.load_weights(model_path, by_name=False)
@@ -101,7 +101,8 @@ def lstm_gentxt(text,num=0,sel_model=None):
         sentence = tmp * maxlen
         sentence = sentence[-maxlen:]
 
-    print('seed text=%s' %sentence)
+    rnd = random.uniform(0.2,0.8)
+    print('seed text=%s %f' %(sentence,rnd))
     if num == 0:
         vol = random.randint(1,5)
     else:
@@ -117,7 +118,7 @@ def lstm_gentxt(text,num=0,sel_model=None):
         with graph.as_default():
             model.load_weights(model_path, by_name=False)
             preds = model.predict(x_pred, verbose=0)[0]
-        next_index = sample(preds, diver)
+        next_index = sample(preds, rnd)
         next_char = indices_char[next_index]
 
         generated += next_char

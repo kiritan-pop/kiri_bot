@@ -25,11 +25,11 @@ pat2 = re.compile(r'[ｗ！？!\?]')
 
 #得点管理、流速監視
 SM = kiri_util.ScoreManager()
-CM = kiri_util.CoolingManager(10)
+CM = kiri_util.CoolingManager(5)
 DAO = kiri_util.DAO_statuses()
 painter = kiri_coloring.Painter(gpu=-1)
 #しりとり用
-StMG = kiri_util.Siritori_manager()
+StMG = kiri_game.Siritori_manager()
 
 
 #.envファイルからトークンとかURLを取得ー！
@@ -648,16 +648,22 @@ def quick_rtn(status):
         toot_now = 'その心は？'
         id_now = None
         interval = 1
-    elif re.search(r"^しばちゃんは.[\?？]$", content):
+    elif re.search(r"^しばちゃんは.+[\?？]$", content) and acct in ['Ko4ba',MASTER_ID]:
         SM.update(acct, 'func')
-        toot_now = '絶好調に美少女ー！'
+        toot_now = '＼絶好調に美少女ー！／'
+        interval = 1
+        id_now = None
+    elif re.search(r"^きりたんは.+[\?？]$", content) and acct == MASTER_ID:
+        SM.update(acct, 'func')
+        toot_now = '＼そこにいるー！／'
+        interval = 1
         id_now = None
     else:
         nicolist = set([tmp.strip() for tmp in open('.nicolist').readlines()])
         if acct in nicolist:
-            rnd = random.randint(0,100)
-            if rnd % 4 == 0:
-                fav_now(id_now)
+            # rnd = random.randint(0,100)
+            # if rnd % 4 == 0:
+            fav_now(id_now)
     #
     if len(toot_now) > 0:
         toot(toot_now, vis_now, id_now, None, None, interval)
@@ -899,9 +905,6 @@ def th_worker():
                 enquete = json.loads(status['enquete'])
 
             a = int(CM.get_coolingtime())
-            #連投防止
-            if  acct in acct_list and acct != MASTER_ID:
-                continue
             if  acct in BOTS:
                 #ももながbotの場合もスルー
                 if  acct == 'JC' and application != '女子会':
@@ -910,53 +913,56 @@ def th_worker():
                     pass
                 else:
                     continue
+
+            #連投防止
+            # if  acct in acct_list and acct != MASTER_ID:
+            #     continue
+
             if re.search(r"きりぼ.*(しりとり).*(しよ|やろ|おねがい|お願い)", content):
                 fav_now(id)
                 if StMG.is_game(acct):
-                    toot('@%s 今やってる！\n※やめる場合は「しりとり終了」って言ってね'%acct, 'direct', None, None,interval=2)
+                    toot('@%s 今やってる！\n※やめる場合は「しりとり終了」って言ってね'%acct, 'direct', id, None,interval=2)
                     continue
 
                 StMG.add_game(acct)
                 SM.update(acct, 'func')
-
-                if re.search(r".*[：:](.+)", str(content)):
-                    word = re.search(r".*[：:](.+)", str(content)).group(1).strip()
-                    result,text = StMG.games[acct].judge(word)
-                    if result:
-                        if text == 'yes':
-                            ret_word,ret_yomi = StMG.games[acct].get_word(word)
-                            if ret_word == None:
-                                toot('@%s う〜ん！思いつかないよー！負けたー！'%(acct,), 'direct', None, None,interval=2)
-                                SM.update(g_acct, 'getnum', score=1)
-                                StMG.end_game(acct)
-                            else:
-                                result2,text2 = StMG.games[acct].judge(ret_word)
-                                if result2:
-                                    toot('@%s %s【%s】'%(acct, ret_word, ret_yomi), 'direct', None, None,interval=2)
-                                else:
-                                    toot('@%s %s【%s】\nあ！んがついちゃったー！負けたー！'%(acct, ret_word, ret_yomi), 'direct', None, None,interval=2)
-                                    SM.update(g_acct, 'getnum', score=1)
-                                    StMG.end_game(acct)
-
-                        else:
-                            #辞書にない場合
-                            toot('@%s %s\n※やめる場合は「しりとり終了」って言ってね'%(acct,text), 'direct', None, None,interval=2)
-                    else:
-                        toot('@%s %s\nきりぼっとの勝ちー！'%(acct, text), 'direct', None, None,interval=2)
-                        StMG.end_game(acct)
-                else:
-                    word1,yomi1 = StMG.games[acct].random_choice()
-                    result,text = StMG.games[acct].judge(word1)
-                    tail1 = yomi1[-1]
-                    if tail1 in ['ー','−']:
-                        tail1 = yomi1[-2]
-                    toot('@%s じゃあ、%s【%s】の「%s」！\n※このトゥートにリプしてね！\n※DMでお願いねー！'%(acct,word1,yomi1,tail1) ,
-                            'direct', None, None,interval=2)
+                #
+                # if re.search(r".*[：:](.+)", str(content)):
+                #     word = re.search(r".*[：:](.+)", str(content)).group(1).strip()
+                #     result,text = StMG.games[acct].judge(word)
+                #     if result:
+                #         if text == 'yes':
+                #             ret_word,ret_yomi,tail = StMG.games[acct].get_word(word)
+                #
+                #             if ret_word == None:
+                #                 toot('@%s う〜ん！思いつかないよー！負けたー！\n(ラリー数：%d／%d点獲得)'%(acct,StMG.games[acct].rcnt,StMG.games[acct].rcnt*2+StMG.games[acct].lv), 'direct',  id, None,interval=2)
+                #                 SM.update(acct, 'getnum', score=StMG.games[acct].rcnt*2+StMG.games[acct].lv)
+                #                 StMG.end_game(acct)
+                #             else:
+                #                 result2,text2 = StMG.games[acct].judge(ret_word)
+                #                 if result2:
+                #                     toot('@%s %s【%s】の「%s」！\n(ラリー数：%d)\n※このトゥートにリプしてね！\n※DMでお願いねー！'%(acct, ret_word, ret_yomi, tail, StMG.games[acct].rcnt), 'direct',  id, None,interval=2)
+                #                 else:
+                #                     toot('@%s %s【%s】\nあ！んがついちゃったー！負けたー！\n(ラリー数：%d／%d点獲得)'%(acct, ret_word, ret_yomi, StMG.games[acct].rcnt,StMG.games[acct].rcnt+5+StMG.games[acct].lv), 'direct',  id, None,interval=2)
+                #                     SM.update(acct, 'getnum', score=5+StMG.games[acct].rcnt+StMG.games[acct].lv)
+                #                     StMG.end_game(acct)
+                #
+                #         else:
+                #             #辞書にない場合
+                #             toot('@%s %s\n※やめる場合は「しりとり終了」って言ってね！\n(ラリー数：%d)'%(acct,text, StMG.games[acct].rcnt), 'direct',  id, None,interval=2)
+                #     else:
+                #         toot('@%s %s\nわーい勝ったー！\n(ラリー数：%d)'%(acct, text, StMG.games[acct].rcnt), 'direct',  id, None,interval=2)
+                #         StMG.end_game(acct)
+                # else:
+                word1,yomi1,tail1 = StMG.games[acct].random_choice()
+                result,text = StMG.games[acct].judge(word1)
+                toot('@%s 【Lv.%d】じゃあ、%s【%s】の「%s」！\n※このトゥートにリプしてね！\n※DMでお願いねー！'%(acct,StMG.games[acct].lv,word1,yomi1,tail1) ,
+                        'direct',  id, None,interval=2)
 
             elif StMG.is_game(acct) and re.search(r"(しりとり).*(終わ|おわ|終了|完了)", content):
                 fav_now(id)
                 StMG.end_game(acct)
-                toot('@%s おつかれさまー！'%acct , 'direct', None, None,interval=2)
+                toot('@%s おつかれさまー！\n(ラリー数：%d)'%(acct, StMG.games[acct].rcnt) , 'direct',  id, None,interval=2)
 
             elif StMG.is_game(acct) and g_vis == 'direct':
                 fav_now(id)
@@ -964,27 +970,26 @@ def th_worker():
                 result,text = StMG.games[acct].judge(word)
                 if result:
                     if text == 'yes':
-                        ret_word,ret_yomi = StMG.games[acct].get_word(word)
+                        ret_word,ret_yomi,tail = StMG.games[acct].get_word(word)
                         if ret_word == None:
-                            toot('@%s う〜ん！思いつかないよー！負けたー！'%(acct,), 'direct', None, None,interval=2)
-                            SM.update(g_acct, 'getnum', score=1)
+                            toot('@%s う〜ん！思いつかないよー！負けたー！\n(ラリー数：%d／%d点獲得)'%(acct,StMG.games[acct].rcnt,StMG.games[acct].rcnt*2+StMG.games[acct].lv), 'direct',  id, None,interval=2)
+                            SM.update(acct, 'getnum', score=StMG.games[acct].rcnt*2+StMG.games[acct].lv)
                             StMG.end_game(acct)
                         else:
                             result2,text2 = StMG.games[acct].judge(ret_word)
                             if result2:
-                                toot('@%s %s【%s】'%(acct, ret_word, ret_yomi), 'direct', None, None,interval=2)
+                                toot('@%s %s【%s】の「%s」！\n(ラリー数：%d)\n※このトゥートにリプしてね！\n※DMでお願いねー！'%(acct, ret_word, ret_yomi, tail, StMG.games[acct].rcnt), 'direct',  id, None,interval=2)
                             else:
-                                toot('@%s %s【%s】\nあ！んがついちゃったー！負けたー！'%(acct, ret_word, ret_yomi), 'direct', None, None,interval=2)
-                                SM.update(g_acct, 'getnum', score=1)
+                                toot('@%s %s【%s】\n%sえ〜ん負けたー！\n(ラリー数：%d／%d点獲得)'%(acct, ret_word, ret_yomi,text2, StMG.games[acct].rcnt,StMG.games[acct].rcnt+5+StMG.games[acct].lv), 'direct',  id, None,interval=2)
+                                SM.update(acct, 'getnum', score=5+StMG.games[acct].rcnt+StMG.games[acct].lv)
                                 StMG.end_game(acct)
 
                     else:
                         #辞書にない場合
-                        toot('@%s %s\n※やめる場合は「しりとり終了」って言ってね'%(acct,text), 'direct', None, None,interval=2)
+                        toot('@%s %s\n※やめる場合は「しりとり終了」って言ってね！\n(ラリー数：%d)'%(acct,text, StMG.games[acct].rcnt), 'direct',  id, None,interval=2)
                 else:
-                    toot('@%s %s\nきりぼっとの勝ちー！'%(acct, text), 'direct', None, None,interval=2)
+                    toot('@%s %s\nわーい勝ったー！\n(ラリー数：%d)'%(acct, text, StMG.games[acct].rcnt), 'direct',  id, None,interval=2)
                     StMG.end_game(acct)
-
             elif re.search(r"(ヒントでピント)[：:]", content):
                 if g_vis == 'direct':
                     word = re.search(r"(ヒントでピント)[：:](.+)", str(content)).group(2)
@@ -1065,7 +1070,7 @@ def th_worker():
                         SM.update(acct, 'func')
             elif  '翻訳して' in spoiler_text:
                 fav_now(id)
-                toot_now = kiri_util.kiri_trans_ｊａ２en(content)
+                toot_now = kiri_util.kiri_trans_ja2en(content)
                 if re.search(r"[^:]@|^@", toot_now):
                     pass
                 else:
@@ -1143,8 +1148,8 @@ def th_worker():
 
             stm = CM.get_coolingtime()
             print('worker sleep :%fs'%stm )
-            # sleep(stm*1.5 + 5)
-            sleep(1)
+            sleep(stm)
+            # sleep(1)
         except Exception:
             kiri_util.error_log()
 
@@ -1345,10 +1350,13 @@ def th_hint_de_pinto():
                 break
 
             loop += 1
+            loop_cnt.append(loop)
             if loop == 1:
                 hint_text = "○"*len(term)
             elif len(term) > loop - 1:
                 hint_text = term[0:loop-1] + "○"*(len(term) - (loop-1))
+
+
 
         sleep(5)
         media_files = []
@@ -1371,19 +1379,24 @@ def th_hint_de_pinto():
 
         HintPinto_flg.append('ON')
         break_flg = []
+        loop_cnt = []
         th = threading.Thread(target=th_shududai, args=(g_acct,g_id,term))
         th.start()
         while True:
             tmp_list = HintPinto_ansQ.get()
             acct, id, ans = tmp_list[0], tmp_list[1], tmp_list[2]
             print('ans=',ans)
-            if g_acct != acct and term in ans:
-                toot(':@{0}: 正解〜！'.format(acct), g_vis='private', rep=None, spo=None)
-                SM.update(acct, 'getnum', score=50)
-                SM.update(g_acct, 'getnum', score=25)
-                break_flg.append('ON')
-                break
             if not th.is_alive():
+                break
+            if g_acct != acct and term in ans:
+                loop = len(loop_cnt)
+                score = 96//(2**loop)
+                toot(':@{0}: 正解〜！'.format(acct), g_vis='private', rep=None, spo=None)
+                SM.update(acct, 'getnum', score=score//1)
+                SM.update(g_acct, 'getnum', score=score//2)
+                break_flg.append('ON')
+                toot('正解者には{0}点、出題者には{1}点入るよー！'.format(score//1, score//2), g_vis='private', rep=None, spo=None, interval=8)
+
                 break
 
         th.join()
@@ -1411,7 +1424,7 @@ def th_gettingnum():
 
             #アクティブ人数確認
             i = DAO.get_gamenum()
-            if  i <= 5:
+            if  i <= 10:
                 sleep(3)
                 toot('@%s\n人少ないからまた後でねー！'%g_acct, 'unlisted', g_id, None)
                 sleep(27)
@@ -1423,10 +1436,8 @@ def th_gettingnum():
             gm = kiri_game.GettingNum(gamenum)
             gameTM.reset()
             gameTM.start()
-            toot('🔸1〜%dの中から一番大きい数を取った人が勝ちだよー！\
+            toot('🔸1〜%dの中から誰とも被らない最大の整数に投票した人が勝ちだよー！\
                     \n🔸きりぼっとにメンション（ＤＭ可）で投票してね！\
-                    \n🔸ただし、他の人と被ったら失格！\
-                    \n🔸他の人と被らない最大の数を取った「一人」だけが勝ち！\
                     \n🔸制限時間は%d分だよー！はじめ！！\n#数取りゲーム #きりぼっと'%(gamenum,int(gameTM.check()/60)), 'public', None, '💸数取りゲーム（ミニ）始まるよー！🎮')
             try:
                 #残り１分処理
