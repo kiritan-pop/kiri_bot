@@ -43,9 +43,9 @@ class Siritori_game():
         self.zumi = []
         self.sdict = {}
         self.lv = random.randint(1,50)
-        if self.lv >= 40:
-            self.lv = random.randint(40,60)
-        for k,v in random.sample(self.MG.wdict.items(),len(self.MG.wdict)//(65-self.lv)):
+        if self.lv >= 45:
+            self.lv = random.randint(45,60)
+        for k,v in random.sample(self.MG.wdict.items(),len(self.MG.wdict)//(21-self.lv//5)):
             self.sdict[k] = v
         del_key = []
         for k,v in self.sdict.items():
@@ -150,6 +150,93 @@ class Siritori_manager():
             return False
 
 
+class Jinro_Manager():
+    def __init__(self):
+        self.accts = {}
+        self.turncnt = 0
+
+    def set_game(self,acct_list):
+        for acct in acct_list:
+            self.accts[acct] = {}
+
+
+class Friends_nico_slot():
+    def __init__(self,acct,o_accts,rate=1):
+        self.ot_base_rate = [0,0,0,10,50,100]
+        self.ac_base_rate = [0,0,0,50,250,1000]
+        self.acct = acct
+        self.rate = rate
+        #リール作成
+        self.reels = []
+        temp = []
+        for a in o_accts:
+            # temp.append(a)
+            temp.append(':@%s:'%a)
+        temp2 = []
+        for a in temp:
+            temp2.extend([a for _ in range(6)])
+        temp2.extend([ ':@'+acct+':' for _ in range(3)])
+        for i in range(5):
+            random.shuffle(temp2)
+            self.reels.append(temp2)
+
+    def start(self):
+        cols = [[] for _ in range(5)]
+        rows = [[] for _ in range(3)]
+        #リール回転
+        for i in range(5):
+            sel = random.randrange(0,len(self.reels[i]))
+            if sel == 0:
+                sel_u = len(self.reels[i])-1
+            else:
+                sel_u = sel - 1
+            if sel == len(self.reels[i])-1:
+                sel_r = 0
+            else:
+                sel_r = sel + 1
+
+            cols[i] = [self.reels[i][sel_u],self.reels[i][sel],self.reels[i][sel_r]]
+
+        for i in range(3):
+            for j in range(5):
+                rows[i].append(cols[j][i])
+
+        #当たり判定
+        cnt_list = []
+        hit_acct_list = []
+        for i in range(3):
+            cnt = 1
+            hit_acct = ''
+            for j in range(4):
+                if rows[i][j] == rows[i][j+1]:
+                    cnt += 1
+                    hit_acct = rows[i][j]
+                else:
+                    if cnt < 3:
+                        cnt = 1
+                        hit_acct = ''
+                    else:
+                        break
+
+            if cnt > 2:
+                cnt_list.append(cnt)
+                hit_acct_list.append(hit_acct)
+
+        #得点カウント
+        score = 0
+        for c,ac in zip(cnt_list,hit_acct_list):
+            if ac == ':@'+self.acct+':' :
+                score += self.ac_base_rate[c]*self.rate
+            else:
+                score += self.ot_base_rate[c]*self.rate
+
+        if len(cnt_list) > 0:
+            if max(cnt_list) == 4:
+                print(cnt_list,hit_acct_list,score)
+                for l in rows:
+                    print(l)
+        return rows,score
+
 """
 class Hunting():
     def __init__(self):
@@ -158,4 +245,21 @@ class Hunting():
     def update_user_status(self):
 
 """
-#if __name__ == '__main__':
+if __name__ == '__main__':
+    g = Friends_nico_slot('kiritan',['yesdotsam', 'JC','rept', 'Thiele','aaa','bbb'],1)
+    # print(g.reels)
+    # print(len(g.reels[0]))
+    # print(len(g.reels[1]))
+    # print(len(g.reels[2]))
+
+    game_cnt = 100000
+    score_sum = 0
+    for i in range(game_cnt):
+        rows,score = g.start()
+        score_sum += score
+    print(score_sum,(score_sum)/game_cnt/3)
+
+    # rows,score = g.start()
+    # for l in rows:
+    #     print(l)
+    # print(score)

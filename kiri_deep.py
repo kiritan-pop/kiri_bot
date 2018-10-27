@@ -16,7 +16,7 @@ from PIL import Image, ImageOps, ImageFile, ImageChops, ImageFilter, ImageEnhanc
 import cv2
 import tensorflow as tf
 config = tf.ConfigProto(device_count={"GPU":1},
-                        gpu_options=tf.GPUOptions(allow_growth=False, visible_device_list="3"))
+                        gpu_options=tf.GPUOptions(allow_growth=False, visible_device_list="1"))
 session = tf.Session(config=config)
 # tensorflow_backend.set_session(session)
 backend.set_session(session)
@@ -28,7 +28,7 @@ for label,i in labels_index.items():
     labels[i] = label
 
 STANDARD_SIZE = (299, 299)
-STANDARD_SIZE2 = (512, 512)
+# STANDARD_SIZE = (512, 512)
 Colors = {}
 Colors['red'] = [1,0,0,0,0,0,0,0,0]
 Colors['blue'] = [0,1,0,0,0,0,0,0,0]
@@ -41,12 +41,13 @@ Colors['white'] = [0,0,0,0,0,0,0,1,0]
 Colors['black'] = [0,0,0,0,0,0,0,0,1]
 
 #いろいろなパラメータ
-maxlen = 15           #モデルに合わせて！
+maxlen = 50           #モデルに合わせて！
 diver = 0.55         #ダイバーシティ：大きくすると想起の幅が大きくなるっぽいー！
 pat3 = re.compile(r'^\n')
 pat4 = re.compile(r'\n')
-adaptr = ['だから','それで','しかし','けど','また','さらに',\
-        'つまり','さて','そして','で','でね','そんで','でも','ところで','まあ','なるほど','']
+# adaptr = ['だから','それで','しかし','けど','また','さらに',\
+#         'つまり','さて','そして','で','でね','そんで','でも','ところで','まあ','なるほど','']
+adaptr = ['📣']
 #辞書読み込み
 wl_chars = list(open('dic/wl.txt').read())
 wl_chars.append(r'\n')
@@ -54,20 +55,18 @@ wl_chars.sort()
 char_indices = dict((c, i) for i, c in enumerate(wl_chars))
 indices_char = dict((i, c) for i, c in enumerate(wl_chars))
 
-model_path = 'db/lstm_toot_v3.h5w'
-# model = load_model(model_path)
-model = lstm_model(maxlen, wl_chars)
-# model.load_weights(model_path, by_name=False)
+model_path = 'db/lstm_toot_v4.h5'
+model = load_model(model_path)
+# model = lstm_model(maxlen, wl_chars)
+# model.load_weights(model_path + 'w', by_name=False)
 
-takomodel_path = 'db/cnn_v13.h5'
+takomodel_path = 'db/cnn_v1.h5'
 takomodel = load_model(takomodel_path)
 # takomodel = cnn_model(labels)
-# takomodel.load_weights(takomodel_path, by_name=False)
+# takomodel.load_weights(takomodel_path + 'w', by_name=False)
 
 
 graph = tf.get_default_graph()
-
-# takomodel.save_weights(takomodel_path+'w')
 
 
 def sample(preds, temperature=1.2):
@@ -92,6 +91,8 @@ def lstm_gentxt(text,num=0,sel_model=None):
     rnd = random.choice(adaptr)
     if rnd == '':
         tmp += '\n'
+    elif rnd == '📣':
+        tmp += '\n' + rnd
     else:
         tmp += '\n' + rnd + '、'
 
@@ -101,7 +102,7 @@ def lstm_gentxt(text,num=0,sel_model=None):
         sentence = tmp * maxlen
         sentence = sentence[-maxlen:]
 
-    rnd = random.uniform(0.2,0.8)
+    rnd = random.uniform(0.1,0.6)
     print('seed text=%s %f' %(sentence,rnd))
     if num == 0:
         vol = random.randint(1,5)
@@ -116,7 +117,7 @@ def lstm_gentxt(text,num=0,sel_model=None):
                 #print('error:char=',t,char)
                 pass
         with graph.as_default():
-            model.load_weights(model_path, by_name=False)
+            model.load_weights(model_path + 'w', by_name=False)
             preds = model.predict(x_pred, verbose=0)[0]
         next_index = sample(preds, rnd)
         next_char = indices_char[next_index]
@@ -130,23 +131,24 @@ def lstm_gentxt(text,num=0,sel_model=None):
     rtn_text = generated
     rtn_text = re.sub(r'。{2,}','。',rtn_text, flags=(re.MULTILINE | re.DOTALL))
     rtn_text = re.sub(r'^[。、\n]','',rtn_text, flags=(re.MULTILINE | re.DOTALL))
+    rtn_text = re.sub(r'📣','',rtn_text, flags=(re.MULTILINE | re.DOTALL))
     return rtn_text
 
 def takoramen(filepath):
     extention = filepath.rsplit('.',1)[-1]
     print(filepath,extention)
     if extention in ['png','jpg','jpeg','gif']:
-        image = np.asarray(Image.open(filepath).convert('RGB').resize(STANDARD_SIZE2) )
+        image = np.asarray(Image.open(filepath).convert('RGB').resize(STANDARD_SIZE) )
     elif extention in ['mp4','webm']:
         cap = cv2.VideoCapture(filepath)
         _, image = cap.read()
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        image = np.asarray(Image.fromarray(image).resize(STANDARD_SIZE2))
+        image = np.asarray(Image.fromarray(image).resize(STANDARD_SIZE))
     else:
         return 'other'
 
     with graph.as_default():
-        # takomodel.load_weights(takomodel_path, by_name=False)
+        # takomodel.load_weights(takomodel_path + 'w', by_name=False)
         result = takomodel.predict(np.array([image/255.0]))
 
     rslt_dict = {}
@@ -158,7 +160,7 @@ def takoramen(filepath):
 
     with open('image.log','a') as f:
         f.write("*** image:" + filepath.split('/')[-1] +  "  *** result:%s\n"%str(rslt_dict))
-    if max(result[0]) > 0.85:
+    if max(result[0]) > 0.93:
         # return labels[np.where(result[0] == max(result[0]) )[0][0]]
         return labels[np.argmax(result[0])]
     else:

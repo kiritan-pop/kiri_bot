@@ -220,9 +220,12 @@ class ScoreManager():
         con.commit()
         con.close()
 
-    def show(self):
+    def show(self,acct=None):
         con = sqlite3.connect(self.DB_PATH)
-        rows = con.execute('select * from scoremanager')
+        if acct == None:
+            rows = con.execute('select * from scoremanager')
+        else:
+            rows = con.execute('select * from scoremanager where acct=?',(acct,))
         return rows.fetchall()
         con.close()
 
@@ -384,11 +387,11 @@ class DAO_statuses():
 
     #######################################################
     # 陣形用５人ピックアップ
-    def get_five(self, num=5):
+    def get_five(self, num=5,minutes=30):
         #過去n分のアクティブユーザ数をベース
         jst_now = datetime.now(timezone('Asia/Tokyo'))
         ymd = int(jst_now.strftime("%Y%m%d"))
-        hh0000 = int((jst_now - timedelta(minutes=30)).strftime("%H%M%S"))
+        hh0000 = int((jst_now - timedelta(minutes=minutes)).strftime("%H%M%S"))
         hh9999 = int(jst_now.strftime("%H%M%S"))
         if hh0000 > hh9999:
             hh0000 = 0
@@ -707,19 +710,20 @@ if __name__ == '__main__':
     # for i,(acct,content) in enumerate(rows):
     #     print(i+1,acct,content)
 
-    sm = ScoreManager()
-    # sm.update(acct='kiritan',key='getnum',i_datetime=None,score=-3273)
-    score = {}
+    # sm = ScoreManager()
+    # # sm.update(acct='kiritan',key='getnum',i_datetime=None,score=-3273)
+    # score = {}
+    #
+    # for row in sm.show():
+    #     # score[row[0]] = (row[2] , row[4] , row[6] , row[7])
+    #     # score[row[0]] = row[2] + row[4] + row[6] + row[7]
+    #     score[row[0]] = row[1]
+    #
+    # for i,row in enumerate( sorted(score.items(), key=lambda x: -x[1])):
+    #     print("%2d位:@%s: %d"%(i+1,row[0],row[1]))
+    #     if i > 100:
+    #         break
 
-    for row in sm.show():
-        # score[row[0]] = (row[2] , row[4] , row[6] , row[7])
-        # score[row[0]] = row[2] + row[4] + row[6] + row[7]
-        score[row[0]] = row[1]
-
-    for i,row in enumerate( sorted(score.items(), key=lambda x: -x[1])):
-        print("%2d位:@%s: %d"%(i+1,row[0],row[1]))
-        if i > 100:
-            break
     #
     #
     # images = []
@@ -742,3 +746,6 @@ if __name__ == '__main__':
     #         print(t1)
     #         t2 = kiri_trans_en2ja(t1)
     #         print(t2)
+
+    sm = ScoreManager()
+    print(sm.show('kiritan'))
