@@ -9,16 +9,17 @@ wl_chars = set(open('wl.txt').read())
 # wl_chars = set(open('../dic/wl.txt').read())
 #NGワード
 ng_words = set(word.strip() for word in open('../.ng_words').readlines())
-ng_words2 = set(['日本酒','friends','時報','toots','スク水','何の日','セカンダリー'])
+ng_words2 = set(['日本酒','friends','時報','震度','toots','スク水','何の日','セカンダリー','お前','サイレンス','ブロック'])
 ng_words = ng_words | ng_words2
-aisatsu_words = set(['おや','おは','こん','おか','やっほ','てら','ただいま','おにい'])
+aisatsu_words = set(['おや','おは','こん','おか','やっほ','てら','ただいま','おにい','その','時間','この','それ'])
+pat1 = re.compile(r'《.*》|\||｜|［.*］|\[.*\]|^.\n')
 pat3 = re.compile(r'^\n')
 pat4 = re.compile(r'^.\n')
 pat5 = re.compile(r'([。、…])\1+')
 pat6 = re.compile(r'(.)\1{4,}')
-WORKERS = 4
+WORKERS = 3
 timeout = 5
-BUF_LINES = 10000
+BUF_LINES = 50000
 EOF_SW = False
 NRM_SW = []
 un_func = unicodedata.normalize
@@ -32,9 +33,10 @@ def normalize(num,readQ,writeQ):
             outs = []
             for line in lines:
                 try:
-                    line = re.sub(r'《.*》|\||｜|［.*］|\[.*\]|^.\n','',line)
+                    line = pat1.sub('',line)
                     for ng_word in ng_words:
-                        if ng_word in line:
+                        # if ng_word in line:
+                        if re.search(ng_word, line):
                             raise Exception
                     #挨拶が多い傾向なので、ｎ分の１にする
                     for word in aisatsu_words:

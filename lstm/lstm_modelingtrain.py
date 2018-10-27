@@ -19,7 +19,7 @@ import tensorflow as tf
 graph = tf.get_default_graph()
 
 #変更するとモデル再構築必要
-maxlen = 25
+maxlen = 50
 # GPUs = 1
 
 #いろいろなパラメータ
@@ -30,13 +30,13 @@ process_count = multiprocessing.cpu_count() - 1
 def lstm_model(maxlen, wl_chars):
     model = Sequential()
     # model.add(CuDNNLSTM(512, input_shape=(maxlen, len(wl_chars)), return_sequences=True, return_state=True, stateful=True))
-    model.add(CuDNNLSTM(512, return_sequences=True, input_shape=(maxlen, len(wl_chars))))
+    model.add(CuDNNLSTM(1024, return_sequences=True, input_shape=(maxlen, len(wl_chars))))
+    model.add(Dropout(0.2))
+    model.add(CuDNNLSTM(256, return_sequences=True))
     model.add(Dropout(0.2))
     model.add(CuDNNLSTM(128, return_sequences=True))
     model.add(Dropout(0.2))
-    model.add(CuDNNLSTM(64, return_sequences=True))
-    model.add(Dropout(0.2))
-    model.add(CuDNNLSTM(32))
+    model.add(CuDNNLSTM(64))
     model.add(Dropout(0.2))
     model.add(Dense(len(wl_chars), activation='softmax'))
     return model

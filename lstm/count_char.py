@@ -21,7 +21,7 @@ def main():
     tmp = list(sorted_dict.keys())
     print(tmp)
     with open('wl.txt','w') as fw:
-        fw.write("".join(tmp[0:2048]))
+        fw.write("".join(tmp[0:1000]))
 
 if __name__ == '__main__':
     main()
