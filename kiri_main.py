@@ -143,7 +143,11 @@ class public_listener(StreamListener):
 #######################################################
 # トゥート処理
 def toot(toot_now, g_vis='direct', rep=None, spo=None, media_ids=None, interval=0):
-    PostQ.put((exe_toot,(toot_now,g_vis, rep, spo, media_ids, interval)))
+    def qput(toot_now, g_vis, rep, spo, media_ids):
+        PostQ.put((exe_toot,(toot_now, g_vis, rep, spo, media_ids)))
+
+    th = threading.Timer(interval=interval,function=qput,args=(toot_now, g_vis, rep, spo, media_ids))
+    th.start()
 
 def exe_toot(toot_now, g_vis='direct', rep=None, spo=None, media_ids=None, interval=0):
     if rep != None:
