@@ -780,15 +780,16 @@ def worker(status):
         reel_num += min([2,acct_score // 10000])
         #貪欲補正
         slot_bal.append(acct)
-        if len(slot_bal) > 20:
+        if len(slot_bal) > 100:
             slot_bal.pop(0)
-        reel_num += min([5,sum([1 for x in slot_bal if x==acct])]) - 3
+        reel_num += min([max([19,sum([1 for x in slot_bal if x==acct])-1])//20 - 1, 2])
         #得点消費
-        SM.update(acct, 'getnum', score=- int( slot_rate*3))
+        SM.update(acct, 'getnum', score=- int(slot_rate*3))
         #スロット回転
         slot_accts = DAO.get_five(num=reel_num,minutes=120)
         slotgame = kiri_game.Friends_nico_slot(acct,slot_accts,slot_rate)
         slot_rows,slot_score = slotgame.start()
+        print(' '*20 + 'acct=%s reel_num=%d'%(acct,reel_num))
         sl_txt = ''
         for row in slot_rows:
             for c in row:
