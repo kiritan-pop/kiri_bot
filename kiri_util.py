@@ -104,7 +104,7 @@ def scheduler(func,hhmm_list):
         try:
             #時刻指定時の処理
             jst_now = datetime.now(timezone('Asia/Tokyo'))
-            hh_now = jst_now.strftime("%M")
+            hh_now = jst_now.strftime("%H")
             mm_now = jst_now.strftime("%M")
             for hhmm in hhmm_list:
                 if len(hhmm.split(":")) == 2:
