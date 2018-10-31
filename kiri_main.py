@@ -239,14 +239,14 @@ def vote_check(status):
                 twocnt = content.count('トゥ')
                 GetNumVoteQ.put([acct, id, int(101 - twocnt)])
             else:
-                toot('@%s\n₍₍ ◝(◍•ᴗ•◍)◟⁾⁾今は数取りゲームしてないよ〜'%acct, g_vis='unlisted', rep=id, interval=3)
+                toot('@%s\n₍₍ ◝(◍•ᴗ•◍)◟⁾⁾今は数取りゲームしてないよ〜'%acct, g_vis='unlisted', rep=id)
         else:
             if len(GetNum_flg) > 0:
                 if content.strip().isdigit():
                     GetNumVoteQ.put([acct,id,int(content.strip())])
             else:
                 if content.strip().isdigit():
-                    toot('@%s\n₍₍ ◝(◍•ᴗ•◍)◟⁾⁾今は数取りゲームしてないよ〜'%acct, g_vis='unlisted', rep=id, interval=3)
+                    toot('@%s\n₍₍ ◝(◍•ᴗ•◍)◟⁾⁾今は数取りゲームしてないよ〜'%acct, g_vis='unlisted', rep=id)
 
 #######################################################
 # ヒントでピント回答受付チェック
@@ -330,7 +330,7 @@ def ana_image(media_attachments,sensitive,acct,g_vis,id,content):
         elif result == '宇治松千夜':
             toot_now += 'こころぴょんぴょん！'
         elif result == 'る':
-            toot_now += '■■■だー！'
+            toot_now += 'インド人？'
         elif result == 'スクショ':
             if random.randint(0,4) == 0:
                 toot_now += '📷スクショパシャパシャ！'
@@ -416,8 +416,8 @@ def worker(status):
     acct = status["account"]["acct"]
     username = "@" +  acct
     g_vis = status["visibility"]
-    if len(kiri_util.hashtag(status['content'])) > 0:
-        return
+    # if len(kiri_util.hashtag(status['content'])) > 0:
+    #     return
     content = kiri_util.content_cleanser(status['content'])
     if status['application'] == None:
         application = ''
@@ -670,7 +670,7 @@ def worker(status):
         if rnd <= 6:
             toot_now = 'えっ'
             id_now = None
-    elif re.search(r"マストドン閉じろ", content):
+    elif "マストドン閉じろ" in content:
         toot_now = 'はい'
         id_now = None
         interval = random.uniform(0.01,0.7)
@@ -758,6 +758,7 @@ def worker(status):
             StMG.end_game(acct)
     elif re.search(r"[!！]スロット", content) and g_vis == 'direct':
         fav_now(id)
+        reelsize = 5
         if re.search(r"100", content):
             slot_rate = 100
             reel_num = 6
@@ -769,7 +770,7 @@ def worker(status):
             reel_num = 4
         else:
             slot_rate = 1
-            reel_num = 5
+            reel_num = 4
 
         #所持金チェック
         acct_score = SM.show(acct)[0][1]
@@ -777,19 +778,23 @@ def worker(status):
             toot('@%s 得点足りないよー！（所持：%d点／必要：%d点）\nレートを下げるかスロットミニか、他のゲームで稼いでねー！'%(acct,acct_score,slot_rate*3), 'direct', rep=id,interval=a)
             return
         #得点補正
-        reel_num += min([2,acct_score // 10000])
+        reel_num += min([2,(acct_score // 10000) - 1])
         #貪欲補正
         slot_bal.append(acct)
         if len(slot_bal) > 100:
             slot_bal.pop(0)
-        reel_num += min([max([19,sum([1 for x in slot_bal if x==acct])-1])//20 - 1, 2])
+        reelsize += min([max([9,sum([1 for x in slot_bal if x==acct])-1])//10 - 1, 5])
+        #乱数補正
+        reel_num += random.randint(-1,1)
+        reelsize += random.randint(-1,1)
+        reel_num = min([7,max([4,reel_num])])
         #得点消費
         SM.update(acct, 'getnum', score=- int(slot_rate*3))
         #スロット回転
         slot_accts = DAO.get_five(num=reel_num,minutes=120)
-        slotgame = kiri_game.Friends_nico_slot(acct,slot_accts,slot_rate)
+        slotgame = kiri_game.Friends_nico_slot(acct,slot_accts,slot_rate,reelsize)
         slot_rows,slot_score = slotgame.start()
-        print(' '*20 + 'acct=%s reel_num=%d'%(acct,reel_num))
+        print(' '*20 + 'acct=%s reel_num=%d reelsize=%d'%(acct,reel_num,reelsize))
         sl_txt = ''
         for row in slot_rows:
             for c in row:
@@ -915,14 +920,18 @@ def worker(status):
             return
         fav_now(id)
         toot_now = "@%s\n"%acct
-        toot_now += kiri_deep.lstm_gentxt("📣"+content,num=1)
+        seeds = DAO.get_least_10toots(acct)
+        seedtxt = "📣\n".join(seeds) + "📣\n"
+        toot_now += kiri_deep.lstm_gentxt(seedtxt,num=1)
         toot(toot_now, g_vis, id, None,interval=a)
     elif re.search(r"(きり|キリ).*(ぼっと|ボット|[bB][oO][tT])|[きキ][りリ][ぼボ]", content + spoiler_text):
-        fav_now(id)
         if random.randint(0,10+a) > 9:
             return
+        fav_now(id)
         toot_now = "@%s\n"%acct
-        toot_now += kiri_deep.lstm_gentxt("📣"+content,num=1)
+        seeds = DAO.get_least_10toots(acct)
+        seedtxt = "📣\n".join(seeds) + "📣\n"
+        toot_now += kiri_deep.lstm_gentxt(seedtxt,num=1)
         toot(toot_now, g_vis, id, None,interval=a)
         SM.update(acct, 'reply')
 
@@ -1114,6 +1123,8 @@ def th_worker():
         except Exception as e:
             print(e)
             kiri_util.error_log()
+            # sleep(30)
+            # th_worker()
 
 #######################################################
 # 定期ものまねさーびす！
@@ -1222,13 +1233,13 @@ def lstm_tooter():
     #print('seeds',seeds)
     if len(seeds) <= 2:
         return
-    seedtxt = "📣" + "\n📣".join(seeds)
+    seedtxt = "📣\n".join(seeds) + "📣\n"
     spoiler = None
 
     gen_txt = kiri_deep.lstm_gentxt(seedtxt,num=1)
     if gen_txt[0:1] == '。':
         gen_txt = gen_txt[1:]
-    if len(gen_txt) > 40:
+    if len(gen_txt) > 60:
         spoiler = ':@%s: 💭'%BOT_ID
 
     toot(gen_txt, "public", None, spoiler)
@@ -1256,7 +1267,8 @@ def th_delete():
         except Exception as e:
             print(e)
             kiri_util.error_log()
-
+            # sleep(30)
+            # th_delete()
 
 #######################################################
 # ヒントでピントゲーム
@@ -1358,7 +1370,7 @@ def th_hint_de_pinto():
 def th_gettingnum():
     gamenum = 100
     junbiTM = kiri_util.KiriTimer(60*60)
-    junbiTM.reset(5*60)
+    junbiTM.reset(30*60)
     junbiTM.start()
     gameTM = kiri_util.KiriTimer(240)
     while True:
@@ -1410,7 +1422,7 @@ def th_gettingnum():
             junbiTM.reset()
             junbiTM.start()
             results = gm.get_results()
-            if len(results) <= 0:
+            if sum( list(map(len,results.values())) ) <= 0:
                 toot('(ง •̀ω•́)ง✧数取りゲーム、０人だったよー！\n#数取りゲーム #きりぼっと', 'public', None, None)
             else:
                 toot_now = ''
@@ -1439,8 +1451,8 @@ def th_gettingnum():
 #######################################################
 # トゥートをいろいろ
 def th_saver():
-    try:
-        while True:
+    while True:
+        try:
             status = StatusQ.get()
             # 業務連絡
             business_contact(status)
@@ -1452,11 +1464,9 @@ def th_saver():
                 #StatusQ.put(status)
                 print(e)
                 kiri_util.error_log()
-    except Exception as e:
-        print(e)
-        kiri_util.error_log()
-        # sleep(30)
-        # th_saver()
+        except Exception as e:
+            print(e)
+            kiri_util.error_log()
 
 #######################################################
 # ローカルタイムライン監視スレッド
@@ -1467,8 +1477,8 @@ def t_local():
     except Exception as e:
         print(e)
         kiri_util.error_log()
-        # sleep(30)
-        # t_local()
+        sleep(30)
+        t_local()
 
 #######################################################
 # ローカルタイムライン監視スレッド（認証なし）
@@ -1478,8 +1488,8 @@ def t_sub():
     except Exception as e:
         print(e)
         kiri_util.error_log()
-        # sleep(30)
-        # t_sub()
+        sleep(30)
+        t_sub()
 
 #######################################################
 # ホームタイムライン監視スレッド
@@ -1489,8 +1499,8 @@ def t_user():
     except Exception as e:
         print(e)
         kiri_util.error_log()
-        # sleep(30)
-        # t_user()
+        sleep(30)
+        t_user()
 
 #######################################################
 # randomニコルくん
@@ -1548,14 +1558,16 @@ def th_follow_mente():
 #######################################################
 # post用worker
 def th_post():
-    try:
-        while True:
+    while True:
+        try:
             func,args = PostQ.get()
             func(*args)
             sleep(1.5)
-    except Exception as e:
-        print(e)
-        kiri_util.error_log()
+        except Exception as e:
+            print(e)
+            kiri_util.error_log()
+            # sleep(10)
+            # th_post()
 
 #######################################################
 # メイン

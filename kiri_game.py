@@ -161,7 +161,7 @@ class Jinro_Manager():
 
 
 class Friends_nico_slot():
-    def __init__(self,acct,o_accts,rate=1):
+    def __init__(self,acct,o_accts,rate=1,reelsize=6):
         self.ot_base_rate = [0,0,0,10,50,100]
         self.ac_base_rate = [0,0,0,50,250,1000]
         self.acct = acct
@@ -174,7 +174,7 @@ class Friends_nico_slot():
             temp.append(':@%s:'%a)
         temp2 = []
         for a in temp:
-            temp2.extend([a for _ in range(6)])
+            temp2.extend([a for _ in range(reelsize)])
         temp2.extend([ ':@'+acct+':' for _ in range(3)])
         for i in range(5):
             random.shuffle(temp2)
@@ -230,12 +230,12 @@ class Friends_nico_slot():
             else:
                 score += self.ot_base_rate[c]*self.rate
 
-        if len(cnt_list) > 0:
-            if max(cnt_list) == 4:
-                print(cnt_list,hit_acct_list,score)
-                for l in rows:
-                    print(l)
-        return rows,score
+        # if len(cnt_list) > 0:
+        #     if max(cnt_list) == 4:
+        #         print(cnt_list,hit_acct_list,score)
+        #         for l in rows:
+        #             print(l)
+        return rows,int(score)
 
 """
 class Hunting():
@@ -246,7 +246,7 @@ class Hunting():
 
 """
 if __name__ == '__main__':
-    g = Friends_nico_slot('kiritan',['yesdotsam', 'JC','rept', 'Thiele','aaa','bbb'],1)
+    g = Friends_nico_slot('kiritan',['yesdotsam', 'JC','rept', 'Thiele','aaa'],1,4) #,'aaa','bbb','ccc','ddd'
     # print(g.reels)
     # print(len(g.reels[0]))
     # print(len(g.reels[1]))
@@ -256,6 +256,8 @@ if __name__ == '__main__':
     score_sum = 0
     for i in range(game_cnt):
         rows,score = g.start()
+        # if score > 0:
+        #     print(score)
         score_sum += score
     print(score_sum,(score_sum)/game_cnt/3)
 

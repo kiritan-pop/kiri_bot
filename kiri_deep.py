@@ -16,9 +16,8 @@ from PIL import Image, ImageOps, ImageFile, ImageChops, ImageFilter, ImageEnhanc
 import cv2
 import tensorflow as tf
 config = tf.ConfigProto(device_count={"GPU":1},
-                        gpu_options=tf.GPUOptions(allow_growth=False, visible_device_list="1"))
+                        gpu_options=tf.GPUOptions(allow_growth=False, visible_device_list="3"))
 session = tf.Session(config=config)
-# tensorflow_backend.set_session(session)
 backend.set_session(session)
 
 labels = {}
@@ -55,7 +54,7 @@ wl_chars.sort()
 char_indices = dict((c, i) for i, c in enumerate(wl_chars))
 indices_char = dict((i, c) for i, c in enumerate(wl_chars))
 
-model_path = 'db/lstm_toot_v4.h5'
+model_path = 'db/lstm_toot_v7.h5'
 model = load_model(model_path)
 # model = lstm_model(maxlen, wl_chars)
 # model.load_weights(model_path + 'w', by_name=False)
@@ -81,20 +80,20 @@ def sample(preds, temperature=1.2):
 def lstm_gentxt(text,num=0,sel_model=None):
     generated = ''
 
-    tmp = text.strip()
-    if len(tmp) > maxlen:
-        tmp = tmp[-maxlen:]
-    else:
-        tmp = tmp * maxlen
-        tmp = tmp[-maxlen:]
+    tmp = text  #.strip()
+    # if len(tmp) > maxlen:
+    #     tmp = tmp[-maxlen:]
+    # else:
+    #     tmp = tmp * maxlen
+    #     tmp = tmp[-maxlen:]
 
-    rnd = random.choice(adaptr)
-    if rnd == '':
-        tmp += '\n'
-    elif rnd == '📣':
-        tmp += '\n' + rnd
-    else:
-        tmp += '\n' + rnd + '、'
+    # rnd = random.choice(adaptr)
+    # if rnd == '':
+    #     tmp += '\n'
+    # elif rnd == '📣':
+    #     tmp += '\n' + rnd
+    # else:
+    #     tmp += '\n' + rnd + '、'
 
     if len(tmp) > maxlen:
         sentence = tmp[-maxlen:]

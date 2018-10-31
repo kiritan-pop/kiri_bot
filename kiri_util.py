@@ -335,19 +335,24 @@ class DAO_statuses():
 
     #######################################################
     # 直近１０トゥートを返す
-    def get_least_10toots(self):
+    def get_least_10toots(self,acct=None,limit=10):
         seeds = []
         con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 6*1000)
         c = con.cursor()
-        sql = r"select content from statuses order by id desc"
-        for row in c.execute(sql):
+        if acct == None:
+            sql = r"select content from statuses order by id desc"
+            exe = c.execute(sql)
+        else:
+            sql = r"select content from statuses where acct=? order by id desc"
+            exe = c.execute(sql,[acct])
+        for row in exe:
             content = content_cleanser(row[0])
             #print('get_least_10toots content=',content)
             if len(content) == 0:
                 continue
             else:
                 seeds.append(content)
-                if len(seeds)>10:
+                if len(seeds)>limit:
                     break
         con.close()
         seeds.reverse()
