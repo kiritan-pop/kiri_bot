@@ -96,35 +96,44 @@ def content_cleanser(content):
 
 #######################################################
 # スケジューラー！
-def scheduler(func,mms=None,intvl=60,rndmin=0,rndmax=0,CM=None):
+def scheduler(func,hhmm_list):
     #func:起動する処理
-    #mm:起動時刻（分）
+    #hhmm_list:起動時刻
+    while True:
+        sleep(10)
+        try:
+            #時刻指定時の処理
+            jst_now = datetime.now(timezone('Asia/Tokyo'))
+            hh_now = jst_now.strftime("%M")
+            mm_now = jst_now.strftime("%M")
+            for hhmm in hhmm_list:
+                if len(hhmm.split(":")) == 2:
+                    hh,mm = hhmm.split(":")
+                    if (hh == hh_now or hh == '**') and mm == mm_now:
+                        func()
+                        sleep(60)
+        except Exception:
+            error_log()
+
+def scheduler_rnd(func,intvl=60,rndmin=0,rndmax=0,CM=None):
+    #func:起動する処理
     #intmm:起動間隔（分）
     while True:
-        sleep(5)
+        sleep(10)
         try:
-            #時刻指定がなければ、インターバル分＋流速考慮値
-            if mms == None:
-                if rndmin == 0 and rndmax == 0 or rndmin >= rndmax:
-                    rndmm = 0
-                else:
-                    rndmm = random.randint(rndmin,rndmax)
-                if CM==None:
-                    cmm = 0
-                else:
-                    cmm = int(CM.get_coolingtime())
-                a = (intvl+cmm+rndmm)*60
-                print('###%s###  start at : %ds'%(func,a))
-                sleep(a)
-                func()
+            #インターバル分＋流速考慮値
+            if rndmin == 0 and rndmax == 0 or rndmin >= rndmax:
+                rndmm = 0
             else:
-                #以降は時刻指定時の処理
-                jst_now = datetime.now(timezone('Asia/Tokyo'))
-                mm = jst_now.strftime("%M")
-                #print('###%s###  start at: **:%s'%(func,mms))
-                if mm in mms:
-                    func()
-                    sleep(60)
+                rndmm = random.randint(rndmin,rndmax)
+            if CM==None:
+                cmm = 0
+            else:
+                cmm = int(CM.get_coolingtime())
+            a = (intvl+cmm+rndmm)*60
+            print('###%s###  start at : %ds'%(func,a))
+            sleep(a)
+            func()
         except Exception:
             error_log()
 

@@ -1511,6 +1511,12 @@ def th_nicoru():
     toot('@%s '%MASTER_ID + gen_txt, "direct", None, None)
 
 #######################################################
+# にゃんタイム
+def nyan_time():
+    gen_txt = 'にゃんにゃんにゃんにゃん！\n₍₍(ฅ=˘꒳ ˘=)ฅ ⁾⁾ ₍₍ ฅ(=╹꒳ ╹=ฅ)⁾⁾'
+    toot(gen_txt, "public")
+
+#######################################################
 # フォロ外し
 def th_follow_mente():
     # print('🌠フォローフォロワー整理処理ーー！！')
@@ -1586,15 +1592,17 @@ def main():
     threads.append( threading.Thread(target=th_worker) )
     threads.append( threading.Thread(target=th_post) )
     #スケジュール起動系
-    # threads.append( threading.Thread(target=kiri_util.scheduler, args=(summarize_tooter,['02'])) )
-    threads.append( threading.Thread(target=kiri_util.scheduler, args=(bottlemail_sending,['05'])) )
-    # threads.append( threading.Thread(target=kiri_util.scheduler, args=(monomane_tooter,None,120,0,15,CM)) )
-    threads.append( threading.Thread(target=kiri_util.scheduler, args=(lstm_tooter,None,5,-3,2,CM)) )
-    # threads.append( threading.Thread(target=kiri_util.scheduler, args=(timer_bst1st,None,90,0,15,CM)) )
-    #threads.append( threading.Thread(target=kiri_util.scheduler, args=(th_nicoru,None,60,0,60,CM)) )
-    threads.append( threading.Thread(target=kiri_util.scheduler, args=(th_follow_mente,None,60*24)) )
-    # threads.append( threading.Thread(target=kiri_util.scheduler, args=(tangrkn_tooter,None,20,-10,10,CM)) )
-    threads.append( threading.Thread(target=kiri_util.scheduler, args=(jinkei_tooter,None,120,-10,10,CM)) )
+    # threads.append( threading.Thread(target=kiri_util.scheduler, args=(summarize_tooter,['**:02'])) )
+    threads.append( threading.Thread(target=kiri_util.scheduler, args=(bottlemail_sending,['**:05'])) )
+    threads.append( threading.Thread(target=kiri_util.scheduler, args=(th_follow_mente,['04:00'])) )
+    threads.append( threading.Thread(target=kiri_util.scheduler, args=(nyan_time,['22:22'])) )
+
+    # threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(monomane_tooter,120,0,15,CM)) )
+    threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(lstm_tooter,5,-3,2,CM)) )
+    # threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(timer_bst1st,90,0,15,CM)) )
+    #threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(th_nicoru,60,0,60,CM)) )
+    # threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(tangrkn_tooter,20,-10,10,CM)) )
+    threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(jinkei_tooter,120,-10,10,CM)) )
 
     for th in threads:
         th.start()
