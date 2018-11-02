@@ -18,7 +18,7 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 MASTER_ID = 'kiritan'
 BOT_ID = 'kiri_bot01'
-BOTS = [BOT_ID,'friends_booster','5','JC','12222222','bt']
+# BOTS = [BOT_ID,'friends_booster','5','JC','12222222','bt']
 DELAY = 2
 pat1 = re.compile(r' ([!-~ぁ-んァ-ン] )+|^([!-~ぁ-んァ-ン] )+| [!-~ぁ-んァ-ン]$',flags=re.MULTILINE)  #[!-~0-9a-zA-Zぁ-んァ-ン０-９ａ-ｚ]
 pat2 = re.compile(r'[ｗ！？!\?]')
@@ -57,6 +57,8 @@ HintPinto_ansQ = queue.Queue()
 HintPinto_flg = []
 
 slot_bal = []
+rep_cnt = []
+rentou = []
 
 # 花宅配サービス用の花リスト
 hanalist = []
@@ -228,7 +230,7 @@ def exe_follow(id):
 def vote_check(status):
     acct = status["account"]["acct"]
     id = status["id"]
-    if re.search(r'[^:]@kiri_bot01', status['content']):
+    if re.search(r'[^:]@%s'%BOT_ID, status['content']):
         if len(kiri_util.hashtag(status['content'])) > 0:
             return
         content = kiri_util.content_cleanser(status['content'])
@@ -436,17 +438,34 @@ def worker(status):
     if status['enquete'] != None:
         enquete = json.loads(status['enquete'])
 
+    rentou.append(acct)
+    if len(rentou) > 100:
+        rentou.pop(0)
+    tmpcnt = sum([1 for x in rentou if x==acct]) 
+    # 占有率50%超える人は異常なのでスルー
+    if tmpcnt/len(rentou) > 0.5:
+        return
+    a = int(CM.get_coolingtime())
+    rnd = random.randint(0,9+a+tmpcnt//5)
+    if acct == MASTER_ID:
+        rnd = 0
+
     #botはスルー
-    if  acct in BOTS:
-        #ももながbotの場合もスルー
+    botlist = set([tmp.strip() for tmp in open('.botlist').readlines()])
+
+    if  acct in botlist:
+        #bot例外
         if  acct == 'JC' and application != '女子会':
             pass
         elif  acct == 'JC' and 'マストドン閉じろ' in content:
             pass
         elif acct == '12222222' and 'ふきふき' in content:
             pass
+        elif acct == 'hihobot': #仮対応。機能増えたら対処
+            pass
         else:
             return
+
     if len(content) <= 0:
         return
     if  Toot1bQ.empty():
@@ -461,11 +480,6 @@ def worker(status):
         toot("@%s 緊急停止しまーす！"%MASTER_ID, 'direct', id ,None)
         sleep(10)
         os.kill(os.getpid(), signal.SIGKILL)
-
-    a = int(CM.get_coolingtime())
-    rnd = random.randint(0,10+a)
-    if acct == MASTER_ID:
-        rnd = 0
 
     ############################################################
     # 定型文応答処理
@@ -501,7 +515,7 @@ def worker(status):
     #     return
 
     #ネイティオが半角スペース区切りで５つ以上あれば翻訳
-    if (acct == 'kiritan' or acct == 'twotwo') and len(content.split(' ')) > 4 and content.count('トゥ') > 4 and content.count('ー') > 0:
+    if (acct == MASTER_ID or acct == 'twotwo') and len(content.split(' ')) > 4 and content.count('トゥ') > 4 and content.count('ー') > 0:
         toot_now = ':@%s: ＜「'%acct + kiri_util.two2jp(content) + '」'
         id_now = None
         SM.update(acct, 'func')
@@ -862,8 +876,7 @@ def worker(status):
                 pass
             else:
                 coloring_image(filename,acct,g_vis,id)
-    elif re.search(r"(私|わたし|わたくし|自分|僕|ぼく|俺|おれ|朕|ちん|余|あたし|ミー|あちき|あちし|あたい|\
-        わい|わっち|おいどん|わし|うち|おら|儂|おいら|あだす|某|麿|拙者|小生|あっし|手前|吾輩|我輩|わらわ|ぅゅ)の(ランク|ランキング|順位|スコア|成績)", content):
+    elif re.search(r"(私|[わワ][たタ][しシ]|[わワ][たタ][くク][しシ]|自分|僕|[ぼボ][くク]|俺|[オお][レれ]|朕|ちん|余|[アあ][タた][シし]|ミー|あちき|あちし|あたち|[あア][たタ][いイ]|[わワ][いイ]|わっち|おいどん|[わワ][しシ]|[うウ][ちチ]|[おオ][らラ]|儂|[おオ][いイ][らラ]|あだす|某|麿|拙者|小生|あっし|手前|吾輩|我輩|わらわ|ぅゅ)の(ランク|ランキング|順位|スコア|成績)", content):
         show_rank(acct=acct, target=acct, id=id, g_vis=g_vis)
         SM.update(acct, 'func')
     elif re.search(r":@(.+):.*の(ランク|ランキング|順位|スコア|成績)", content):
@@ -913,10 +926,16 @@ def worker(status):
             if len(gen_txt) > 5:
                 gen_txt +=  "\n#きり要約 #きりぼっと"
                 toot("@" + acct + " :@" + acct + ":\n"  + gen_txt, g_vis, id, "勝手に要約サービス", interval=a)
-    elif re.search(r'[^:]@kiri_bot01', status['content']):
+    elif re.search(r'[^:]@%s'%BOT_ID, status['content']):
         if content.strip().isdigit():
             return
         if len(content) == 0:
+            return
+        rep_cnt.append(acct)
+        if len(rep_cnt) > 30:
+            rep_cnt.pop(0)
+        tmpcnt = sum([1 for x in rep_cnt if x==acct]) 
+        if tmpcnt > 20:
             return
         fav_now(id)
         toot_now = "@%s\n"%acct
@@ -1461,7 +1480,7 @@ def th_saver():
                 DAO.save_toot(status)
             except Exception as e:
                 #保存失敗したら、キューに詰めてリトライ！
-                #StatusQ.put(status)
+                StatusQ.put(status)
                 print(e)
                 kiri_util.error_log()
         except Exception as e:
@@ -1598,7 +1617,7 @@ def main():
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(nyan_time,['22:22'])) )
 
     # threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(monomane_tooter,120,0,15,CM)) )
-    threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(lstm_tooter,5,-3,2,CM)) )
+    threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(lstm_tooter,10,-3,2,CM)) )
     # threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(timer_bst1st,90,0,15,CM)) )
     #threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(th_nicoru,60,0,60,CM)) )
     # threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(tangrkn_tooter,20,-10,10,CM)) )

@@ -116,7 +116,7 @@ def lstm_gentxt(text,num=0,sel_model=None):
                 #print('error:char=',t,char)
                 pass
         with graph.as_default():
-            model.load_weights(model_path + 'w', by_name=False)
+            # model.load_weights(model_path + 'w', by_name=False)
             preds = model.predict(x_pred, verbose=0)[0]
         next_index = sample(preds, rnd)
         next_char = indices_char[next_index]
