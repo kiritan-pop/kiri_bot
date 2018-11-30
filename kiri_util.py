@@ -24,6 +24,7 @@ from urllib.request import urlopen, Request
 
 BOT_ID = 'kiri_bot01'
 count = 0
+TIMEOUT = 3.0
 
 #######################################################
 # ネイティオ語翻訳
@@ -59,7 +60,8 @@ def hashtag(content):
     hashtag = []
     for x in tmp.find_all("a",rel="tag"):
         hashtag.append(x.span.text)
-    return ','.join(hashtag)
+    return hashtag
+    # return ','.join(hashtag)
 
 #######################################################
 # トゥート内容の標準化・クレンジング
@@ -148,7 +150,7 @@ class ScoreManager():
 
         # DBがない場合、作る！
         if not os.path.exists(self.DB_PATH):
-            con = sqlite3.connect(self.DB_PATH)
+            con = sqlite3.connect(self.DB_PATH, timeout=TIMEOUT, isolation_level='EXCLUSIVE')
             with open(self.DB_SCHEMA_PATH, "r") as f:
                 schema = f.read()
                 con.execute(schema)
@@ -177,7 +179,7 @@ class ScoreManager():
         elif key == 'func':
             i_score_func = score
 
-        con = sqlite3.connect(self.DB_PATH)
+        con = sqlite3.connect(self.DB_PATH, timeout=TIMEOUT, isolation_level='EXCLUSIVE')
         c = con.cursor()
         c.execute( r"select * from scoremanager where acct = ?",(acct,))
         row = c.fetchone()
@@ -230,7 +232,7 @@ class ScoreManager():
         con.close()
 
     def show(self,acct=None):
-        con = sqlite3.connect(self.DB_PATH)
+        con = sqlite3.connect(self.DB_PATH, timeout=TIMEOUT, isolation_level='DEFERRED')
         if acct == None:
             rows = con.execute('select * from scoremanager')
         else:
@@ -316,9 +318,9 @@ class DAO_statuses():
     # 指定された時間内から一人ユーザを選ぶ
     def sample_acct(self):
         acct_list = set([])
-        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 60*1000)
+        con = sqlite3.connect(self.STATUSES_DB_PATH, timeout=TIMEOUT, isolation_level='DEFERRED')
         c = con.cursor()
-        sql = r"select acct from statuses where acct <> ? order by id desc"
+        sql = r"select distinct acct from statuses where acct <> ? order by id desc limit 30"
         for row in c.execute(sql , [BOT_ID,] ) :
             acct_list.add(row[0])
             if len(acct_list)>30:
@@ -334,7 +336,7 @@ class DAO_statuses():
         if acct == None:
             return
         ids = []
-        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 6*1000)
+        con = sqlite3.connect(self.STATUSES_DB_PATH, timeout=TIMEOUT, isolation_level='DEFERRED')
         c = con.cursor()
         sql = r"select id from statuses where acct = ?  order by id asc"
         for row in c.execute( sql, (acct,)):
@@ -346,14 +348,14 @@ class DAO_statuses():
     # 直近１０トゥートを返す
     def get_least_10toots(self,acct=None,limit=10):
         seeds = []
-        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 6*1000)
+        con = sqlite3.connect(self.STATUSES_DB_PATH, timeout=TIMEOUT, isolation_level='DEFERRED')
         c = con.cursor()
         if acct == None:
-            sql = r"select content from statuses order by id desc"
-            exe = c.execute(sql)
+            sql = r"select content from statuses order by id desc limit ?"
+            exe = c.execute(sql,[limit])
         else:
-            sql = r"select content from statuses where acct=? order by id desc"
-            exe = c.execute(sql,[acct])
+            sql = r"select content from statuses where acct=? order by id desc limit ?"
+            exe = c.execute(sql,[acct,limit])
         for row in exe:
             content = content_cleanser(row[0])
             #print('get_least_10toots content=',content)
@@ -370,7 +372,7 @@ class DAO_statuses():
     #######################################################
     # ｉｄ指定でトゥート内容を返す
     def pickup_1toot(self,status_id):
-        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 6*1000)
+        con = sqlite3.connect(self.STATUSES_DB_PATH, timeout=TIMEOUT, isolation_level='DEFERRED')
         c = con.cursor()
         c.execute( r"select acct, content, date, time  from statuses where id = ?",
                         (status_id,))
@@ -380,18 +382,22 @@ class DAO_statuses():
 
     #######################################################
     # 数取りゲーム用 人数カウント
-    def get_gamenum(self):
-        #過去５分のアクティブユーザ数をベース
+    def get_gamenum(self, minutes=5):
+        #過去n分のアクティブユーザ数をベース
         jst_now = datetime.now(timezone('Asia/Tokyo'))
-        ymd = int(jst_now.strftime("%Y%m%d"))
-        hh0000 = int((jst_now - timedelta(minutes=5)).strftime("%H%M%S"))
-        hh9999 = int(jst_now.strftime("%H%M%S"))
-        if hh0000 > hh9999:
-            hh0000 = 0
-        #ランダムに人を選ぶよー！（最近いる人から）
-        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 6*1000)
+        ymd = int((jst_now - timedelta(minutes=minutes)).strftime("%Y%m%d"))
+        hms = int((jst_now - timedelta(minutes=minutes)).strftime("%H%M%S"))
+        ymd2 = int(jst_now.strftime("%Y%m%d"))
+        hms2 = int(jst_now.strftime("%H%M%S"))
+
+        con = sqlite3.connect(self.STATUSES_DB_PATH, timeout=TIMEOUT, isolation_level='DEFERRED')
         c = con.cursor()
-        c.execute( r"select acct from statuses where (date = ?) and time >= ? and time <= ? and acct <> ?",[ymd,hh0000,hh9999,BOT_ID] )
+        if ymd == ymd2 and int(hms) <= int(hms2):
+            c.execute( r"select distinct acct from statuses where (date = ? and time >= ? and time <= ? )",
+                        (ymd,hms,hms2) )
+        else:
+            c.execute( r"select distinct acct from statuses where (date = ? and time >= ?) or (date = ? and time <= ? ) or (date > ? and date < ?)",
+                        (ymd,hms,ymd2,hms2,ymd,ymd2) )
         acct_list = set([])
         for row in c.fetchall():
             acct_list.add(row[0])
@@ -408,7 +414,7 @@ class DAO_statuses():
         hms = int((jst_now - timedelta(minutes=minutes)).strftime("%H%M%S"))
         ymd2 = int(jst_now.strftime("%Y%m%d"))
         hms2 = int(jst_now.strftime("%H%M%S"))
-        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 6*1000)
+        con = sqlite3.connect(self.STATUSES_DB_PATH, timeout=TIMEOUT, isolation_level='DEFERRED')
         c = con.cursor()
         if ymd == ymd2 and int(hms) <= int(hms2):
             c.execute( r"select distinct acct from statuses where (date = ? and time >= ? and time <= ? )",
@@ -426,7 +432,7 @@ class DAO_statuses():
     #######################################################
     # モノマネ用
     def get_user_toots(self,acct):
-        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 6*1000)
+        con = sqlite3.connect(self.STATUSES_DB_PATH, timeout=TIMEOUT, isolation_level='DEFERRED')
         c = con.cursor()
         c.execute( r"select content from statuses where acct = ?", (acct,) )
         rows = c.fetchall()
@@ -441,7 +447,7 @@ class DAO_statuses():
         hms = int((jst_now - timedelta(hours=hours)).strftime("%H%M%S"))
         ymd2 = int(jst_now.strftime("%Y%m%d"))
         hms2 = int(jst_now.strftime("%H%M%S"))
-        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 6*1000)
+        con = sqlite3.connect(self.STATUSES_DB_PATH, timeout=TIMEOUT, isolation_level='DEFERRED')
         c = con.cursor()
         if ymd == ymd2 and int(hms) <= int(hms2):
             c.execute( r"select acct,count(content) from statuses where (date = ? and time >= ? and time <= ? ) group by acct",
@@ -474,7 +480,7 @@ class DAO_statuses():
                     status['account']['display_name'],
                     mediatext
                     )
-        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 6*1000)
+        con = sqlite3.connect(self.STATUSES_DB_PATH, timeout=TIMEOUT, isolation_level='EXCLUSIVE')
         c = con.cursor()
         insert_sql = u"insert into statuses (id, date, time, content, acct,\
                 display_name, media_attachments) values (?, ?, ?, ?, ?, ?, ?)"
@@ -491,11 +497,26 @@ class DAO_statuses():
             con.close()
 
     #######################################################
-    # 対象の人の最新のトゥート日付を取得（新規さん等はNoneを返す）
-    def get_least_created_at(self,acct):
-        con = sqlite3.connect(self.STATUSES_DB_PATH,timeout = 6*1000)
+    # 対象の人のh時間以内のトゥート日付を取得
+    def get_least_created_at(self,acct,h=3):
+        # con = sqlite3.connect(self.STATUSES_DB_PATH, timeout=TIMEOUT, isolation_level='DEFERRED')
+        # c = con.cursor()
+        # c.execute( r"select date, time from statuses where acct = ? order by id desc limit 1", (acct,))
+        jst_now = datetime.now(timezone('Asia/Tokyo'))
+        ymd = int((jst_now - timedelta(hours=h)).strftime("%Y%m%d"))
+        hms = int((jst_now - timedelta(hours=h)).strftime("%H%M%S"))
+        ymd2 = int(jst_now.strftime("%Y%m%d"))
+        hms2 = int(jst_now.strftime("%H%M%S"))
+
+        con = sqlite3.connect(self.STATUSES_DB_PATH, timeout=TIMEOUT, isolation_level='DEFERRED')
         c = con.cursor()
-        c.execute( r"select date, time from statuses where acct = ? order by id desc ", (acct,))
+        if ymd == ymd2 and int(hms) <= int(hms2):
+            c.execute( r"select date, time from statuses where acct = ? and (date = ? and time >= ? and time <= ? ) limit 1",
+                        (acct,ymd,hms,hms2) )
+        else:
+            c.execute( r"select date, time  from statuses where acct = ? and ((date = ? and time >= ?) or (date = ? and time <= ? ) or (date > ? and date < ?)) limit 1",
+                        (acct,ymd,hms,ymd2,hms2,ymd,ymd2) )
+
         row = c.fetchone()
         con.close()
         if row:
@@ -625,7 +646,7 @@ class get_images:
         headers = {'Ocp-Apim-Subscription-Key': self.key}
         conn = http.client.HTTPSConnection(self.host)
         query = urllib.parse.quote(search)
-        conn.request("GET", self.path + "?q=" + query + '&count=15', headers=headers)
+        conn.request("GET", self.path + "?q=" + query + '&count=15' + '&safeSearch=Strict', headers=headers)
         response = conn.getresponse()
         headers = [k + ": " + v for (k, v) in response.getheaders()
                        if k.startswith("BingAPIs-") or k.startswith("X-MSEdge-")]

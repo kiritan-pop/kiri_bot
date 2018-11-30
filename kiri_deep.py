@@ -54,7 +54,7 @@ wl_chars.sort()
 char_indices = dict((c, i) for i, c in enumerate(wl_chars))
 indices_char = dict((i, c) for i, c in enumerate(wl_chars))
 
-model_path = 'db/lstm_toot_v7.h5'
+model_path = 'db/lstm_toot_v1.h5'
 model = load_model(model_path)
 # model = lstm_model(maxlen, wl_chars)
 # model.load_weights(model_path + 'w', by_name=False)
@@ -79,29 +79,19 @@ def sample(preds, temperature=1.2):
 
 def lstm_gentxt(text,num=0,sel_model=None):
     generated = ''
+    out = []
+    for c in list(text):
+        if c in wl_chars:
+            out.append(c)
+    text = "".join(out)
 
-    tmp = text  #.strip()
-    # if len(tmp) > maxlen:
-    #     tmp = tmp[-maxlen:]
-    # else:
-    #     tmp = tmp * maxlen
-    #     tmp = tmp[-maxlen:]
-
-    # rnd = random.choice(adaptr)
-    # if rnd == '':
-    #     tmp += '\n'
-    # elif rnd == '📣':
-    #     tmp += '\n' + rnd
-    # else:
-    #     tmp += '\n' + rnd + '、'
-
-    if len(tmp) > maxlen:
-        sentence = tmp[-maxlen:]
+    if len(text) > maxlen:
+        sentence = text[-maxlen:]
     else:
-        sentence = tmp * maxlen
+        sentence = text * maxlen
         sentence = sentence[-maxlen:]
 
-    rnd = random.uniform(0.1,0.6)
+    rnd = random.uniform(0.3,0.6)
     print('seed text=%s %f' %(sentence,rnd))
     if num == 0:
         vol = random.randint(1,5)
@@ -116,7 +106,7 @@ def lstm_gentxt(text,num=0,sel_model=None):
                 #print('error:char=',t,char)
                 pass
         with graph.as_default():
-            # model.load_weights(model_path + 'w', by_name=False)
+            model.load_weights(model_path + 'w', by_name=False)
             preds = model.predict(x_pred, verbose=0)[0]
         next_index = sample(preds, rnd)
         next_char = indices_char[next_index]
@@ -124,13 +114,16 @@ def lstm_gentxt(text,num=0,sel_model=None):
         generated += next_char
         sentence = sentence[1:] + next_char
         if i > 2:
-            if generated.count('\n') + generated.count('。') >= vol:
+            if generated.count('\n') >= vol:
                 break
 
     rtn_text = generated
+    print('gen pre=%s' %rtn_text)
+    rtn_text = re.sub(r'📣','',rtn_text, flags=(re.MULTILINE | re.DOTALL))
     rtn_text = re.sub(r'。{2,}','。',rtn_text, flags=(re.MULTILINE | re.DOTALL))
     rtn_text = re.sub(r'^[。、\n]','',rtn_text, flags=(re.MULTILINE | re.DOTALL))
-    rtn_text = re.sub(r'📣','',rtn_text, flags=(re.MULTILINE | re.DOTALL))
+    rtn_text = rtn_text.strip()
+    print('gen text=%s' %rtn_text)
     return rtn_text
 
 def takoramen(filepath):
