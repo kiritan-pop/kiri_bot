@@ -503,6 +503,7 @@ def worker(status):
                     sec += time
             if sec > 0:
                 toot_delete(id=id, interval=sec)
+            return
         else:
             return
 
