@@ -1,15 +1,14 @@
 # coding: utf-8
 
-# from keras.models import load_model as keras_load_model
-# from keras.backend import tensorflow_backend
 from tensorflow.python.keras.models import load_model
 from tensorflow.python.keras import backend
-from cnn.cnn_model import cnn_model
-from lstm.lstm_modelingtrain import lstm_model
+from gensim.models.doc2vec import Doc2Vec
+import MeCab
 import numpy as np
 import random,json
 import sys,io,re,gc
 from liner import kiri_coloring_model
+import kiri_util
 from time import sleep
 import unicodedata
 from PIL import Image, ImageOps, ImageFile, ImageChops, ImageFilter, ImageEnhance
@@ -40,30 +39,38 @@ Colors['white'] = [0,0,0,0,0,0,0,1,0]
 Colors['black'] = [0,0,0,0,0,0,0,0,1]
 
 #いろいろなパラメータ
-maxlen = 50           #モデルに合わせて！
-diver = 0.55         #ダイバーシティ：大きくすると想起の幅が大きくなるっぽいー！
+#変更するとモデル再構築必要
+VEC_SIZE = 256  # Doc2vecの出力より
+VEC_MAXLEN = 7     # vec推定で参照するトゥート(vecor)数
+TXT_MAXLEN = 5      # 
+MU = "🧪"       # 無
+END = "🦷"      # 終わりマーク
+tagger = MeCab.Tagger('-Owakati -d /usr/lib/mecab/dic/mecab-ipadic-neologd -u dic/nicodic.dic')
+DAO = kiri_util.DAO_statuses()
+
 pat3 = re.compile(r'^\n')
 pat4 = re.compile(r'\n')
-# adaptr = ['だから','それで','しかし','けど','また','さらに',\
-#         'つまり','さて','そして','で','でね','そんで','でも','ところで','まあ','なるほど','']
-adaptr = ['📣']
+
 #辞書読み込み
 wl_chars = list(open('dic/wl.txt').read())
-wl_chars.append(r'\n')
-wl_chars.sort()
-char_indices = dict((c, i) for i, c in enumerate(wl_chars))
-indices_char = dict((i, c) for i, c in enumerate(wl_chars))
+idx_char = {i:c for i,c in enumerate(wl_chars)}
+num_chars = len(idx_char)
+idx_char[num_chars] = MU
+idx_char[num_chars+1] = END
+char_idx = {c:i for i,c in enumerate(wl_chars)}
+char_idx[MU] = num_chars
+char_idx[END] = num_chars + 1
 
-model_path = 'db/lstm_toot_v1.h5'
-model = load_model(model_path)
-# model = lstm_model(maxlen, wl_chars)
-# model.load_weights(model_path + 'w', by_name=False)
+d2v_path = 'db/d2v.model'
+# lstm_vec_path = 'db/lstm_vec.h5'
+lstm_set_path = 'db/lstm_set.h5'
+
+d2vmodel = Doc2Vec.load(d2v_path)
+# lstm_vec_model = load_model(lstm_vec_path)
+lstm_set_model = load_model(lstm_set_path)
 
 takomodel_path = 'db/cnn_v1.h5'
 takomodel = load_model(takomodel_path)
-# takomodel = cnn_model(labels)
-# takomodel.load_weights(takomodel_path + 'w', by_name=False)
-
 
 graph = tf.get_default_graph()
 
@@ -77,53 +84,60 @@ def sample(preds, temperature=1.2):
     probas = np.random.multinomial(1, preds, 1)
     return np.argmax(probas)
 
-def lstm_gentxt(text,num=0,sel_model=None):
+def lstm_gentxt(toots,num=0,sel_model=None):
+    # 入力トゥート（VEC_MAXLEN）をベクトル化。
+    input_vec = np.zeros((1,VEC_MAXLEN, VEC_SIZE))
+    if len(toots) >= VEC_MAXLEN:
+        toots_nrm = toots[-VEC_MAXLEN:]
+    else:
+        toots_nrm = toots + [toots[-1]]*(VEC_MAXLEN-len(toots))
+
+    # # 直近のトゥートの色を濃くする（+3分の調整）
+    # toots_nrm.append(toots[-2])
+    # toots_nrm.append(toots[-1])
+    # toots_nrm.append(toots[-1])
+
+    for i,toot in enumerate(toots_nrm):
+        wakati = tagger.parse(toot).split(" ")
+        input_vec[0,i,:] = d2vmodel.infer_vector(wakati)
+
+    # ベクトル推定（平均値を使う）
+    # with graph.as_default():
+    #     output_vec = lstm_vec_model.predict_on_batch(input_vec)[0]
+    output_vec = np.mean(input_vec, axis=1)
+    output_vec = np.reshape(output_vec,(output_vec.shape[1]))
+
+    ret = d2vmodel.docvecs.most_similar([output_vec])
+    print("lstm_gen --------------------")
+    print("  目標のトゥート")
+    for toot_id, score in ret[:4]:
+        row = DAO.pickup_1toot(toot_id)
+        print(f"{score:2f}:{kiri_util.content_cleanser(row[1])}")
+
+    # 推定したベクトルから文章生成
     generated = ''
-    out = []
-    for c in list(text):
-        if c in wl_chars:
-            out.append(c)
-    text = "".join(out)
+    char_IDs = [char_idx[MU] for _ in range(TXT_MAXLEN)]    #初期値は無
+    rnd = random.uniform(0.1,0.5)
 
-    if len(text) > maxlen:
-        sentence = text[-maxlen:]
-    else:
-        sentence = text * maxlen
-        sentence = sentence[-maxlen:]
-
-    rnd = random.uniform(0.3,0.6)
-    print('seed text=%s %f' %(sentence,rnd))
-    if num == 0:
-        vol = random.randint(1,5)
-    else:
-        vol = num
-    for i in range(300):
-        x_pred = np.zeros((1, maxlen, len(wl_chars)))
-        for t, char in enumerate(list(sentence)):
-            try:
-                x_pred[0, t, char_indices[char]] = 1.
-            except:
-                #print('error:char=',t,char)
-                pass
+    for i in range(200):
         with graph.as_default():
-            model.load_weights(model_path + 'w', by_name=False)
-            preds = model.predict(x_pred, verbose=0)[0]
-        next_index = sample(preds, rnd)
-        next_char = indices_char[next_index]
+            preds = lstm_set_model.predict_on_batch([ np.asarray([output_vec]),  np.asarray([char_IDs]) ])
 
+        next_index = sample(preds[0], rnd)
+        char_IDs = char_IDs[1:]
+        char_IDs.append(next_index)
+        next_char = idx_char[next_index]
         generated += next_char
-        sentence = sentence[1:] + next_char
-        if i > 2:
-            if generated.count('\n') >= vol:
-                break
+        if next_char == END:
+            break
 
     rtn_text = generated
-    print('gen pre=%s' %rtn_text)
-    rtn_text = re.sub(r'📣','',rtn_text, flags=(re.MULTILINE | re.DOTALL))
-    rtn_text = re.sub(r'。{2,}','。',rtn_text, flags=(re.MULTILINE | re.DOTALL))
-    rtn_text = re.sub(r'^[。、\n]','',rtn_text, flags=(re.MULTILINE | re.DOTALL))
-    rtn_text = rtn_text.strip()
-    print('gen text=%s' %rtn_text)
+    print(f'gen pre,rnd={rtn_text},{rnd:2f}')
+    rtn_text = re.sub(END,'',rtn_text, flags=(re.MULTILINE | re.DOTALL))
+    # rtn_text = re.sub(r'。{2,}','。',rtn_text, flags=(re.MULTILINE | re.DOTALL))
+    # rtn_text = re.sub(r'^[。、\n]','',rtn_text, flags=(re.MULTILINE | re.DOTALL))
+    # rtn_text = rtn_text.strip()
+    print(f'gen text,rnd={rtn_text},{rnd:2f}')
     return rtn_text
 
 def takoramen(filepath):

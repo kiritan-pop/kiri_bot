@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from mastodon import Mastodon, StreamListener
+import requests
 import re, os, json, random, unicodedata, signal, sys
 import threading, queue, urllib
 from time import sleep
@@ -118,7 +119,9 @@ class ltl_listener(StreamListener):
         #mentionはnotificationで受けるのでLTLのはスルー！(｢・ω・)｢ 二重レス防止！
         if re.search(r'[^:]@' + BOT_ID, status['content']):
             return
-        WorkerQ.put(status)
+        acct = status["account"]["acct"]
+        if acct != BOT_ID:
+            WorkerQ.put(status)
 
 #######################################################
 # タイムライン保存用（認証なし）
@@ -146,15 +149,19 @@ def toot(toot_now, g_vis='direct', rep=None, spo=None, media_ids=None, interval=
     th.start()
 
 def exe_toot(toot_now, g_vis='direct', rep=None, spo=None, media_ids=None, interval=0):
+    if spo:
+        spo_len = len(spo)
+    else:
+        spo_len = 0
     if rep != None:
         try:
             status = mastodon.status(rep)
         except Exception:
-            mastodon.status_post(status=toot_now[0:450], visibility=g_vis, in_reply_to_id=None, spoiler_text=spo, media_ids=media_ids)
+            mastodon.status_post(status=toot_now[0:490-spo_len], visibility=g_vis, in_reply_to_id=None, spoiler_text=spo, media_ids=media_ids)
         else:
-            mastodon.status_post(status=toot_now[0:450], visibility=g_vis, in_reply_to_id=rep, spoiler_text=spo, media_ids=media_ids)
+            mastodon.status_post(status=toot_now[0:490-spo_len], visibility=g_vis, in_reply_to_id=rep, spoiler_text=spo, media_ids=media_ids)
     else:
-        mastodon.status_post(status=toot_now[0:450], visibility=g_vis, in_reply_to_id=None, spoiler_text=spo, media_ids=media_ids)
+        mastodon.status_post(status=toot_now[0:490-spo_len], visibility=g_vis, in_reply_to_id=None, spoiler_text=spo, media_ids=media_ids)
 
     # th = threading.Timer(interval=interval,function=th_toot,args=(toot_now, g_vis, rep, spo, media_ids))
     # th.start()
@@ -404,7 +411,7 @@ def coloring_image(filename, acct, g_vis, id):
             toot_now = "@%s えっち！"%acct
         else:
             media_files.append(mastodon.media_post(tmp_file, 'image/png'))
-            toot_now = "@%s 色塗ったー！ \n#exp5m"%acct
+            toot_now = "@%s 色塗ったー！ \n#exp15m"%acct
         toot(toot_now, g_vis=g_vis, rep=id, media_ids=media_files)
     except Exception as e:
         print(e)
@@ -423,7 +430,7 @@ def face_search(filename, acct, g_vis, id):
             else:
                 ex = tmp.rsplit('.')[-1]
             media_files.append(mastodon.media_post(tmp, 'image/' + ex))
-            toot_now = "@%s \n#exp5m"%acct
+            toot_now = "@%s \n#exp15m"%acct
             toot(toot_now, g_vis=g_vis, rep=None, spo='おわかりいただけるだろうか……', media_ids=media_files, interval=5)
             return True
     except Exception as e:
@@ -990,11 +997,10 @@ def worker(status):
         toot_now = "@%s\n"%acct
         seeds = DAO.get_least_10toots(acct)
         seeds.extend(toots_for_rep[acct])
-        seedtxt = "📣\n".join(seeds) + "📣\n"
-        tmp = kiri_deep.lstm_gentxt(seedtxt,num=1)
-        toots_for_rep[acct].append(tmp)
-        if len(toots_for_rep[acct]) > 20:
-            toots_for_rep[acct].pop(0)
+        tmp = kiri_deep.lstm_gentxt(seeds,num=1)
+        # toots_for_rep[acct].append(tmp)
+        # if len(toots_for_rep[acct]) > 20:
+        #     toots_for_rep[acct].pop(0)
         toot_now += tmp
         toot(toot_now, g_vis, id, None,interval=a)
     elif re.search(r"(きり|キリ).*(ぼっと|ボット|[bB][oO][tT])|[きキ][りリ][ぼボ]", content + spoiler_text):
@@ -1004,8 +1010,8 @@ def worker(status):
         fav_now(id)
         toot_now = "@%s\n"%acct
         seeds = DAO.get_least_10toots(acct)
-        seedtxt = "📣\n".join(seeds) + "📣\n"  + content + "📣\n"
-        toot_now += kiri_deep.lstm_gentxt(seedtxt,num=1)
+        tmp = kiri_deep.lstm_gentxt(seeds,num=1)
+        toot_now += tmp
         toot(toot_now, g_vis, id, None,interval=a)
         SM.update(acct, 'reply')
 
@@ -1038,7 +1044,7 @@ def business_contact(status):
 
     if statuses_count == 1:
         fav_now(id)
-        toot_now = '@%s 新規さんかも−！\n:@%s:(%s)＜「%s」(created at %s)'%(MASTER_ID, acct, display_name, content, ac_ymd)
+        toot_now = '@%s 新規さんかも−！\n:@%s:(%s)＜「%s」(created at %s)\n#exp10m'%(MASTER_ID, acct, display_name, content, ac_ymd)
         toot(toot_now, rep=id)
 
         # toot_now = ':@%s: （%s）ご新規さんかもー！(๑•᎑•๑)♬*゜\n #ももな代理 #ニコフレ挨拶部 #しんかこ'%(acct,display_name)
@@ -1053,7 +1059,7 @@ def business_contact(status):
 
     watch_list = set([kansi_acct.strip() for kansi_acct in open('.watch_list').readlines()])
     if acct in watch_list:
-        toot_now = '@%s\n:@%s: %s\n「%s」'%(MASTER_ID, acct, display_name, content)
+        toot_now = '@%s\n:@%s: %s\n「%s」\n#exp10m'%(MASTER_ID, acct, display_name, content)
         toot(toot_now)
 
 #######################################################
@@ -1312,10 +1318,10 @@ def lstm_tooter():
     #print('seeds',seeds)
     if len(seeds) <= 2:
         return
-    seedtxt = "📣\n".join(seeds) + "📣\n"
+    # seedtxt = "📣\n".join(seeds) + "📣\n"
     spoiler = None
 
-    gen_txt = kiri_deep.lstm_gentxt(seedtxt,num=1)
+    gen_txt = kiri_deep.lstm_gentxt(seeds,num=1)
     if gen_txt[0:1] == '。':
         gen_txt = gen_txt[1:]
     if len(gen_txt) > 60:
@@ -1340,7 +1346,7 @@ def th_delete():
                     ymdhms = '%s %s'%(date,time)
                     ymdhms = dateutil.parser.parse(ymdhms).astimezone(timezone('Asia/Tokyo'))
                     toot_now += ':@%s: 🚓🚓🚓＜う〜う〜！トゥー消し警察でーす！\n'%row[0]
-                    toot_now += ':@%s: ＜「%s」 at %s'%(row[0], kiri_util.content_cleanser(row[1]) , ymdhms.strftime("%Y.%m.%d %H:%M:%S"))
+                    toot_now += ':@%s: ＜「%s」 at %s\n#exp10m'%(row[0], kiri_util.content_cleanser(row[1]) , ymdhms.strftime("%Y.%m.%d %H:%M:%S"))
                     toot(toot_now, 'direct', rep=None, spo=':@%s: がトゥー消ししたよー……'%row[0], media_ids=None, interval=0)
                     acct_1b = row[0]
                     SM.update(row[0], 'func', score=-1)
@@ -1385,7 +1391,7 @@ def th_hint_de_pinto():
                 tmp.save(filename,ex, optimize=True)
                 media_files = []
                 media_files.append(mastodon.media_post(filename, 'image/' + ex))
-                toot_now = "さて、これは何/誰でしょうか？\nヒント：{0}\n#きりたんのヒントでピント #exp5m".format(hint_text)
+                toot_now = "さて、これは何/誰でしょうか？\nヒント：{0}\n#きりたんのヒントでピント #exp15m".format(hint_text)
                 toot(toot_now, g_vis='private', rep=None, spo=None, media_ids=media_files)
                 for tt in range(60):
                     sleep(1)
@@ -1412,7 +1418,7 @@ def th_hint_de_pinto():
         # sleep(1)
         media_files = []
         media_files.append(mastodon.media_post(path, 'image/' + ex))
-        toot_now = "正解は{0}でした〜！\n（出題 :@{1}: ） #exp5m".format(term,acct)
+        toot_now = "正解は{0}でした〜！\n（出題 :@{1}: ） #exp15m".format(term,acct)
         toot(toot_now, g_vis='private', rep=None, spo=None, media_ids=media_files,interval=4)
 
     gi = kiri_util.get_images(BING_KEY)
@@ -1556,13 +1562,14 @@ def th_saver():
                 DAO.save_toot(status)
             except Exception as e:
                 #保存失敗したら、キューに詰めてリトライ！
-                StatusQ.put(status)
                 print(e)
                 kiri_util.error_log()
+                sleep(5)
+                StatusQ.put(status)
         except Exception as e:
             print(e)
             kiri_util.error_log()
-            sleep(30)
+            sleep(10)
             th_saver()
 
 #######################################################
@@ -1570,33 +1577,51 @@ def th_saver():
 def t_local():
     try:
         # mastodon.stream_public(ltl_listener())
-        mastodon.stream_local(ltl_listener())
+        mastodon.stream_local(ltl_listener(),timeout=20)
+    except requests.exceptions.ConnectionError as e:
+        print("＊＊＊再接続するよ〜t_local()＊＊＊")
+        # print(e)
+        # kiri_util.error_log()
+        sleep(5)
+        t_local()
     except Exception as e:
         print(e)
         kiri_util.error_log()
-        sleep(30)
+        sleep(5)
         t_local()
 
 #######################################################
 # ローカルタイムライン監視スレッド（認証なし）
 def t_sub():
     try:
-        publicdon.stream_local(public_listener())
+        publicdon.stream_local(public_listener(),timeout=20)
+    except requests.exceptions.ConnectionError as e:
+        print("＊＊＊再接続するよ〜t_sub()＊＊＊")
+        # print(e)
+        # kiri_util.error_log()
+        sleep(5)
+        t_sub()
     except Exception as e:
         print(e)
         kiri_util.error_log()
-        sleep(30)
+        sleep(5)
         t_sub()
 
 #######################################################
 # ホームタイムライン監視スレッド
 def t_user():
     try:
-        mastodon.stream_user(notification_listener())
+        mastodon.stream_user(notification_listener(),timeout=20)
+    except requests.exceptions.ConnectionError as e:
+        print("＊＊＊再接続するよ〜t_user()＊＊＊")
+        # print(e)
+        # kiri_util.error_log()
+        sleep(5)
+        t_user()
     except Exception as e:
         print(e)
         kiri_util.error_log()
-        sleep(30)
+        sleep(5)
         t_user()
 
 #######################################################

@@ -351,11 +351,11 @@ class DAO_statuses():
         con = sqlite3.connect(self.STATUSES_DB_PATH, timeout=TIMEOUT, isolation_level='DEFERRED')
         c = con.cursor()
         if acct == None:
-            sql = r"select content from statuses order by id desc limit ?"
-            exe = c.execute(sql,[limit])
+            sql = r"select content from statuses order by id desc"
+            exe = c.execute(sql)
         else:
-            sql = r"select content from statuses where acct=? order by id desc limit ?"
-            exe = c.execute(sql,[acct,limit])
+            sql = r"select content from statuses where acct=? order by id desc"
+            exe = c.execute(sql,[acct])
         for row in exe:
             content = content_cleanser(row[0])
             #print('get_least_10toots content=',content)
