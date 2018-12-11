@@ -10,7 +10,7 @@ import dateutil
 from datetime import datetime,timedelta
 import warnings, traceback
 from os.path import join, dirname
-from collections import defaultdict
+from collections import defaultdict, Counter
 from dotenv import load_dotenv
 import wikipedia
 import Toot_summary, GenerateText, PrepareChain, bottlemail
@@ -23,14 +23,7 @@ BOT_ID = 'kiri_bot01'
 DELAY = 2
 pat1 = re.compile(r' ([!-~ぁ-んァ-ン] )+|^([!-~ぁ-んァ-ン] )+| [!-~ぁ-んァ-ン]$',flags=re.MULTILINE)  #[!-~0-9a-zA-Zぁ-んァ-ン０-９ａ-ｚ]
 pat2 = re.compile(r'[ｗ！？!\?]')
-
-#得点管理、流速監視
-SM = kiri_util.ScoreManager()
-CM = kiri_util.CoolingManager(3)
-DAO = kiri_util.DAO_statuses()
-painter = kiri_coloring.Painter(gpu=-1)
-#しりとり用
-StMG = kiri_game.Siritori_manager()
+abc = list("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?.()+-=,")
 
 #.envファイルからトークンとかURLを取得ー！
 dotenv_path = join(dirname(__file__), '.env')
@@ -38,6 +31,18 @@ load_dotenv(dotenv_path)
 MASTODON_URL = os.environ.get("MASTODON_URL")
 MASTODON_ACCESS_TOKEN = os.environ.get("MASTODON_ACCESS_TOKEN")
 BING_KEY = os.environ.get("BING_KEY")
+GOOGLE_KEY = os.environ.get("GOOGLE_KEY")
+GOOGLE_ENGINE_KEY = os.environ.get("GOOGLE_ENGINE_KEY")
+
+#得点管理、流速監視
+SM = kiri_util.ScoreManager()
+CM = kiri_util.CoolingManager(3)
+DAO = kiri_util.DAO_statuses()
+TRANS = kiri_util.trans(GOOGLE_KEY)
+painter = kiri_coloring.Painter(gpu=-1)
+#しりとり用
+StMG = kiri_game.Siritori_manager()
+
 
 publicdon = Mastodon(api_base_url=MASTODON_URL)  # インスタンス
 
@@ -949,25 +954,31 @@ def worker(status):
         else:
             GetNumQ.put([acct,id])
             SM.update(acct, 'func')
-    elif len(content) > 40:
-        if kiri_util.kiri_trans_detect(content) != 'ja':
+    elif len(content) > 140:
+        cntdict = Counter(content)
+        abclen = sum([v for k,v in cntdict.items() if k in abc])
+        if len(content) * 0.8 < abclen:
             fav_now(id)
-            toot_now = kiri_util.kiri_trans_xx2ja(kiri_util.kiri_trans_detect(content), content)
+            lang = TRANS.detect(content)
+            if lang:
+                toot_now = TRANS.xx2ja(lang, content)
+                if toot_now:
+                    if re.search(r"[^:]@|^@", toot_now):
+                        pass
+                    else:
+                        toot_now +=  "\n#きり翻訳 #きりぼっと"
+                        toot(toot_now, 'public', id, '翻訳したよ〜！なになに……？ :@%s:＜'%acct ,interval=a)
+                        SM.update(acct, 'func')
+    elif  '翻訳して' in spoiler_text:
+        fav_now(id)
+        toot_now = TRANS.ja2en(content)
+        if toot_now:
             if re.search(r"[^:]@|^@", toot_now):
                 pass
             else:
                 toot_now +=  "\n#きり翻訳 #きりぼっと"
-                toot(toot_now, 'public', id, '翻訳したよ〜！なになに……？ :@%s:＜'%acct ,interval=a)
+                toot(toot_now, 'public', id, '翻訳したよ〜！ :@%s:＜'%acct ,interval=a)
                 SM.update(acct, 'func')
-    elif  '翻訳して' in spoiler_text:
-        fav_now(id)
-        toot_now = kiri_util.kiri_trans_ja2en(content)
-        if re.search(r"[^:]@|^@", toot_now):
-            pass
-        else:
-            toot_now +=  "\n#きり翻訳 #きりぼっと"
-            toot(toot_now, 'public', id, '翻訳したよ〜！ :@%s:＜'%acct ,interval=a)
-            SM.update(acct, 'func')
     elif len(content) > 140 and (spoiler_text == None or spoiler_text == ''):
         content = re.sub(r"(.){3,}",r"\1",content, flags=(re.DOTALL))
         gen_txt = Toot_summary.summarize(pat1.sub("",pat2.sub("",content)),limit=10,lmtpcs=1, m=1, f=4)
@@ -998,6 +1009,7 @@ def worker(status):
         seeds = DAO.get_least_10toots(acct)
         seeds.extend(toots_for_rep[acct])
         tmp = kiri_deep.lstm_gentxt(seeds,num=1)
+        tmp = kiri_util.content_cleanser_light(tmp)
         # toots_for_rep[acct].append(tmp)
         # if len(toots_for_rep[acct]) > 20:
         #     toots_for_rep[acct].pop(0)
@@ -1011,6 +1023,7 @@ def worker(status):
         toot_now = "@%s\n"%acct
         seeds = DAO.get_least_10toots(acct)
         tmp = kiri_deep.lstm_gentxt(seeds,num=1)
+        tmp = kiri_util.content_cleanser_light(tmp)
         toot_now += tmp
         toot(toot_now, g_vis, id, None,interval=a)
         SM.update(acct, 'reply')
@@ -1322,6 +1335,7 @@ def lstm_tooter():
     spoiler = None
 
     gen_txt = kiri_deep.lstm_gentxt(seeds,num=1)
+    gen_txt = kiri_util.content_cleanser_light(gen_txt)
     if gen_txt[0:1] == '。':
         gen_txt = gen_txt[1:]
     if len(gen_txt) > 60:
@@ -1421,7 +1435,8 @@ def th_hint_de_pinto():
         toot_now = "正解は{0}でした〜！\n（出題 :@{1}: ） #exp15m".format(term,acct)
         toot(toot_now, g_vis='private', rep=None, spo=None, media_ids=media_files,interval=4)
 
-    gi = kiri_util.get_images(BING_KEY)
+    # gi = kiri_util.get_images(BING_KEY)
+    gi = kiri_util.get_images_GGL(GOOGLE_KEY,GOOGLE_ENGINE_KEY)
     junbiTM = kiri_util.KiriTimer(30*60)
     junbiTM.reset(5*60)
     junbiTM.start()

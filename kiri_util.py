@@ -15,11 +15,12 @@ from dateutil import parser
 from datetime import datetime,timedelta
 from bs4 import BeautifulSoup
 import warnings, traceback
-from googletrans import Translator
+# from googletrans import Translator
 import cv2
 import traceback
 from mimetypes import guess_extension
 from urllib.request import urlopen, Request
+import requests
 
 
 BOT_ID = 'kiri_bot01'
@@ -95,6 +96,18 @@ def content_cleanser(content):
         return rtext + " #" + hashtag
     else:
         return rtext
+
+#######################################################
+# トゥート内容の標準化・クレンジング・ライト
+def content_cleanser_light(text):
+    rtext = re.sub(r'([^:])@', r'\1', text)
+    rtext = re.sub(r'(___R___)\1{2,}', r'\1', rtext)
+    rtext = re.sub(r'___R___', r'\n', rtext)
+    #NGワード
+    ng_words = set(word.strip() for word in open('.ng_words').readlines())
+    for ng_word in ng_words:
+        rtext = re.sub(ng_word, '■■■', rtext)
+    return rtext
 
 #######################################################
 # スケジューラー！
@@ -490,6 +503,7 @@ class DAO_statuses():
         except sqlite3.IntegrityError:
             pass
         except sqlite3.Error:
+            error_log()
             raise
         else:
             con.commit()
@@ -527,26 +541,50 @@ class DAO_statuses():
         else:
             return None
 
+class trans:
+    def __init__(self, key):
+        self.key = key
+        self.url="https://translation.googleapis.com/language/translate/v2"
 
-def kiri_trans_xx2ja(lang, text):
-    tor = Translator()
-    return tor.translate(text, src=lang, dest='ja').text
+    def xx2ja(self,lang, text):
+        url = self.url
+        url += "?key=" + self.key
+        url += "&q=" + text
+        url += f"&source={lang}&target=ja"
+        #
+        return self.__req_dec(url)
 
-def kiri_trans_ja2en(text):
-    tor = Translator()
-    return tor.translate(text, src='ja', dest='en').text
+    def ja2en(self,text):
+        url = self.url
+        url += "?key=" + self.key
+        url += "&q=" + text
+        url += f"&source=ja&target=en"
+        #
+        return self.__req_dec(url)
 
-def kiri_trans_detect(text):
-    tor = Translator()
-    try:
-        la = tor.detect(text).lang
-        return la
-    except json.decoder.JSONDecodeError as e:
-        return 'ja'
-    except AttributeError as e:
-        # print(e)
-        return 'ja'
+    def detect(self,text):
+        url = self.url +  "/detect"
+        url += "?key=" + self.key
+        url += "&q=" + text
+        rr=requests.get(url)
+        unit_aa=json.loads(rr.text)
+        # print(unit_aa)
+        try:
+            result = unit_aa["data"]["detections"][0][0]["language"]
+            return result
+        except Exception:
+            error_log()
+            return None
 
+    def __req_dec(self,url):
+        rr=requests.get(url)
+        unit_aa=json.loads(rr.text)
+        try:
+            result = unit_aa["data"]["translations"][0]["translatedText"]
+            return result
+        except Exception:
+            error_log()
+            return None
 
 def face_search(image_path):
     try:
@@ -591,9 +629,55 @@ def face_search(image_path):
             cv2.imwrite(save_path, image)
             return save_path
     except Exception as e:
+        error_log()
         print(e)
         return None
 
+class get_images_GGL:
+    def __init__(self,key,engine_key):
+
+        self.key = key
+        self.engine_key = engine_key
+        self.url = "https://www.googleapis.com/customsearch/v1"
+        self.save_dir_path = "media/"
+
+    def ImageSearch(self, search):
+        url = f"{self.url}?key={self.key}&cx={self.engine_key}&searchType=image&cr=ja&num=10&safe=active&q={search}"
+        rr=requests.get(url)
+        unit_aa=json.loads(rr.text)
+        # print(unit_aa)
+        image_links = []
+        for item in unit_aa['items']:
+            image_links.append(item['link'])
+
+        return image_links
+
+    def get_images_forQ(self, term):
+        make_dir(self.save_dir_path)
+        url_list = []
+        try:
+            print('Searching images for: ', term)
+            url_list = self.ImageSearch(term)
+        except Exception as err:
+            error_log()
+            print(err)
+            return []
+
+        img_paths = []
+        for url in url_list:
+            try:
+                img_path = make_img_path(self.save_dir_path, url, term)
+                image = download_image(url)
+                save_image(img_path, image)
+                img_paths.append(img_path)
+                print(f'saved image... {url}')
+            except KeyboardInterrupt:
+                break
+            except Exception as err:
+                error_log()
+                print("%s" % (err))
+
+        return img_paths
 
 def make_dir(path):
     if not os.path.isdir(path):
@@ -629,62 +713,6 @@ def download_image(url, timeout=10):
 
     return response.content
 
-class get_images:
-    def __init__(self,key):
-        if len(key) != 32:
-            print("Invalid Bing Search API subscription key!")
-            print("Please paste yours into the source code.")
-            raise ValueError('Invalid Bing Search API subscription key!')
-
-        self.key = key
-        self.host = "api.cognitive.microsoft.com"
-        self.path = "/bing/v7.0/images/search"
-        self.save_dir_path = "media/"
-
-    def BingImageSearch(self, search):
-        "Performs a Bing image search and returns the results."
-        headers = {'Ocp-Apim-Subscription-Key': self.key}
-        conn = http.client.HTTPSConnection(self.host)
-        query = urllib.parse.quote(search)
-        conn.request("GET", self.path + "?q=" + query + '&count=15' + '&safeSearch=Strict', headers=headers)
-        response = conn.getresponse()
-        headers = [k + ": " + v for (k, v) in response.getheaders()
-                       if k.startswith("BingAPIs-") or k.startswith("X-MSEdge-")]
-        data = response.read()
-        conn.close()
-        return headers, data.decode("utf8")
-
-    def get_images_forQ(self, term):
-        make_dir(self.save_dir_path)
-        url_list = []
-        try:
-            print('Searching images for: ', term)
-            headers, result = self.BingImageSearch(term)
-        except Exception as err:
-            print(err)
-        else:
-            data = json.loads(result)
-
-            if 'value' in data:
-                for values in data['value']:
-                    unquoted_url = urllib.parse.unquote(
-                            values['contentUrl'])
-                    url_list.append(unquoted_url)
-
-        img_paths = []
-        for url in url_list:
-            try:
-                img_path = make_img_path(self.save_dir_path, url, term)
-                image = download_image(url)
-                save_image(img_path, image)
-                img_paths.append(img_path)
-                print('saved image... {}'.format(url))
-            except KeyboardInterrupt:
-                break
-            except Exception as err:
-                print("%s" % (err))
-
-        return img_paths
 
 class Fetcher:
     def __init__(self, ua=''):
