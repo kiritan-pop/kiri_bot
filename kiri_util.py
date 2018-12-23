@@ -21,6 +21,7 @@ import traceback
 from mimetypes import guess_extension
 from urllib.request import urlopen, Request
 import requests
+from pprint import pprint as pp
 
 
 BOT_ID = 'kiri_bot01'
@@ -359,7 +360,7 @@ class DAO_statuses():
 
     #######################################################
     # 直近１０トゥートを返す
-    def get_least_10toots(self,acct=None,limit=10):
+    def get_least_10toots(self,acct=None,limit=15):
         seeds = []
         con = sqlite3.connect(self.STATUSES_DB_PATH, timeout=TIMEOUT, isolation_level='DEFERRED')
         c = con.cursor()
@@ -574,6 +575,8 @@ class trans:
             return result
         except Exception:
             error_log()
+            pp(url)
+            pp(unit_aa)
             return None
 
     def __req_dec(self,url):
@@ -584,6 +587,8 @@ class trans:
             return result
         except Exception:
             error_log()
+            pp(url)
+            pp(unit_aa)
             return None
 
 def face_search(image_path):
@@ -673,6 +678,8 @@ class get_images_GGL:
                 print(f'saved image... {url}')
             except KeyboardInterrupt:
                 break
+            except ValueError:
+                pass
             except Exception as err:
                 error_log()
                 print("%s" % (err))

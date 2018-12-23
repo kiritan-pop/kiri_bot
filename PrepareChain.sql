@@ -6,3 +6,6 @@ create table chain_freqs (
     suffix text not null,
     freq integer not null
 );
+create index prefix1_idx on chain_freqs(prefix1);
+create index prefix2_idx on chain_freqs(prefix2);
+create index prefix_idx on chain_freqs(prefix1,prefix2);

@@ -1,7 +1,7 @@
 # coding: utf-8
 
-from tensorflow.python.keras.models import load_model
-from tensorflow.python.keras import backend
+from tensorflow.keras.models import load_model
+from tensorflow.keras import backend
 from gensim.models.doc2vec import Doc2Vec
 import MeCab
 import numpy as np
@@ -27,21 +27,12 @@ for label,i in labels_index.items():
 
 STANDARD_SIZE = (299, 299)
 # STANDARD_SIZE = (512, 512)
-Colors = {}
-Colors['red'] = [1,0,0,0,0,0,0,0,0]
-Colors['blue'] = [0,1,0,0,0,0,0,0,0]
-Colors['green'] = [0,0,1,0,0,0,0,0,0]
-Colors['purple'] = [0,0,0,1,0,0,0,0,0]
-Colors['brown'] = [0,0,0,0,1,0,0,0,0]
-Colors['pink'] = [0,0,0,0,0,1,0,0,0]
-Colors['blonde'] = [0,0,0,0,0,0,1,0,0]
-Colors['white'] = [0,0,0,0,0,0,0,1,0]
-Colors['black'] = [0,0,0,0,0,0,0,0,1]
 
 #いろいろなパラメータ
 #変更するとモデル再構築必要
 VEC_SIZE = 256  # Doc2vecの出力より
-VEC_MAXLEN = 7     # vec推定で参照するトゥート(vecor)数
+VEC_MAXLEN = 5     # vec推定で参照するトゥート(vecor)数
+AVE_LEN = 5        # vec推定で参照するトゥート(vecor)数
 TXT_MAXLEN = 5      # 
 MU = "🧪"       # 無
 END = "🦷"      # 終わりマーク
@@ -62,14 +53,14 @@ char_idx[MU] = num_chars
 char_idx[END] = num_chars + 1
 
 d2v_path = 'db/d2v.model'
-# lstm_vec_path = 'db/lstm_vec.h5'
+lstm_vec_path = 'db/lstm_vec.h5'
 lstm_set_path = 'db/lstm_set.h5'
 
 d2vmodel = Doc2Vec.load(d2v_path)
-# lstm_vec_model = load_model(lstm_vec_path)
+lstm_vec_model = load_model(lstm_vec_path)
 lstm_set_model = load_model(lstm_set_path)
 
-takomodel_path = 'db/cnn_v1.h5'
+takomodel_path = 'db/cnn.h5'
 takomodel = load_model(takomodel_path)
 
 graph = tf.get_default_graph()
@@ -86,29 +77,31 @@ def sample(preds, temperature=1.2):
 
 def lstm_gentxt(toots,num=0,sel_model=None):
     # 入力トゥート（VEC_MAXLEN）をベクトル化。
-    input_vec = np.zeros((1,VEC_MAXLEN, VEC_SIZE))
-    if len(toots) >= VEC_MAXLEN:
-        toots_nrm = toots[-VEC_MAXLEN:]
+    input_vec = np.zeros((VEC_MAXLEN + AVE_LEN, VEC_SIZE))
+    input_mean_vec = np.zeros((VEC_MAXLEN, VEC_SIZE))
+    if len(toots) >= VEC_MAXLEN + AVE_LEN:
+        toots_nrm = toots[-(VEC_MAXLEN + AVE_LEN):]
     else:
-        toots_nrm = toots + [toots[-1]]*(VEC_MAXLEN-len(toots))
+        toots_nrm = toots + [toots[-1]]*(VEC_MAXLEN + AVE_LEN -len(toots))
 
-    # # 直近のトゥートの色を濃くする（+3分の調整）
-    # toots_nrm.append(toots[-2])
-    # toots_nrm.append(toots[-1])
-    # toots_nrm.append(toots[-1])
-
+    print("lstm_gen --------------------")
+    print("  inputトゥート")
     for i,toot in enumerate(toots_nrm):
+        print(toot)
         wakati = tagger.parse(toot).split(" ")
-        input_vec[0,i,:] = d2vmodel.infer_vector(wakati)
+        input_vec[i] = d2vmodel.infer_vector(wakati)
 
-    # ベクトル推定（平均値を使う）
-    # with graph.as_default():
-    #     output_vec = lstm_vec_model.predict_on_batch(input_vec)[0]
-    output_vec = np.mean(input_vec, axis=1)
-    output_vec = np.reshape(output_vec,(output_vec.shape[1]))
+    for i in range(VEC_MAXLEN):
+        input_mean_vec[i] = np.mean(input_vec[i:i+AVE_LEN], axis=0)
+
+    # ベクトル推定
+    input_mean_vec = input_mean_vec.reshape((1,VEC_MAXLEN, VEC_SIZE))
+    with graph.as_default():
+        output_vec = lstm_vec_model.predict_on_batch(input_mean_vec)[0]
+    # output_vec = np.mean(input_vec, axis=1)
+    # output_vec = np.reshape(output_vec,(output_vec.shape[1]))
 
     ret = d2vmodel.docvecs.most_similar([output_vec])
-    print("lstm_gen --------------------")
     print("  目標のトゥート")
     for toot_id, score in ret[:4]:
         row = DAO.pickup_1toot(toot_id)

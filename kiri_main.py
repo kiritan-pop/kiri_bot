@@ -160,11 +160,11 @@ def exe_toot(toot_now, g_vis='direct', rep=None, spo=None, media_ids=None, inter
         spo_len = 0
     if rep != None:
         try:
-            status = mastodon.status(rep)
-        except Exception:
-            mastodon.status_post(status=toot_now[0:490-spo_len], visibility=g_vis, in_reply_to_id=None, spoiler_text=spo, media_ids=media_ids)
-        else:
+            # status = mastodon.status(rep)
             mastodon.status_post(status=toot_now[0:490-spo_len], visibility=g_vis, in_reply_to_id=rep, spoiler_text=spo, media_ids=media_ids)
+        except Exception:
+            sleep(2)
+            mastodon.status_post(status=toot_now[0:490-spo_len], visibility=g_vis, in_reply_to_id=None, spoiler_text=spo, media_ids=media_ids)
     else:
         mastodon.status_post(status=toot_now[0:490-spo_len], visibility=g_vis, in_reply_to_id=None, spoiler_text=spo, media_ids=media_ids)
 
@@ -404,7 +404,7 @@ def ana_image(media_attachments,sensitive,acct,g_vis,id,content):
     return toot_now
 
 #######################################################
-# 画像検索サービス
+# 着色サービス
 def coloring_image(filename, acct, g_vis, id):
     username = "@" +  acct
     media_files = []
@@ -806,7 +806,7 @@ def worker(status):
                 ret_word,ret_yomi,tail = StMG.games[acct].get_word(word)
                 if ret_word == None:
                     tmp_score = StMG.games[acct].rcnt*2+StMG.games[acct].lv
-                    tmp_score *= 25
+                    tmp_score //= 4
                     toot('@%s う〜ん！思いつかないよー！負けたー！\n(ラリー数：%d／%d点獲得)'%(acct,StMG.games[acct].rcnt,tmp_score), 'direct',  id, None,interval=a)
                     SM.update(acct, 'getnum', score=tmp_score)
                     StMG.end_game(acct)
@@ -815,8 +815,8 @@ def worker(status):
                     if result2:
                         toot('@%s %s【%s】の「%s」！\n(ラリー数：%d)\n※このトゥートにリプしてね！\n※DMでお願いねー！'%(acct, ret_word, ret_yomi, tail, StMG.games[acct].rcnt), 'direct',  id, None,interval=a)
                     else:
-                        tmp_score = 5+StMG.games[acct].rcnt+StMG.games[acct].lv
-                        tmp_score *= 25
+                        tmp_score = StMG.games[acct].rcnt+StMG.games[acct].lv
+                        tmp_score //= 2
                         toot('@%s %s【%s】\n%sえ〜ん負けたー！\n(ラリー数：%d／%d点獲得)'%(acct, ret_word, ret_yomi,text2, StMG.games[acct].rcnt,tmp_score), 'direct',  id, None,interval=a)
                         SM.update(acct, 'getnum', score=tmp_score)
                         StMG.end_game(acct)
@@ -830,13 +830,13 @@ def worker(status):
     elif re.search(r"[!！]スロット", content) and g_vis == 'direct':
         fav_now(id)
         reelsize = 5
-        if re.search(r"100", content):
-            slot_rate = 100
-            reel_num = 5
-        elif re.search(r"10", content):
-            slot_rate = 10
-            reel_num = 4
-        elif re.search(r"ミニ", content):
+        # if re.search(r"100", content):
+        #     slot_rate = 100
+        #     reel_num = 5
+        # elif re.search(r"10", content):
+        #     slot_rate = 10
+        #     reel_num = 4
+        if re.search(r"ミニ", content):
             slot_rate = 0.1
             reel_num = 4
         else:
@@ -846,10 +846,10 @@ def worker(status):
         #所持金チェック
         acct_score = SM.show(acct)[0][1]
         if acct_score < int(slot_rate*3):
-            toot('@%s 得点足りないよー！（所持：%d点／必要：%d点）\nレートを下げるかスロットミニか、他のゲームで稼いでねー！'%(acct,acct_score,slot_rate*3), 'direct', rep=id,interval=a)
+            toot('@%s 得点足りないよー！（所持：%d点／必要：%d点）\nスロットミニや他のゲームで稼いでねー！'%(acct,acct_score,slot_rate*3), 'direct', rep=id,interval=a)
             return
         #得点補正
-        reel_num += min([2,(acct_score // 100000)])
+        # reel_num += min([2,(acct_score // 100000)])
         #貪欲補正
         slot_bal.append(acct)
         if len(slot_bal) > 100:
@@ -882,6 +882,22 @@ def worker(status):
     elif re.search(r"(ヒントでピント)[：:]", content):
         if g_vis == 'direct':
             word = re.search(r"(ヒントでピント)[：:](.+)", str(content)).group(2)
+            hintPinto_words = []
+            if os.path.exists("hintPinto_words.txt"):
+                for line in open('hintPinto_words.txt','r'):
+                    hintPinto_words.append(line.strip())
+
+            if word in hintPinto_words:
+                toot(f'@{acct} この前やったお題なので別のにして〜！', 'direct', rep=id, interval=a)
+                return
+
+            hintPinto_words.append(word)
+            if len(hintPinto_words) > 10:
+                hintPinto_words.pop(0)
+
+            with open('hintPinto_words.txt','w') as f:
+                f.write("\n".join(hintPinto_words))
+
             HintPintoQ.put([acct,id,word])
             SM.update(acct, 'func')
         else:
@@ -1021,7 +1037,7 @@ def worker(status):
             return
         fav_now(id)
         toot_now = "@%s\n"%acct
-        seeds = DAO.get_least_10toots(acct)
+        seeds = DAO.get_least_10toots()
         tmp = kiri_deep.lstm_gentxt(seeds,num=1)
         tmp = kiri_util.content_cleanser_light(tmp)
         toot_now += tmp
@@ -1354,7 +1370,7 @@ def th_delete():
             print('th_delete:',row)
             if row:
                 acct = row[0]
-                if acct not in del_accts:
+                if acct not in del_accts and acct != BOT_ID:
                     date = '{0:08d}'.format(row[2])
                     time = '{0:06d}'.format(row[3])
                     ymdhms = '%s %s'%(date,time)
@@ -1464,7 +1480,7 @@ def th_hint_de_pinto():
                 break
             if g_acct != acct and term in ans:
                 loop = len(loop_cnt)
-                score = 96*64//(2**loop)
+                score = min([10,len(term)])*8//(2**loop)
                 toot(':@{0}: 正解〜！'.format(acct), g_vis='private', rep=None, spo=None)
                 SM.update(acct, 'getnum', score=score//1)
                 SM.update(g_acct, 'getnum', score=score//2)
@@ -1549,7 +1565,7 @@ def th_gettingnum():
                         toot_now += '💮'
                         hanamaru = True
                         # print('#######%sに%d点！'%(accts[0],val))
-                        score = val*100
+                        score = val
                         SM.update(accts[0], 'getnum', score=score)
                     else:
                         toot_now += '❌'

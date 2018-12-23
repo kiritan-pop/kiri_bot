@@ -246,13 +246,13 @@ class Hunting():
 
 """
 if __name__ == '__main__':
-    g = Friends_nico_slot('kiritan',['yesdotsam', 'JC','rept', 'Thiele','aaa'],1,4) #,'aaa','bbb','ccc','ddd'
+    g = Friends_nico_slot('kiritan',['yesdotsam', 'JC','rept', 'Thiele'],1,5) #,'aaa','bbb','ccc','ddd'
     # print(g.reels)
     # print(len(g.reels[0]))
     # print(len(g.reels[1]))
     # print(len(g.reels[2]))
 
-    game_cnt = 100000
+    game_cnt = 10000
     score_sum = 0
     for i in range(game_cnt):
         rows,score = g.start()
