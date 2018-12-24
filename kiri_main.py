@@ -14,7 +14,7 @@ from collections import defaultdict, Counter
 from dotenv import load_dotenv
 import wikipedia
 import Toot_summary, GenerateText, PrepareChain, bottlemail
-import kiri_util, kiri_deep, kiri_game, kiri_coloring, kiri_romasaga
+import kiri_util, kiri_deep, kiri_game, kiri_romasaga
 from PIL import Image, ImageOps, ImageFile, ImageChops, ImageFilter, ImageEnhance
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -39,7 +39,7 @@ SM = kiri_util.ScoreManager()
 CM = kiri_util.CoolingManager(3)
 DAO = kiri_util.DAO_statuses()
 TRANS = kiri_util.trans(GOOGLE_KEY)
-painter = kiri_coloring.Painter(gpu=-1)
+# painter = kiri_coloring.Painter(gpu=-1)
 #しりとり用
 StMG = kiri_game.Siritori_manager()
 
@@ -326,11 +326,11 @@ def ana_image(media_attachments,sensitive,acct,g_vis,id,content):
         elif result == 'イラスト男':
             toot_now += 'かっこいい！'
         elif result == 'イラスト線画':
-            # if random.randint(0,9) > 0:
-            #     coloring_image(filename,acct,g_vis,id)
-            #     return ''
-            # else:
-            if random.randint(0,9) %4 == 0:
+            r = random.randint(0,100)
+            if r > 50:
+                coloring_image(filename,acct,g_vis,id)
+                return ''
+            elif r > 30:
                 toot_now += '色塗ってー！'
         elif result == 'ろびすて':
             toot_now += '🙏ろびすてとうとい！'
@@ -405,18 +405,17 @@ def ana_image(media_attachments,sensitive,acct,g_vis,id,content):
 
 #######################################################
 # 着色サービス
-def coloring_image(filename, acct, g_vis, id):
-    username = "@" +  acct
+def coloring_image(filename, acct, g_vis, id, color=None):
     media_files = []
-    tmp_file = painter.colorize(filename)
-    # tmp_file = kiri_deep.colorize(filename)
     try:
+        # tmp_file = painter.colorize(filename)
+        tmp_file = kiri_deep.colorize(filename, color=color)
         result = kiri_deep.takoramen(tmp_file)
         if result == 'にじえろ':
-            toot_now = "@%s えっち！"%acct
+            toot_now = f"@{acct} えっち！"
         else:
             media_files.append(mastodon.media_post(tmp_file, 'image/png'))
-            toot_now = "@%s 色塗ったー！ \n#exp15m"%acct
+            toot_now = f"@{acct} 色塗ったー！ \n#exp15m"
         toot(toot_now, g_vis=g_vis, rep=id, media_ids=media_files)
     except Exception as e:
         print(e)
@@ -425,7 +424,6 @@ def coloring_image(filename, acct, g_vis, id):
 #######################################################
 # 顔マーク
 def face_search(filename, acct, g_vis, id):
-    username = "@" +  acct
     media_files = []
     try:
         tmp = kiri_util.face_search(filename)
@@ -948,7 +946,34 @@ def worker(status):
             if '.mp' in filename or '.webm' in filename:
                 pass
             else:
-                coloring_image(filename,acct,g_vis,id)
+                if "赤" in content + spoiler_text:
+                    colorvec = 0
+                elif "青" in content + spoiler_text:
+                    colorvec = 1
+                elif "緑" in content + spoiler_text:
+                    colorvec = 2
+                elif "紫" in content + spoiler_text:
+                    colorvec = 3
+                elif "茶" in content + spoiler_text:
+                    colorvec = 4
+                elif "ピンク" in content + spoiler_text:
+                    colorvec = 5
+                elif "金" in content + spoiler_text:
+                    colorvec = 6
+                elif "白" in content + spoiler_text or "銀" in content + spoiler_text:
+                    colorvec = 7
+                elif "黒" in content + spoiler_text:
+                    colorvec = 8
+                else:
+                    colorvec = None
+
+                result = kiri_deep.takoramen(filename)
+                if result in ["イラスト線画", "漫画"]:
+                    coloring_image(filename,acct,g_vis,id, color=colorvec)
+                else:
+                    line_path = kiri_util.image_to_line(filename)
+                    coloring_image(line_path,acct,g_vis,id, color=colorvec)
+
     elif re.search(r"([わワ][てテ]|拙僧|小職|私|[わワ][たタ][しシ]|[わワ][たタ][くク][しシ]|自分|僕|[ぼボ][くク]|俺|[オお][レれ]|朕|ちん|余|[アあ][タた][シし]|ミー|あちき|あちし|あたち|[あア][たタ][いイ]|[わワ][いイ]|わっち|おいどん|[わワ][しシ]|[うウ][ちチ]|[おオ][らラ]|儂|[おオ][いイ][らラ]|あだす|某|麿|拙者|小生|あっし|手前|吾輩|我輩|わらわ|ぅゅ)の(ランク|ランキング|順位|スコア|成績)", content):
         show_rank(acct=acct, target=acct, id=id, g_vis=g_vis)
         SM.update(acct, 'func')

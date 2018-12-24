@@ -6,8 +6,7 @@ from gensim.models.doc2vec import Doc2Vec
 import MeCab
 import numpy as np
 import random,json
-import sys,io,re,gc
-from liner import kiri_coloring_model
+import sys,io,re,gc,os
 import kiri_util
 from time import sleep
 import unicodedata
@@ -26,6 +25,8 @@ for label,i in labels_index.items():
     labels[i] = label
 
 STANDARD_SIZE = (299, 299)
+STANDARD_SIZE_S1 = (128, 128)
+STANDARD_SIZE_S2 = (512, 512)
 # STANDARD_SIZE = (512, 512)
 
 #いろいろなパラメータ
@@ -36,6 +37,18 @@ AVE_LEN = 5        # vec推定で参照するトゥート(vecor)数
 TXT_MAXLEN = 5      # 
 MU = "🧪"       # 無
 END = "🦷"      # 終わりマーク
+Colors = {}
+Colors['red']    = 0
+Colors['blue']   = 1
+Colors['green']  = 2
+Colors['purple'] = 3
+Colors['brown']  = 4
+Colors['pink']   = 5
+Colors['blonde'] = 6
+Colors['white']  = 7
+Colors['black']  = 8
+Colors_rev = {v:k for k,v in Colors.items()}
+
 tagger = MeCab.Tagger('-Owakati -d /usr/lib/mecab/dic/mecab-ipadic-neologd -u dic/nicodic.dic')
 DAO = kiri_util.DAO_statuses()
 
@@ -59,9 +72,17 @@ lstm_set_path = 'db/lstm_set.h5'
 d2vmodel = Doc2Vec.load(d2v_path)
 lstm_vec_model = load_model(lstm_vec_path)
 lstm_set_model = load_model(lstm_set_path)
+lstm_vec_model._make_predict_function
+lstm_set_model._make_predict_function
 
 takomodel_path = 'db/cnn.h5'
 takomodel = load_model(takomodel_path)
+takomodel._make_predict_function
+
+colorize_s1_model = load_model('db/g_model_s1.h5')
+colorize_s2_model = load_model('db/g_model_s2.h5')
+colorize_s1_model._make_predict_function
+colorize_s2_model._make_predict_function
 
 graph = tf.get_default_graph()
 
@@ -165,36 +186,33 @@ def takoramen(filepath):
     else:
         return 'other'
 
-# def colorize(image_path):
-#     img = Image.open(image_path)
-#     img = img.convert('RGB')
-#     line_image = np.asarray(img)
-#     line_size = (line_image.shape[0],line_image.shape[1])
-#     img = img.resize(STANDARD_SIZE2,Image.LANCZOS)
-#     gray = img.convert("L") #グレイスケール
-#     gray2 = gray.filter(ImageFilter.MaxFilter(5))
-#     senga_inv = ImageChops.difference(gray, gray2)
-#     img = ImageOps.invert(senga_inv)
-#     img = img.point(lambda x: 255 if x > 230 else x)
-#     img = img.convert("RGB")  #フォーマット戻し
-#     img = np.asarray(img)
-#     img = (img-127.5)/127.5
-#     with graph.as_default():
-#         g_model.load_weights(g_model_path, by_name=False)
-#         selcol = random.choice(list(Colors.keys()))
-#         colorvec = Colors[selcol]
-#         image = g_model.predict([np.array([img]), np.array([colorvec]) ])[0]
-#         image = (image*127.5+127.5).clip(0, 255).astype(np.uint8)
-#         filename = 'media/__coloring.png'
-#         Image.fromarray(image).resize((line_size[1],line_size[0]),Image.LANCZOS ).save(filename, optimize=True)
-#         return filename
+def colorize(image_path, color=None):
+    img = Image.open(image_path)
+    img = img.convert('L')
+    line_image128 = img.resize(STANDARD_SIZE_S1,Image.BICUBIC)
+    line_image128 = (np.asarray(line_image128)-127.5)/127.5
+    line_image512 = img.resize(STANDARD_SIZE_S2,Image.BICUBIC)
+    line_image512 = (np.asarray(line_image512)-127.5)/127.5
+    if color == None:
+        colorvec = random.randrange(len(Colors))
+    else:
+        colorvec = color
+    with graph.as_default():
+        gen1 = colorize_s1_model.predict([np.array([line_image128]), np.array([colorvec]) ])[0]
+        gen2 = colorize_s2_model.predict([np.array([line_image512]), np.array([gen1]) ])[0]
+
+    gen2 = (gen2*127.5+127.5).clip(0, 255).astype(np.uint8)
+
+    filename = 'colorize_images/'
+    if not os.path.exists(filename):
+        os.mkdir(filename)
+
+    filename += image_path.split("/")[-1].split(".")[0] + "_" + Colors_rev[colorvec] + ".png"
+    Image.fromarray(gen2).resize(img.size, Image.LANCZOS ).save(filename, optimize=True)
+
+    return filename
 
 if __name__ == '__main__':
-#    text = ''
-#    while text != 'exit':
-#        print('input text')
-#        text = input('>>>')
-#        print(gentxt(text))
     text = ''
     while text != 'exit':
         print('input path')

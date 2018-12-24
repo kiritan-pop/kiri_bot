@@ -22,6 +22,7 @@ from mimetypes import guess_extension
 from urllib.request import urlopen, Request
 import requests
 from pprint import pprint as pp
+from PIL import Image, ImageOps, ImageFile, ImageChops, ImageFilter, ImageEnhance
 
 
 BOT_ID = 'kiri_bot01'
@@ -774,6 +775,22 @@ def img_url_list(word):
     img_urls = [e.get('href') for e in img_link_elems if e.get('href').startswith('http')]
     img_urls = list(set(img_urls))
     return img_urls
+
+#######################################################
+# 線画化
+def image_to_line(path): # img:RGBモード
+    # 線画化
+    img = Image.open(path)
+    gray = img.convert("L") #グレイスケール
+    gray2 = gray.filter(ImageFilter.MaxFilter(5))
+    senga_inv = ImageChops.difference(gray, gray2)
+    senga_inv = ImageOps.invert(senga_inv)
+    senga_inv.filter(ImageFilter.MedianFilter(5))
+    save_path = "media/_templine.png"
+    senga_inv.save(save_path)
+    return save_path
+
+
 
 if __name__ == '__main__':
     # DAO = DAO_statuses()
