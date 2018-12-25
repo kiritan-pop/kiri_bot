@@ -335,6 +335,11 @@ def ana_image(media_attachments,sensitive,acct,g_vis,id,content):
         elif result == 'ろびすて':
             toot_now += '🙏ろびすてとうとい！'
         elif result == '漫画':
+            # r = random.randint(0,100)
+            # if r > 50:
+            #     coloring_image(filename,acct,g_vis,id)
+            #     return ''
+            # else:
             toot_now += 'それなんて漫画ー？'
         elif result in  ['汚部屋','部屋','自撮り','太もも']:
             toot_now += result + 'だー！'
@@ -411,7 +416,7 @@ def coloring_image(filename, acct, g_vis, id, color=None):
         # tmp_file = painter.colorize(filename)
         tmp_file = kiri_deep.colorize(filename, color=color)
         result = kiri_deep.takoramen(tmp_file)
-        if result == 'にじえろ':
+        if g_vis != 'direct' and result == 'にじえろ':
             toot_now = f"@{acct} えっち！"
         else:
             media_files.append(mastodon.media_post(tmp_file, 'image/png'))
@@ -952,13 +957,13 @@ def worker(status):
                     colorvec = 1
                 elif "緑" in content + spoiler_text:
                     colorvec = 2
-                elif "紫" in content + spoiler_text:
+                elif "紫" in content + spoiler_text or "パープル" in content + spoiler_text:
                     colorvec = 3
-                elif "茶" in content + spoiler_text:
+                elif "茶" in content + spoiler_text or "ブラウン" in content + spoiler_text:
                     colorvec = 4
-                elif "ピンク" in content + spoiler_text:
+                elif "ピンク" in content + spoiler_text or "桃" in content + spoiler_text:
                     colorvec = 5
-                elif "金" in content + spoiler_text:
+                elif "金" in content + spoiler_text or "黃" in content + spoiler_text:
                     colorvec = 6
                 elif "白" in content + spoiler_text or "銀" in content + spoiler_text:
                     colorvec = 7
@@ -968,9 +973,11 @@ def worker(status):
                     colorvec = None
 
                 result = kiri_deep.takoramen(filename)
-                if result in ["イラスト線画", "漫画"]:
+                if result in ["イラスト線画"]:
+                    # 線画はそのまま塗る
                     coloring_image(filename,acct,g_vis,id, color=colorvec)
                 else:
+                    # それ以外は一旦線画に変換してから
                     line_path = kiri_util.image_to_line(filename)
                     coloring_image(line_path,acct,g_vis,id, color=colorvec)
 
@@ -1001,7 +1008,7 @@ def worker(status):
         if len(content) * 0.8 < abclen:
             fav_now(id)
             lang = TRANS.detect(content)
-            if lang:
+            if lang and lang != 'ja':
                 toot_now = TRANS.xx2ja(lang, content)
                 if toot_now:
                     if re.search(r"[^:]@|^@", toot_now):

@@ -201,14 +201,18 @@ def colorize(image_path, color=None):
         gen1 = colorize_s1_model.predict([np.array([line_image128]), np.array([colorvec]) ])[0]
         gen2 = colorize_s2_model.predict([np.array([line_image512]), np.array([gen1]) ])[0]
 
+    gen1 = (gen1*127.5+127.5).clip(0, 255).astype(np.uint8)
     gen2 = (gen2*127.5+127.5).clip(0, 255).astype(np.uint8)
 
-    filename = 'colorize_images/'
-    if not os.path.exists(filename):
-        os.mkdir(filename)
+    savepath = 'colorize_images/'
+    if not os.path.exists(savepath):
+        os.mkdir(savepath)
 
-    filename += image_path.split("/")[-1].split(".")[0] + "_" + Colors_rev[colorvec] + ".png"
+    filename = savepath + image_path.split("/")[-1].split(".")[0] + "_" + Colors_rev[colorvec] + "_g2.png"
     Image.fromarray(gen2).resize(img.size, Image.LANCZOS ).save(filename, optimize=True)
+
+    filename2 = savepath + image_path.split("/")[-1].split(".")[0] + "_" + Colors_rev[colorvec] + "_g1.png"
+    Image.fromarray(gen1).resize(img.size, Image.LANCZOS ).save(filename2, optimize=True)
 
     return filename
 
