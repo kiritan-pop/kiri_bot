@@ -1532,7 +1532,7 @@ def th_hint_de_pinto():
 def th_gettingnum():
     gamenum = 100
     junbiTM = kiri_util.KiriTimer(60*60)
-    junbiTM.reset(30*60)
+    junbiTM.reset(1*60)
     junbiTM.start()
     gameTM = kiri_util.KiriTimer(240)
     while True:

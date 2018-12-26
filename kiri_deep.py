@@ -187,11 +187,10 @@ def takoramen(filepath):
         return 'other'
 
 def colorize(image_path, color=None):
-    img = Image.open(image_path)
-    img = img.convert('L')
-    line_image128 = img.resize(STANDARD_SIZE_S1,Image.BICUBIC)
+    img = Image.open(image_path).convert('L')
+    line_image128 =  kiri_util.image_resize(img,STANDARD_SIZE_S1)
     line_image128 = (np.asarray(line_image128)-127.5)/127.5
-    line_image512 = img.resize(STANDARD_SIZE_S2,Image.BICUBIC)
+    line_image512 =  kiri_util.image_resize(img,STANDARD_SIZE_S2)
     line_image512 = (np.asarray(line_image512)-127.5)/127.5
     if color == None:
         colorvec = random.randrange(len(Colors))
@@ -208,11 +207,19 @@ def colorize(image_path, color=None):
     if not os.path.exists(savepath):
         os.mkdir(savepath)
 
-    filename = savepath + image_path.split("/")[-1].split(".")[0] + "_" + Colors_rev[colorvec] + "_g2.png"
-    Image.fromarray(gen2).resize(img.size, Image.LANCZOS ).save(filename, optimize=True)
+    tmp = Image.fromarray(gen1)
+    tmp = tmp.resize(img.size, Image.LANCZOS )
+    tmp = tmp.resize((max(img.size), max(img.size)) ,Image.LANCZOS)
+    tmp = kiri_util.crop_center(tmp, img.size[0], img.size[1])
+    filename = savepath + image_path.split("/")[-1].split(".")[0] + "_" + Colors_rev[colorvec] + "_g1.png"
+    tmp.save(filename, optimize=True)
 
-    filename2 = savepath + image_path.split("/")[-1].split(".")[0] + "_" + Colors_rev[colorvec] + "_g1.png"
-    Image.fromarray(gen1).resize(img.size, Image.LANCZOS ).save(filename2, optimize=True)
+    tmp = Image.fromarray(gen2)
+    tmp = tmp.resize(img.size, Image.LANCZOS )
+    tmp = tmp.resize((max(img.size), max(img.size)) ,Image.LANCZOS)
+    tmp = kiri_util.crop_center(tmp, img.size[0], img.size[1])
+    filename = savepath + image_path.split("/")[-1].split(".")[0] + "_" + Colors_rev[colorvec] + "_g2.png"
+    tmp.save(filename, optimize=True)
 
     return filename
 
