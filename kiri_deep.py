@@ -217,7 +217,7 @@ def colorize(image_path, color=None):
     tmp = Image.fromarray(gen2)
     tmp = tmp.resize(img.size, Image.LANCZOS )
     tmp = tmp.resize((max(img.size), max(img.size)) ,Image.LANCZOS)
-    tmp = kiri_util.crop_center(tmp, img.size[0], img.size[1])
+    tmp = kiri_util.crop_center(tmp, img.width, img.height)
     filename = savepath + image_path.split("/")[-1].split(".")[0] + "_" + Colors_rev[colorvec] + "_g2.png"
     tmp.save(filename, optimize=True)
 
