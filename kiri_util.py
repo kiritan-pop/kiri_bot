@@ -781,7 +781,8 @@ def img_url_list(word):
 def image_to_line(path): # img:RGBモード
     # 線画化
     img = Image.open(path)
-    gray = img.convert("L") #グレイスケール
+    # gray = img.convert("L") #グレイスケール
+    gray = new_convert(img, "L") #グレイスケール
     gray2 = gray.filter(ImageFilter.MaxFilter(5))
     senga_inv = ImageChops.difference(gray, gray2)
     senga_inv = ImageOps.invert(senga_inv)
@@ -819,6 +820,17 @@ def crop_center(pil_img, crop_width, crop_height):
                          (img_height - crop_height) // 2,
                          (img_width + crop_width) // 2,
                          (img_height + crop_height) // 2))
+
+def new_convert(img, mode):
+    if img.mode == "RGBA":
+        bg = Image.new("RGB", img.size, (255, 255, 255))
+        bg.paste(img, mask=img.split()[3])
+    elif img.mode == "LA":
+        bg = Image.new("L", img.size, (255,))
+        bg.paste(img, mask=img.split()[1])
+    else:
+        bg = img
+    return bg.convert(mode)
 
 if __name__ == '__main__':
     # DAO = DAO_statuses()

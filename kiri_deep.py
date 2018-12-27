@@ -158,7 +158,11 @@ def takoramen(filepath):
     extention = filepath.rsplit('.',1)[-1]
     print(filepath,extention)
     if extention in ['png','jpg','jpeg','gif']:
-        image = np.asarray(Image.open(filepath).convert('RGB').resize(STANDARD_SIZE) )
+        # image = np.asarray(Image.open(filepath).convert('RGB').resize(STANDARD_SIZE) )
+        image = Image.open(filepath)
+        image = kiri_util.new_convert(image, "RGB")
+        image = image.resize(STANDARD_SIZE) 
+        image = np.asarray(image)
     elif extention in ['mp4','webm']:
         cap = cv2.VideoCapture(filepath)
         _, image = cap.read()
@@ -187,7 +191,8 @@ def takoramen(filepath):
         return 'other'
 
 def colorize(image_path, color=None):
-    img = Image.open(image_path).convert('L')
+    img = Image.open(image_path)
+    img = kiri_util.new_convert(img, 'L')
     line_image128 =  kiri_util.image_resize(img,STANDARD_SIZE_S1)
     line_image128 = (np.asarray(line_image128)-127.5)/127.5
     line_image512 =  kiri_util.image_resize(img,STANDARD_SIZE_S2)
