@@ -5,6 +5,7 @@ import os,sys,io,re
 import requests
 import http.client
 import urllib.parse
+import numpy as np
 from urllib.parse import quote
 from time import time, sleep
 import unicodedata
@@ -326,8 +327,23 @@ class DAO_statuses():
     def __init__(self):
         #path
         self.STATUSES_DB_PATH = "db/statuses.db"
+        self.DB_SCHEMA_PATH = "statuses.sql"
+        # create index date_idx on statuses(date);
+        # create index time_idx on statuses(time);
+        # create index datetime_idx on statuses(date,time);
         #トゥート先NGの人たちー！
         self.ng_user_set = set('friends_nico')
+
+        # DBがない場合、作る！
+        if not os.path.exists(self.STATUSES_DB_PATH):
+            con = sqlite3.connect(
+                self.STATUSES_DB_PATH, timeout=TIMEOUT, isolation_level='EXCLUSIVE')
+            with open(self.DB_SCHEMA_PATH, "r") as f:
+                schema = f.read()
+
+            con.execute(schema)
+            con.commit()
+            con.close()
 
     #######################################################
     # 指定された時間内から一人ユーザを選ぶ
@@ -776,6 +792,188 @@ def img_url_list(word):
     img_urls = list(set(img_urls))
     return img_urls
 
+def newyear_icon_maker(path, mode=0):
+    if mode==0:
+        STEP = 2
+        FPS = 30//STEP
+        DWON = 4
+        cap = cv2.VideoCapture("db/material/newyear.mp4")
+    else:
+        STEP = 2
+        FPS = 30//STEP
+        DWON = 2
+        cap = cv2.VideoCapture("db/material/gear.mp4")
+    base_images = []
+    anime_images = []
+    cnt = 0
+    if path.split(".")[-1].lower() not in ('jpg', 'jpeg', 'gif', 'png', 'bmp'):
+        return None
+
+    base_icon = Image.open(path)
+    if base_icon.mode in ["RGB", "L"]:
+        newpath = auto_alpha(path)
+        base_icon = Image.open(newpath)
+
+    base_icon = base_icon.convert("RGBA")
+
+    SIZE = (base_icon.width*400//max(base_icon.size),
+            base_icon.height*400//max(base_icon.size))
+    # if max(base_icon.size) > 400:
+    #     SIZE = (base_icon.width*400//max(base_icon.size),
+    #             base_icon.height*400//max(base_icon.size))
+    # else:
+    #     SIZE = base_icon.size
+    base_icon = base_icon.resize(SIZE, Image.LANCZOS)
+
+    def dwondwon(x):
+        if x < 0:
+            return 0
+        elif x > 1:
+            return dwondwon(x - 1.0)
+        
+        if x <= 0.2:
+            return x/0.2
+        else:
+            return 1.0 - (x-0.2)/0.8
+
+    while True:
+        flag, img = cap.read()
+        if flag == False:
+            break
+        if cnt % STEP == 0:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            img = Image.fromarray(img)  #.resize(SIZE, Image.LANCZOS)
+            if max(img.size) > 500:
+                img = crop_center(img, 500, 500)
+            base_images.append(img)
+        cnt += 1
+
+    for i, base_image in enumerate(base_images):
+        # print(base_icon.mode)
+        if base_icon.mode == "RGBA":
+            tmp = base_icon.copy()
+            # 横揺れ
+            rate = 5 * np.sin(2.0*np.pi*i/len(base_images))
+            tmp = tmp.rotate(rate, expand=True, resample=Image.BICUBIC)
+
+            # ドゥンドゥン
+            rate = 1.0 + 0.1 * dwondwon(DWON*i/len(base_images))
+            print(rate)
+            tmp = tmp.resize((int(tmp.width*rate), int(tmp.height*rate)),
+                             resample=Image.BICUBIC)
+
+            base_image.paste(tmp, ((base_image.width - tmp.width)//2,
+                                   base_image.height - tmp.height), mask=tmp.split()[3])
+        else:
+            return None
+
+        anime_images.append(base_image.resize((400,400), Image.LANCZOS).convert("P", dither=None,
+                            palette=Image.ADAPTIVE, colors=256))
+
+    genpath = path.split(".")[0] + "_gen.gif"
+    anime_images[0].save(genpath,
+                         # save_all=True, append_images=anime_images[1:], include_color_table=True, interlace=True, optimize=True, duration=1000.0/(30.0*STEP), loop=0)
+                         save_all=True, append_images=anime_images[1:], optimize=True, duration=1000.0/FPS, loop=0)
+
+    return genpath
+
+def auto_alpha(path):
+    DVR = 20
+    img = Image.open(path)
+    SIZE = (img.width*400//max(img.size),
+            img.height*400//max(img.size))
+    # if max(img.size) > 400:
+    #     SIZE = (img.width*400//max(img.size),
+    #             img.height*400//max(img.size))
+    # else:
+    #     SIZE = img.size
+
+    img = img.resize(SIZE, Image.LANCZOS)
+
+    # img = img.filter(ImageFilter.CONTOUR)
+    # img = img.convert("L")
+    gray = new_convert(img, "L")  # グレイスケール
+    enhancer = ImageEnhance.Contrast(gray)
+    gray = enhancer.enhance(2.0)
+
+    gray.save("media/gray.png")
+    img_mat = np.asarray(gray, dtype=np.uint8)
+    gray2 = gray.filter(ImageFilter.MaxFilter(3))
+    senga_inv = ImageChops.difference(gray, gray2)
+    senga_inv = ImageOps.invert(senga_inv)
+    senga_inv.filter(ImageFilter.MedianFilter(5))
+    enhancer = ImageEnhance.Contrast(senga_inv)
+    senga_inv = enhancer.enhance(5.0)
+    # senga_inv = senga_inv.filter(ImageFilter.GaussianBlur(0.5))
+    senga_inv.save("media/edge.png")
+    edge = np.asarray(senga_inv)
+    # 四隅から領域調査
+    CS = set([0,255])
+    for h, w in [(0, 0), (0, img.width//2), (0, img.width-1), (img.height//2, 0), (img.height//2, img.width-1), (img.height-1, 0), (img.height-1, img.width//2), (img.height-1, img.width-1)]:
+        CS.add(img_mat[h, w])
+
+    EDGE_VAL = 255
+    max_mask = np.zeros((img_mat.shape), dtype=np.uint8)
+    for c_min, c_max in [(max([0, i-DVR]), min([i+DVR, 255])) for i in CS]:
+        mask = np.ones((img_mat.shape), dtype=np.uint8)
+        for sh, sw in [(0, 0), (0, img.width//2), (0, img.width-1), (img.height//2, 0), (img.height//2, img.width-1), (img.height-1, 0), (img.height-1, img.width//2), (img.height-1, img.width-1)]:
+            que = []
+            if mask[sh, sw] == 1 and c_min <= img_mat[sh, sw] <= c_max:
+                que.append((sh,sw))
+            while len(que) > 0:
+                # print(len(que))
+                h, w = que.pop(0)
+                if mask[h, w] == 1:
+                    if  edge[h, w] >= EDGE_VAL:
+                        mask[h, w] = 255
+                    else:
+                        mask[h, w] = 0
+                        continue
+                else:
+                    continue
+                # 上
+                if h - 1 >= 0:
+                    que.append((h-1, w))
+                # 下
+                if h + 1 <= img.height - 1:
+                    que.append((h+1, w))
+                # 左
+                if w - 1 >= 0:
+                    que.append((h, w-1))
+                # 右
+                if w + 1 <= img.width - 1:
+                    que.append((h, w+1))
+
+        np.where(mask == 1, 0, mask)
+        if np.sum(max_mask) < np.sum(mask):
+            max_mask = mask
+
+    # BB,GB対応
+    
+    if img.mode == "RGB":
+        tmpmat = np.asarray(img)
+        mask = np.zeros((img_mat.shape), dtype=np.uint8)
+        for r,g,b in [(0,255,0), (0,0,255)]:
+            for h in range(img.height):
+                for w in range(img.width):
+                    if r - DVR <= tmpmat[h, w][0] <= r + DVR and g - DVR <= tmpmat[h, w][1] <= g + DVR and b - DVR <= tmpmat[h, w][2] <= b + DVR:
+                        mask[h, w] = 255
+
+            if np.sum(max_mask) < np.sum(mask):
+                max_mask = mask
+
+    # 反転
+    max_mask = 255 - max_mask
+    max_mask = Image.fromarray(max_mask)
+    max_mask = max_mask.filter(ImageFilter.MaxFilter(3))
+    max_mask = max_mask.filter(ImageFilter.MinFilter(3))
+    max_mask = max_mask.filter(ImageFilter.GaussianBlur(2.0))
+    max_mask.save("media/mask.png")
+    img.putalpha(max_mask)
+    retpath = path.split(".")[0] + "_putalpha.png"
+    img.save(retpath)
+    return retpath
+
 #######################################################
 # 線画化
 def image_to_line(path): # img:RGBモード
@@ -806,7 +1004,7 @@ def expand2square(pil_img, background_color):
 
 def image_resize(img, resize):
     # アスペクト比維持
-    tmp = img
+    tmp = img.copy()
     # tmp.thumbnail(resize,Image.BICUBIC)
     if tmp.mode == 'L':
         tmp = expand2square(tmp,(255,))
