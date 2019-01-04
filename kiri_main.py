@@ -15,7 +15,7 @@ from collections import defaultdict, Counter
 from dotenv import load_dotenv
 import wikipedia
 import GenerateText, bottlemail
-import kiri_util, kiri_game, kiri_romasaga, kiri_deep
+import kiri_util, kiri_game, kiri_romasaga #, kiri_deep
 from PIL import Image, ImageOps, ImageFile, ImageChops, ImageFilter, ImageEnhance
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -770,7 +770,7 @@ def worker(status):
             id_now = None
     elif re.search(r"パソコンつけ", content) and acct == "12":
             SM.update(acct, 'func')
-            if rand % 2 == 0:
+            if rnd % 2 == 0:
                 toot_now = '!お年玉'
             else:
                 toot_now = '!おみくじ10連'
