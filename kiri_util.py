@@ -793,16 +793,24 @@ def img_url_list(word):
     return img_urls
 
 def newyear_icon_maker(path, mode=0):
+    print("newyear_icon_maker")
+    REP = 1
     if mode==0:
         STEP = 2
-        FPS = 30//STEP
         DWON = 4
         cap = cv2.VideoCapture("db/material/newyear.mp4")
-    else:
+    elif mode==1:
         STEP = 2
-        FPS = 30//STEP
         DWON = 2
         cap = cv2.VideoCapture("db/material/gear.mp4")
+    elif mode==2:
+        STEP = 1
+        DWON = 3
+        REP = 2
+        cap = cv2.VideoCapture("db/material/nc178379.mp4")
+
+    FPS = 30//STEP
+
     base_images = []
     anime_images = []
     cnt = 0
@@ -810,9 +818,16 @@ def newyear_icon_maker(path, mode=0):
         return None
 
     base_icon = Image.open(path)
-    if base_icon.mode in ["RGB", "L"]:
+    print(f"mode={base_icon.mode}")
+    if base_icon.mode in ["RGB", "L", "P"]:
         newpath = auto_alpha(path)
         base_icon = Image.open(newpath)
+    elif base_icon.mode == "RGBA":
+        tmp = np.asarray(base_icon.split()[3])
+        # ほとんど透過していない場合も
+        if np.mean(tmp) >= 250:
+            newpath = auto_alpha(path)
+            base_icon = Image.open(newpath)
 
     base_icon = base_icon.convert("RGBA")
 
@@ -836,18 +851,21 @@ def newyear_icon_maker(path, mode=0):
         else:
             return 1.0 - (x-0.2)/0.8
 
-    while True:
-        flag, img = cap.read()
-        if flag == False:
-            break
-        if cnt % STEP == 0:
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            img = Image.fromarray(img)  #.resize(SIZE, Image.LANCZOS)
-            if max(img.size) > 500:
-                img = crop_center(img, 500, 500)
-            base_images.append(img)
-        cnt += 1
+    for _ in range(REP):
+        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+        while True:
+            flag, img = cap.read()
+            if flag == False:
+                break
+            if cnt % STEP == 0:
+                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                img = Image.fromarray(img)  #.resize(SIZE, Image.LANCZOS)
+                if max(img.size) > 500:
+                    img = crop_center(img, 500, 500)
+                base_images.append(img)
+            cnt += 1
 
+    print(len(base_images))
     for i, base_image in enumerate(base_images):
         # print(base_icon.mode)
         if base_icon.mode == "RGBA":
@@ -857,8 +875,8 @@ def newyear_icon_maker(path, mode=0):
             tmp = tmp.rotate(rate, expand=True, resample=Image.BICUBIC)
 
             # ドゥンドゥン
-            rate = 1.0 + 0.1 * dwondwon(DWON*i/len(base_images))
-            print(rate)
+            rate = 1.0 + 0.15 * dwondwon(DWON*i/len(base_images))
+            # print(rate)
             tmp = tmp.resize((int(tmp.width*rate), int(tmp.height*rate)),
                              resample=Image.BICUBIC)
 
@@ -878,8 +896,9 @@ def newyear_icon_maker(path, mode=0):
     return genpath
 
 def auto_alpha(path):
+    print("auto_alpha")
     DVR = 20
-    img = Image.open(path)
+    img = Image.open(path).convert("RGB")
     SIZE = (img.width*400//max(img.size),
             img.height*400//max(img.size))
     # if max(img.size) > 400:

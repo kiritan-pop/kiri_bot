@@ -677,6 +677,12 @@ def worker(status):
         if rnd <= 2:
             toot_now = '( *ˊᵕˋ)ﾉ:@%s: ﾅﾃﾞﾅﾃﾞ'%acct
             id_now = None
+    elif re.search(r"^.+じゃないが$", content+spoiler_text):
+        word = re.search(r"^(.+)じゃないが$", content+spoiler_text).group(1)
+        SM.update(acct, 'func')
+        if rnd <= 6:
+            toot_now = f'{word}じゃが！'
+            id_now = None
     elif re.search(r"^はいじゃないが$", content+spoiler_text):
         SM.update(acct, 'func')
         if rnd <= 6:
@@ -719,6 +725,8 @@ def worker(status):
         filename = download(media_attachments[0]["url"], "media")
         if re.search(r"正月", content):
             ret = kiri_util.newyear_icon_maker(filename)
+        elif re.search(r"2|２", content):
+            ret = kiri_util.newyear_icon_maker(filename,mode=2)
         else:
             ret = kiri_util.newyear_icon_maker(filename,mode=1)
         if ret:
@@ -786,6 +794,11 @@ def worker(status):
     if len(toot_now) > 0:
         toot(toot_now, vis_now, id_now, None, None, interval)
         return
+
+    if re.search(r"死ね", content+spoiler_text):
+        SM.update(acct, 'func',score=-20)
+    if re.search(r"^クソ|クソ$|[^ダ]クソ", content+spoiler_text):
+        SM.update(acct, 'func',score=-3)
 
     ############################################################
     #各種機能
@@ -1820,7 +1833,7 @@ def th_post():
         try:
             func,args = PostQ.get()
             func(*args)
-            sleep(1.0+CM.get_coolingtime())
+            sleep(2.0+CM.get_coolingtime())
         except Exception as e:
             print(e)
             kiri_util.error_log()
