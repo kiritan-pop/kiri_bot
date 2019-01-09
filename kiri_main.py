@@ -739,22 +739,6 @@ def worker(status):
         toot_now = ana_image(media_attachments, sensitive, acct, g_vis, id_now, content)
         id_now = None
         interval = 0
-    elif len(media_attachments) > 0 and re.search(r"きりぼ.*アイコン作", content):
-        SM.update(acct, 'func', score=1)
-        filename = download(media_attachments[0]["url"], "media")
-        if re.search(r"正月", content):
-            ret = kiri_util.newyear_icon_maker(filename)
-        elif re.search(r"2|２", content):
-            ret = kiri_util.newyear_icon_maker(filename,mode=2)
-        else:
-            ret = kiri_util.newyear_icon_maker(filename,mode=1)
-        if ret:
-            media = mastodon.media_post(ret, 'image/gif')
-            toot_now = f"@{acct} できたよ〜 \n ここでgifに変換するといいよ〜 https://www.aconvert.com/jp/video/mp4-to-gif/ \n#exp15m"
-            toot(toot_now, g_vis=g_vis, rep=id, media_ids=[media])
-            return
-        else:
-            toot_now = f"@{acct} 透過画像じゃないとな〜"
     elif re.search(r"^う$", content):
         SM.update(acct, 'func')
         if rnd <= 6:
@@ -869,7 +853,7 @@ def worker(status):
         else:
             toot('@%s %s\nわーい勝ったー！\n(ラリー数：%d)'%(acct, text, StMG.games[acct].rcnt), 'direct',  id, None,interval=a)
             StMG.end_game(acct)
-    if re.search(r"[!！]スロット", content) and g_vis == 'direct':
+    elif re.search(r"[!！]スロット", content) and g_vis == 'direct':
         fav_now(id)
         reelsize = 5
         # if re.search(r"100", content):
@@ -1019,6 +1003,25 @@ def worker(status):
                     # それ以外は一旦線画に変換してから
                     line_path = kiri_util.image_to_line(filename)
                     coloring_image(line_path,acct,g_vis,id, color=colorvec)
+
+    elif len(media_attachments) > 0 and re.search(r"きりぼ.*アイコン作", content):
+        SM.update(acct, 'func', score=1)
+        filename = download(media_attachments[0]["url"], "media")
+        if re.search(r"正月", content):
+            mode = 0
+        elif re.search(r"2|２", content):
+            mode = 2
+        else:
+            mode = 1
+
+        ret = kiri_util.newyear_icon_maker(filename,mode=mode)
+        if ret:
+            media = mastodon.media_post(ret, 'image/gif')
+            toot_now = f"@{acct} できたよ〜 \n ここでgifに変換するといいよ〜 https://www.aconvert.com/jp/video/mp4-to-gif/ \n#exp15m"
+            toot(toot_now, g_vis=g_vis, rep=id, media_ids=[media])
+        else:
+            toot_now = f"@{acct} 透過画像じゃないとな〜"
+            toot(toot_now, g_vis=g_vis, rep=id)
 
     elif re.search(r"([わワ][てテ]|拙僧|小職|私|[わワ][たタ][しシ]|[わワ][たタ][くク][しシ]|自分|僕|[ぼボ][くク]|俺|[オお][レれ]|朕|ちん|余|[アあ][タた][シし]|ミー|あちき|あちし|あたち|[あア][たタ][いイ]|[わワ][いイ]|わっち|おいどん|[わワ][しシ]|[うウ][ちチ]|[おオ][らラ]|儂|[おオ][いイ][らラ]|あだす|某|麿|拙者|小生|あっし|手前|吾輩|我輩|わらわ|ぅゅ)の(ランク|ランキング|順位|スコア|成績)", content):
         show_rank(acct=acct, target=acct, id=id, g_vis=g_vis)
