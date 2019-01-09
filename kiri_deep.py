@@ -7,7 +7,7 @@ import MeCab
 import numpy as np
 import random,json
 import sys,io,re,gc,os
-from kiri_bot import kiri_util
+import kiri_util
 from time import sleep
 import unicodedata
 from PIL import Image, ImageOps, ImageFile, ImageChops, ImageFilter, ImageEnhance
