@@ -1,13 +1,13 @@
 # coding: utf-8
 
-from tensorflow.keras.models import load_model
+from tensorflow.keras.models import load_model, Model
 from tensorflow.keras import backend
 from gensim.models.doc2vec import Doc2Vec
 import MeCab
 import numpy as np
 import random,json
 import sys,io,re,gc,os
-import kiri_util
+from kiri_bot import kiri_util
 from time import sleep
 import unicodedata
 from PIL import Image, ImageOps, ImageFile, ImageChops, ImageFilter, ImageEnhance
@@ -79,10 +79,15 @@ takomodel_path = 'db/cnn.h5'
 takomodel = load_model(takomodel_path)
 takomodel._make_predict_function
 
-colorize_s1_model = load_model('db/g_model_s1.h5')
-colorize_s2_model = load_model('db/g_model_s2.h5')
-colorize_s1_model._make_predict_function
-colorize_s2_model._make_predict_function
+gens1_model = load_model('db/g_model_s1.h5')
+gens2_model = load_model('db/g_model_s2.h5')
+# colorize_s1_model._make_predict_function
+# colorize_s2_model._make_predict_function
+colorize_model = Model(
+        inputs=[gens1_model.inputs[0], gens1_model.inputs[1], gens2_model.inputs[0]], 
+        outputs=[gens2_model([gens2_model.inputs[0], gens1_model.outputs[0]])] 
+    )
+colorize_model._make_predict_function
 
 graph = tf.get_default_graph()
 
@@ -202,22 +207,23 @@ def colorize(image_path, color=None):
     else:
         colorvec = color
     with graph.as_default():
-        gen1 = colorize_s1_model.predict([np.array([line_image128]), np.array([colorvec]) ])[0]
-        gen2 = colorize_s2_model.predict([np.array([line_image512]), np.array([gen1]) ])[0]
+        # gen1 = colorize_s1_model.predict([np.array([line_image128]), np.array([colorvec]) ])[0]
+        # gen2 = colorize_s2_model.predict([np.array([line_image512]), np.array([gen1]) ])[0]
+        gen2 = colorize_model.predict([np.array([line_image128]), np.array([colorvec]), np.array([line_image512])])[0]
 
-    gen1 = (gen1*127.5+127.5).clip(0, 255).astype(np.uint8)
+    # gen1 = (gen1*127.5+127.5).clip(0, 255).astype(np.uint8)
     gen2 = (gen2*127.5+127.5).clip(0, 255).astype(np.uint8)
 
     savepath = 'colorize_images/'
     if not os.path.exists(savepath):
         os.mkdir(savepath)
 
-    tmp = Image.fromarray(gen1)
-    tmp = tmp.resize(img.size, Image.LANCZOS )
-    tmp = tmp.resize((max(img.size), max(img.size)) ,Image.LANCZOS)
-    tmp = kiri_util.crop_center(tmp, img.size[0], img.size[1])
-    filename = savepath + image_path.split("/")[-1].split(".")[0] + "_" + Colors_rev[colorvec] + "_g1.png"
-    tmp.save(filename, optimize=True)
+    # tmp = Image.fromarray(gen1)
+    # tmp = tmp.resize(img.size, Image.LANCZOS )
+    # tmp = tmp.resize((max(img.size), max(img.size)) ,Image.LANCZOS)
+    # tmp = kiri_util.crop_center(tmp, img.size[0], img.size[1])
+    # filename = savepath + image_path.split("/")[-1].split(".")[0] + "_" + Colors_rev[colorvec] + "_g1.png"
+    # tmp.save(filename, optimize=True)
 
     tmp = Image.fromarray(gen2)
     tmp = tmp.resize(img.size, Image.LANCZOS )

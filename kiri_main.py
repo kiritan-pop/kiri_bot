@@ -66,6 +66,7 @@ slot_bal = []
 rep_cnt = []
 rentou = []
 acct_least_created_at = {}
+pita_list = []
 
 toots_for_rep = defaultdict(list)
 
@@ -1118,6 +1119,10 @@ def business_contact(status):
         # toot_now = ':@%s: %s!おかえりー！(๑́ºㅿº๑̀)💦\n #ももな代理 #ニコフレ挨拶部'%(acct,display_name)
         # toot(toot_now, g_vis='public',interval=3)
 
+    pita_list.append(created_at)
+    if len(pita_list) > 1:
+        pita_list.pop(0)
+
     watch_list = set([kansi_acct.strip() for kansi_acct in open('.watch_list').readlines()])
     if acct in watch_list:
         toot_now = '@%s\n:@%s: %s\n「%s」\n#exp10m'%(MASTER_ID, acct, display_name, content)
@@ -1532,7 +1537,7 @@ def th_hint_de_pinto():
 def th_gettingnum():
     gamenum = 100
     junbiTM = kiri_util.KiriTimer(60*60)
-    junbiTM.reset(1*60)
+    junbiTM.reset(30*60)
     junbiTM.start()
     gameTM = kiri_util.KiriTimer(240)
     while True:
@@ -1615,8 +1620,8 @@ def th_gettingnum():
 #######################################################
 # トゥートをいろいろ
 def th_saver():
-    while True:
-        try:
+    try:
+        while True:
             status = StatusQ.get()
             # 業務連絡
             business_contact(status)
@@ -1629,11 +1634,11 @@ def th_saver():
                 kiri_util.error_log()
                 sleep(5)
                 StatusQ.put(status)
-        except Exception as e:
-            print(e)
-            kiri_util.error_log()
-            sleep(10)
-            th_saver()
+    except Exception as e:
+        print(e)
+        kiri_util.error_log()
+        sleep(10)
+        th_saver()
 
 #######################################################
 # ローカルタイムライン監視スレッド
@@ -1764,6 +1769,17 @@ def th_post():
             # th_post()
 
 #######################################################
+# pita
+def th_pita():
+    while True:
+        sleep(10.0)
+        jst_now = datetime.now(timezone('Asia/Tokyo'))
+        diff = timedelta(seconds=60)
+        # toot[-1] + 1min < now -> pita!
+        if len(pita_list) > 0 and pita_list[-1] + diff < jst_now:
+            toot('◝( ・_・)◟ <ﾋﾟﾀｯ!', g_vis='public')
+
+#######################################################
 # メイン
 def main():
     threads = []
@@ -1772,13 +1788,13 @@ def main():
     threads.append( threading.Thread(target=t_user ) ) #LTL
     threads.append( threading.Thread(target=t_sub ) ) #LTL
     #タイムライン応答系
-    # threads.append( threading.Thread(target=th_worker) )
     threads.append( threading.Thread(target=th_delete) )
     threads.append( threading.Thread(target=th_saver) )
     threads.append( threading.Thread(target=th_gettingnum) )
     threads.append( threading.Thread(target=th_hint_de_pinto) )
     threads.append( threading.Thread(target=th_worker) )
     threads.append( threading.Thread(target=th_post) )
+    threads.append( threading.Thread(target=th_pita) )
     #スケジュール起動系(時刻)
     # threads.append( threading.Thread(target=kiri_util.scheduler, args=(summarize_tooter,['**:02'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(bottlemail_sending,['**:05'])) )

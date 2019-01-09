@@ -365,15 +365,29 @@ class DAO_statuses():
         seeds = []
         con = sqlite3.connect(self.STATUSES_DB_PATH, timeout=TIMEOUT, isolation_level='DEFERRED')
         c = con.cursor()
-        if acct == None:
-            sql = r"select content from statuses order by id desc"
-            exe = c.execute(sql)
+        jst_now = datetime.now(timezone('Asia/Tokyo'))
+        ymd = int((jst_now - timedelta(minutes=10)).strftime("%Y%m%d"))
+        hms = int((jst_now - timedelta(minutes=10)).strftime("%H%M%S"))
+        ymd2 = int(jst_now.strftime("%Y%m%d"))
+        hms2 = int(jst_now.strftime("%H%M%S"))
+
+        if ymd == ymd2 and int(hms) <= int(hms2):
+            if acct == None:
+                sql = r"select content from statuses where (date = ? and time >= ? and time <= ? ) order by id desc limit ?"
+                exe = c.execute(sql,(ymd,hms,hms2,limit))
+            else:
+                sql = r"select content from statuses where acct=? and (date = ? and time >= ? and time <= ? ) order by id desc limit ?"
+                exe = c.execute(sql,(acct,ymd,hms,hms2,limit))
         else:
-            sql = r"select content from statuses where acct=? order by id desc"
-            exe = c.execute(sql,[acct])
+            if acct == None:
+                sql = r"select content from statuses where (date = ? and time >= ?) or (date = ? and time <= ? ) or (date > ? and date < ?) order by id desc limit ?"
+                exe = c.execute(sql,(ymd,hms,ymd2,hms2,ymd,ymd2,limit))
+            else:
+                sql = r"select content from statuses where acct=? and ((date = ? and time >= ?) or (date = ? and time <= ? ) or (date > ? and date < ?)) order by id desc limit ?"
+                exe = c.execute(sql,(acct,ymd,hms,ymd2,hms2,ymd,ymd2,limit))
+
         for row in exe:
             content = content_cleanser(row[0])
-            #print('get_least_10toots content=',content)
             if len(content) == 0:
                 continue
             else:
