@@ -577,6 +577,15 @@ def worker(status):
             # toot_now = ":" + username + ": "
             toot_now = random.choice(hanalist) #+ ' 三💨 ﾋﾟｭﾝ!!'
             id_now = None
+    elif re.search(r"花$", content+spoiler_text):
+        SM.update(acct, 'func')
+        if rnd <= 1:
+            tmp = []
+            tmp.append('木')
+            tmp.append('森')
+            tmp.append('種')
+            toot_now = random.choice(tmp)
+            id_now = None
     elif re.search(r"^:twitter:.+🔥$", content, flags=(re.MULTILINE | re.DOTALL)):
         SM.update(acct, 'func')
         if rnd <= 4:
@@ -586,7 +595,7 @@ def worker(status):
             tmp.append('(ﾉ・_・)ﾉ ﾆｹﾞﾃ!⌒🍗 ＜ｱﾘｶﾞﾄｩ!\n🔥')
             toot_now = random.choice(tmp)
             id_now = None
-    elif re.search(r"ブリブリ|ぶりぶり|うん[ちこ]|💩|^流して$", content+spoiler_text):
+    elif re.search(r"ブリブリ|ぶりぶり|うん[ちこ]|💩", content+spoiler_text):
         SM.update(acct, 'func',score=-2)
         if rnd <= 4:
             tmp = []
@@ -595,7 +604,12 @@ def worker(status):
             tmp.append('っ🚽')
             toot_now = random.choice(tmp)
             id_now = None
-    elif re.search(r"^ふきふき$|^竜巻$", content):
+    elif re.search(r"^流して$|^水$", content+spoiler_text):
+        SM.update(acct, 'func')
+        if rnd <= 6:
+            toot_now = '🌊🌊🌊🌊 ＜ざばーっ！'
+            id_now = None
+    elif re.search(r"^ふきふき$|^竜巻$|^風$", content):
         SM.update(acct, 'func')
         if rnd <= 4:
             tmp = []
@@ -603,7 +617,7 @@ def worker(status):
             tmp.append('💨💨💨🍃＜ぴゅ〜〜っ！')
             toot_now = random.choice(tmp)
             id_now = None
-    elif re.search(r"^凍らせて$", content):
+    elif re.search(r"^凍らせて$|^氷$", content):
         SM.update(acct, 'func')
         if rnd <= 2:
             toot_now = '❄❄❄❄❄＜カチコチ〜ッ！'
@@ -688,9 +702,14 @@ def worker(status):
         if rnd <= 6:
             toot_now = 'はいじゃが！'
             id_now = None
-    elif re.search(r"惚気|ほっけ|ホッケ|^燃やして$", content+spoiler_text):
+    elif re.search(r"惚気|ほっけ|ホッケ", content+spoiler_text):
         SM.update(acct, 'func',score=-1)
         if rnd <= 2:
+            toot_now = '🔥🔥🔥🔥＜ごぉぉぉっ！'
+            id_now = None
+    elif re.search(r"^燃やして$|^火$|^炎$", content+spoiler_text):
+        SM.update(acct, 'func')
+        if rnd <= 6:
             toot_now = '🔥🔥🔥🔥＜ごぉぉぉっ！'
             id_now = None
     elif "今日もみなさんが素敵な一日を送れますように" in content and acct == 'lamazeP':
@@ -1559,7 +1578,7 @@ def th_hint_de_pinto():
     # gi = kiri_util.get_images(BING_KEY)
     gi = kiri_util.get_images_GGL(GOOGLE_KEY,GOOGLE_ENGINE_KEY)
     junbiTM = kiri_util.KiriTimer(30*60)
-    junbiTM.reset(5*60)
+    junbiTM.reset(20*60)
     junbiTM.start()
     while True:
         tmp_list = HintPintoQ.get()
@@ -1605,7 +1624,7 @@ def th_hint_de_pinto():
 def th_gettingnum():
     gamenum = 100
     junbiTM = kiri_util.KiriTimer(60*60)
-    junbiTM.reset(1*60)
+    junbiTM.reset(50*60)
     junbiTM.start()
     gameTM = kiri_util.KiriTimer(240)
     while True:
