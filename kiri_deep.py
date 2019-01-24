@@ -32,8 +32,8 @@ STANDARD_SIZE_S2 = (512, 512)
 #いろいろなパラメータ
 #変更するとモデル再構築必要
 VEC_SIZE = 256  # Doc2vecの出力より
-VEC_MAXLEN = 5     # vec推定で参照するトゥート(vecor)数
-AVE_LEN = 5        # vec推定で参照するトゥート(vecor)数
+VEC_MAXLEN = 10     # vec推定で参照するトゥート(vecor)数
+AVE_LEN = 4        # vec推定で参照するトゥート(vecor)数
 TXT_MAXLEN = 5      # 
 MU = "🧪"       # 無
 END = "🦷"      # 終わりマーク
@@ -124,8 +124,6 @@ def lstm_gentxt(toots,num=0,sel_model=None):
     input_mean_vec = input_mean_vec.reshape((1,VEC_MAXLEN, VEC_SIZE))
     with graph.as_default():
         output_vec = lstm_vec_model.predict_on_batch(input_mean_vec)[0]
-    # output_vec = np.mean(input_vec, axis=1)
-    # output_vec = np.reshape(output_vec,(output_vec.shape[1]))
 
     ret = d2vmodel.docvecs.most_similar([output_vec])
     print("  目標のトゥート")
@@ -136,7 +134,7 @@ def lstm_gentxt(toots,num=0,sel_model=None):
     # 推定したベクトルから文章生成
     generated = ''
     char_IDs = [char_idx[MU] for _ in range(TXT_MAXLEN)]    #初期値は無
-    rnd = random.uniform(0.1,0.5)
+    rnd = random.uniform(0.2,0.8)
 
     for i in range(200):
         with graph.as_default():
@@ -153,9 +151,9 @@ def lstm_gentxt(toots,num=0,sel_model=None):
     rtn_text = generated
     print(f'gen pre,rnd={rtn_text},{rnd:2f}')
     rtn_text = re.sub(END,'',rtn_text, flags=(re.MULTILINE | re.DOTALL))
-    # rtn_text = re.sub(r'。{2,}','。',rtn_text, flags=(re.MULTILINE | re.DOTALL))
-    # rtn_text = re.sub(r'^[。、\n]','',rtn_text, flags=(re.MULTILINE | re.DOTALL))
-    # rtn_text = rtn_text.strip()
+    rtn_text = re.sub(r'(.)(.)(.)(\1\2\3){4,}','\1\2\3\1\2\3',rtn_text, flags=(re.MULTILINE | re.DOTALL))
+    rtn_text = re.sub(r'(.)(.)(\1\2){4,}','\1\2\1\2',rtn_text, flags=(re.MULTILINE | re.DOTALL))
+    rtn_text = re.sub(r'(.)(\1){4,}','\1\1',rtn_text, flags=(re.MULTILINE | re.DOTALL))
     print(f'gen text,rnd={rtn_text},{rnd:2f}')
     return rtn_text
 
@@ -163,7 +161,6 @@ def takoramen(filepath):
     extention = filepath.rsplit('.',1)[-1]
     print(filepath,extention)
     if extention in ['png','jpg','jpeg','gif']:
-        # image = np.asarray(Image.open(filepath).convert('RGB').resize(STANDARD_SIZE) )
         image = Image.open(filepath)
         image = kiri_util.new_convert(image, "RGB")
         image = image.resize(STANDARD_SIZE) 
@@ -177,7 +174,6 @@ def takoramen(filepath):
         return 'other'
 
     with graph.as_default():
-        # takomodel.load_weights(takomodel_path + 'w', by_name=False)
         result = takomodel.predict(np.array([image/255.0]))
 
     rslt_dict = {}
@@ -190,7 +186,6 @@ def takoramen(filepath):
     with open('image.log','a') as f:
         f.write("*** image:" + filepath.split('/')[-1] +  "  *** result:%s\n"%str(rslt_dict))
     if max(result[0]) > 0.93:
-        # return labels[np.where(result[0] == max(result[0]) )[0][0]]
         return labels[np.argmax(result[0])]
     else:
         return 'other'
@@ -207,23 +202,13 @@ def colorize(image_path, color=None):
     else:
         colorvec = color
     with graph.as_default():
-        # gen1 = colorize_s1_model.predict([np.array([line_image128]), np.array([colorvec]) ])[0]
-        # gen2 = colorize_s2_model.predict([np.array([line_image512]), np.array([gen1]) ])[0]
         gen2 = colorize_model.predict([np.array([line_image128]), np.array([colorvec]), np.array([line_image512])])[0]
 
-    # gen1 = (gen1*127.5+127.5).clip(0, 255).astype(np.uint8)
     gen2 = (gen2*127.5+127.5).clip(0, 255).astype(np.uint8)
 
     savepath = 'colorize_images/'
     if not os.path.exists(savepath):
         os.mkdir(savepath)
-
-    # tmp = Image.fromarray(gen1)
-    # tmp = tmp.resize(img.size, Image.LANCZOS )
-    # tmp = tmp.resize((max(img.size), max(img.size)) ,Image.LANCZOS)
-    # tmp = kiri_util.crop_center(tmp, img.size[0], img.size[1])
-    # filename = savepath + image_path.split("/")[-1].split(".")[0] + "_" + Colors_rev[colorvec] + "_g1.png"
-    # tmp.save(filename, optimize=True)
 
     tmp = Image.fromarray(gen2)
     tmp = tmp.resize(img.size, Image.LANCZOS )

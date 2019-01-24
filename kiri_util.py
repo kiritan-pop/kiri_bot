@@ -909,12 +909,15 @@ def newyear_icon_maker(path, mode=0):
 
     return genpath
 
-def auto_alpha(path):
+def auto_alpha(path, icon=True):
     print("auto_alpha")
     DVR = 20
     img = Image.open(path).convert("RGB")
-    SIZE = (img.width*400//max(img.size),
-            img.height*400//max(img.size))
+    if icon:
+        SIZE = (img.width*400//max(img.size),
+                img.height*400//max(img.size))
+    else:
+        SIZE = (img.width,img.height)
     # if max(img.size) > 400:
     #     SIZE = (img.width*400//max(img.size),
     #             img.height*400//max(img.size))
@@ -934,7 +937,7 @@ def auto_alpha(path):
     gray2 = gray.filter(ImageFilter.MaxFilter(3))
     senga_inv = ImageChops.difference(gray, gray2)
     senga_inv = ImageOps.invert(senga_inv)
-    senga_inv.filter(ImageFilter.MedianFilter(5))
+    # senga_inv.filter(ImageFilter.MedianFilter(5))
     enhancer = ImageEnhance.Contrast(senga_inv)
     senga_inv = enhancer.enhance(5.0)
     # senga_inv = senga_inv.filter(ImageFilter.GaussianBlur(0.5))

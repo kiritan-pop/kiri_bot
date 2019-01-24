@@ -694,7 +694,7 @@ def worker(status):
     elif re.search(r"^.+じゃないが$", content+spoiler_text):
         word = re.search(r"^(.+)じゃないが$", content+spoiler_text).group(1)
         SM.update(acct, 'func')
-        if rnd <= 6:
+        if rnd <= 6 and len(word) < 10:
             toot_now = f'{word}じゃが！'
             id_now = None
     elif re.search(r"^はいじゃないが$", content+spoiler_text):
@@ -735,7 +735,7 @@ def worker(status):
             tmp.append('٩(٩`^´๑ )三( ๑`^´۶)۶')
             toot_now = random.choice(tmp)
             id_now = None
-    elif len(media_attachments) > 0 and re.search(r"色[ぬ塗]って", content) == None:
+    elif len(media_attachments) > 0 and re.search(r"色[ぬ塗]って", content) == None and re.search(r"きりぼ.*アイコン作", content) == None and re.search(r"きりぼ.*透過して", content) == None:
         toot_now = ana_image(media_attachments, sensitive, acct, g_vis, id_now, content)
         id_now = None
         interval = 0
@@ -1023,14 +1023,22 @@ def worker(status):
             toot_now = f"@{acct} 透過画像じゃないとな〜"
             toot(toot_now, g_vis=g_vis, rep=id)
 
-    elif re.search(r"([わワ][てテ]|拙僧|小職|私|[わワ][たタ][しシ]|[わワ][たタ][くク][しシ]|自分|僕|[ぼボ][くク]|俺|[オお][レれ]|朕|ちん|余|[アあ][タた][シし]|ミー|あちき|あちし|あたち|[あア][たタ][いイ]|[わワ][いイ]|わっち|おいどん|[わワ][しシ]|[うウ][ちチ]|[おオ][らラ]|儂|[おオ][いイ][らラ]|あだす|某|麿|拙者|小生|あっし|手前|吾輩|我輩|わらわ|ぅゅ)の(ランク|ランキング|順位|スコア|成績)", content):
+    elif len(media_attachments) > 0 and re.search(r"きりぼ.*透過して", content):
+        SM.update(acct, 'func', score=1)
+        filename = download(media_attachments[0]["url"], "media")
+        alpha_image_path = kiri_util.auto_alpha(filename, icon=False)
+        media = mastodon.media_post(alpha_image_path, 'image/png')
+        toot_now = f"@{acct} できたよ〜 \n#exp15m"
+        toot(toot_now, g_vis=g_vis, rep=id, media_ids=[media])
+
+    elif re.search(r"([わワ][てテ]|拙僧|小職|私|[わワ][たタ][しシ]|[わワ][たタ][くク][しシ]|自分|僕|[ぼボ][くク]|俺|[オお][レれ]|朕|ちん|余|[アあ][タた][シし]|ミー|あちき|あちし|あたち|[あア][たタ][いイ]|[わワ][いイ]|わっち|おいどん|[わワ][しシ]|[うウ][ちチ]|[おオ][らラ]|儂|[おオ][いイ][らラ]|あだす|某|麿|拙者|小生|あっし|手前|吾輩|我輩|わらわ|ぅゅ|のどに)の(ランク|ランキング|順位|スコア|成績|せいせき|らんく|らんきんぐ|すこあ)", content):
         show_rank(acct=acct, target=acct, id=id, g_vis=g_vis)
         SM.update(acct, 'func')
-    elif re.search(r":@(.+):.*の(ランク|ランキング|順位|スコア|成績)", content):
+    elif re.search(r":@(.+):.*の(ランク|ランキング|順位|スコア|成績|せいせき|らんく|らんきんぐ|すこあ)", content):
         word = re.search(r":@(.+):.*の(ランク|ランキング|順位|スコア|成績)", str(content)).group(1)
         show_rank(acct=acct, target=word, id=id, g_vis=g_vis)
         SM.update(acct, 'func')
-    elif re.search(r"(数取りゲーム).*(おねがい|お願い)", content):
+    elif re.search(r"(数取りゲーム|かずとりげぇむ).*(おねがい|お願い)", content):
         print('数取りゲーム受信')
         if len(GetNum_flg) > 0:
             toot("@%s 数取りゲーム開催中だよー！急いで投票してー！"%acct, 'public', id)
@@ -1096,7 +1104,7 @@ def worker(status):
             return
         fav_now(id)
         toot_now = "@%s\n"%acct
-        seeds = DAO.get_least_10toots(acct)
+        seeds = DAO.get_least_10toots()
         seeds.extend(toots_for_rep[acct])
         tmp = kiri_deep.lstm_gentxt(seeds,num=1)
         tmp = kiri_util.content_cleanser_light(tmp)
@@ -1718,12 +1726,13 @@ def th_saver():
             business_contact(status)
             # トゥートを保存
             try:
+                # threading.Thread(target=DAO.save_toot, args=(status,))
                 DAO.save_toot(status)
             except Exception as e:
                 #保存失敗したら、キューに詰めてリトライ！
                 print(e)
                 kiri_util.error_log()
-                sleep(5)
+                sleep(2)
                 StatusQ.put(status)
     except Exception as e:
         print(e)
@@ -1856,7 +1865,8 @@ def th_post():
         try:
             func,args = PostQ.get()
             func(*args)
-            sleep(2.0+CM.get_coolingtime())
+            sleep(2.0)
+            # sleep(2.0+CM.get_coolingtime())
         except Exception as e:
             print(e)
             kiri_util.error_log()
@@ -1873,6 +1883,7 @@ def th_pita():
         # toot[-1] + 1min < now -> pita!
         if len(pita_list) > 0 and pita_list[-1] + diff < jst_now:
             toot('◝( ・_・)◟ <ﾋﾟﾀｯ!', g_vis='public')
+            sleep(60.0)
 
 #######################################################
 # メイン
