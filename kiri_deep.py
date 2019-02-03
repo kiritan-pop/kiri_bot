@@ -134,7 +134,7 @@ def lstm_gentxt(toots,num=0,sel_model=None):
     # 推定したベクトルから文章生成
     generated = ''
     char_IDs = [char_idx[MU] for _ in range(TXT_MAXLEN)]    #初期値は無
-    rnd = random.uniform(0.2,0.8)
+    rnd = random.uniform(0.2,0.7)
 
     for i in range(200):
         with graph.as_default():
@@ -150,10 +150,10 @@ def lstm_gentxt(toots,num=0,sel_model=None):
 
     rtn_text = generated
     print(f'gen pre,rnd={rtn_text},{rnd:2f}')
-    rtn_text = re.sub(END,'',rtn_text, flags=(re.MULTILINE | re.DOTALL))
-    rtn_text = re.sub(r'(.)(.)(.)(\1\2\3){4,}','\1\2\3\1\2\3',rtn_text, flags=(re.MULTILINE | re.DOTALL))
-    rtn_text = re.sub(r'(.)(.)(\1\2){4,}','\1\2\1\2',rtn_text, flags=(re.MULTILINE | re.DOTALL))
-    rtn_text = re.sub(r'(.)(\1){4,}','\1\1',rtn_text, flags=(re.MULTILINE | re.DOTALL))
+    rtn_text = re.sub(END,r'',rtn_text, flags=(re.MULTILINE | re.DOTALL))
+    rtn_text = re.sub(r'(.)(.)(.)(\1\2\3){4,}',r'\4\4',rtn_text, flags=(re.MULTILINE | re.DOTALL))
+    rtn_text = re.sub(r'(.)(.)(\1\2){4,}',r'\3\3',rtn_text, flags=(re.MULTILINE | re.DOTALL))
+    rtn_text = re.sub(r'(.)\1{4,}',r'\1\1',rtn_text, flags=(re.MULTILINE | re.DOTALL))
     print(f'gen text,rnd={rtn_text},{rnd:2f}')
     return rtn_text
 

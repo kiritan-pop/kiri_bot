@@ -338,21 +338,14 @@ def ana_image(media_attachments,sensitive,acct,g_vis,id,content):
         elif result == 'ろびすて':
             toot_now += '🙏ろびすてとうとい！'
         elif result == '漫画':
-            # r = random.randint(0,100)
-            # if r > 50:
-            #     coloring_image(filename,acct,g_vis,id)
-            #     return ''
-            # else:
             toot_now += 'それなんて漫画ー？'
         elif result in  ['汚部屋','部屋','自撮り','太もも']:
             toot_now += result + 'だー！'
-        elif result == 'kent':
-            toot_now += 'ケント丸だー！'
         elif result == 'ポプテピピック':
             toot_now += 'それポプテピピックー？'
-        elif result == 'ボブ':
-            toot_now += 'ボブだー！'
-        elif result == 'ローゼンメイデン 真紅':
+        elif result == '電車':
+            toot_now += '🚃🚃がたんごとん！'
+        elif result == '真紅':
             toot_now += 'めいめいなのだわ！'
         elif result == '結月ゆかり':
             toot_now += 'ゆかりさん！'
@@ -375,33 +368,6 @@ def ana_image(media_attachments,sensitive,acct,g_vis,id,content):
         elif result == 'スクショ':
             if random.randint(0,4) == 0:
                 toot_now += '📷スクショパシャパシャ！'
-        elif sensitive:
-            if 'ラーメン' in result or '麺' in result or result == 'うどん' or  result == 'そば':
-                toot_now += '🍜%sちゅるちゅるーっ！'%result
-            elif result == 'パスタ':
-                toot_now += '🍝%sちゅるちゅるーっ！'%result
-            elif 'バーガー' in result:
-                toot_now += '🍔%sもぐもぐー！'%result
-            elif result == 'からあげ':
-                toot_now += 'かけるよね？っ🍋'
-            elif result == 'サラダ':
-                toot_now += '🥗さくさくー！'
-            elif result == '冷凍チャーハン':
-                toot_now += '焦がしにんにくのマー油と葱油が香るザ★チャーハン600g！？！？！？'
-            elif result == '焼き鳥':
-                toot_now += '鳥貴族ーー！！！！'
-            elif result == 'ピザ':
-                toot_now += 'ぽざ！'
-            elif result == 'ビール':
-                toot_now += '🍺しゅわしゅわ〜！'
-            elif '緑茶' in result:
-                toot_now += '🍵ずずーっ'
-            elif '紅茶' in result or 'コーヒー' in result:
-                toot_now += '☕ごくごく'
-            elif 'チョコ' in result or 'ショコラ' in result:
-                toot_now += 'チョコ系だー！おいしそう！'
-            else:
-                toot_now += result + 'だー！おいしそうー！'
         else:
             if 'チョコ' in result or 'ショコラ' in result:
                 toot_now += ':@%s: 🚓🚓🚓＜う〜う〜！飯テロ警察 チョコレート係でーす！\n'%(acct)
@@ -907,7 +873,7 @@ def worker(status):
 
     elif re.search(r"(ヒントでピント)[：:]", content):
         if g_vis == 'direct':
-            word = re.search(r"(ヒントでピント)[：:](.+)", str(content)).group(2)
+            word = re.search(r"(ヒントでピント)[：:](.+)", str(content)).group(2).strip()
             hintPinto_words = []
             if os.path.exists("hintPinto_words.txt"):
                 for line in open('hintPinto_words.txt','r'):
@@ -954,6 +920,7 @@ def worker(status):
         word = re.search(r"\s?(.+)って(何|なに|ナニ|誰|だれ|ダレ|いつ|どこ)\?$", str(content)).group(1)
         SM.update(acct, 'func')
         try:
+            word = re.sub(r"きりぼ.*[、。]","",word)
             wikipedia.set_lang("ja")
             page = wikipedia.page(word)
         except  wikipedia.exceptions.DisambiguationError as e:
