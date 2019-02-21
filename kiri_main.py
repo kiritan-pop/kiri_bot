@@ -303,7 +303,7 @@ def ana_image(media_attachments,sensitive,acct,g_vis,id,content):
     if sensitive:
         return toot_now
 
-    for media in media_attachments:
+    for media in media_attachments[:1]:
         filename = download(media["url"] , "media")
         result = kiri_deep.takoramen(filename)
         print('   ',result)
@@ -475,11 +475,11 @@ def worker(status):
     if len(content) <= 0:
         return
     if  Toot1bQ.empty():
-        content_1b, acct_1b, id_1b, g_vis_1b = None,None,None,None
+        content_1b, acct_1b = None,None
     else:
-        content_1b, acct_1b, id_1b, g_vis_1b = Toot1bQ.get() #キューから１回前を取得
+        content_1b, acct_1b = Toot1bQ.get() #キューから１回前を取得
     #
-    Toot1bQ.put((content, acct, id, g_vis))
+    Toot1bQ.put((content, acct))
 
     if re.search(r"^(緊急|強制)(停止|終了)$", content) and acct == MASTER_ID:
         print("＊＊＊＊＊＊＊＊＊＊＊緊急停止したよー！＊＊＊＊＊＊＊＊＊＊＊")
@@ -822,12 +822,6 @@ def worker(status):
     elif re.search(r"[!！]スロット", content) and g_vis == 'direct':
         fav_now(id)
         reelsize = 5
-        # if re.search(r"100", content):
-        #     slot_rate = 100
-        #     reel_num = 5
-        # elif re.search(r"10", content):
-        #     slot_rate = 10
-        #     reel_num = 4
         if re.search(r"ミニ", content):
             slot_rate = 0.1
             reel_num = 4
@@ -840,8 +834,6 @@ def worker(status):
         if acct_score < int(slot_rate*3):
             toot('@%s 得点足りないよー！（所持：%d点／必要：%d点）\nスロットミニや他のゲームで稼いでねー！'%(acct,acct_score,slot_rate*3), 'direct', rep=id,interval=a)
             return
-        #得点補正
-        # reel_num += min([2,(acct_score // 100000)])
         #貪欲補正
         slot_bal.append(acct)
         if len(slot_bal) > 100:
@@ -998,7 +990,7 @@ def worker(status):
         toot_now = f"@{acct} できたよ〜 \n#exp15m"
         toot(toot_now, g_vis=g_vis, rep=id, media_ids=[media])
 
-    elif re.search(r"([わワ][てテ]|拙僧|小職|私|[わワ][たタ][しシ]|[わワ][たタ][くク][しシ]|自分|僕|[ぼボ][くク]|俺|[オお][レれ]|朕|ちん|余|[アあ][タた][シし]|ミー|あちき|あちし|あたち|[あア][たタ][いイ]|[わワ][いイ]|わっち|おいどん|[わワ][しシ]|[うウ][ちチ]|[おオ][らラ]|儂|[おオ][いイ][らラ]|あだす|某|麿|拙者|小生|あっし|手前|吾輩|我輩|わらわ|ぅゅ|のどに)の(ランク|ランキング|順位|スコア|成績|せいせき|らんく|らんきんぐ|すこあ)", content):
+    elif re.search(r"([わワ][てテ]|拙僧|小職|私|[わワ][たタ][しシ]|[わワ][たタ][くク][しシ]|自分|僕|[ぼボ][くク]|俺|[オお][レれ]|朕|ちん|余|[アあ][タた][シし]|ミー|あちき|あちし|あたち|[あア][たタ][いイ]|[わワ][いイ]|わっち|おいどん|[わワ][しシ]|[うウ][ちチ]|[おオ][らラ]|儂|[おオ][いイ][らラ]|あだす|某|麿|拙者|小生|あっし|手前|吾輩|我輩|わらわ|ぅゅ|のどに|ちゃそ)の(ランク|ランキング|順位|スコア|成績|せいせき|らんく|らんきんぐ|すこあ)", content):
         show_rank(acct=acct, target=acct, id=id, g_vis=g_vis)
         SM.update(acct, 'func')
     elif re.search(r":@(.+):.*の(ランク|ランキング|順位|スコア|成績|せいせき|らんく|らんきんぐ|すこあ)", content):
@@ -1054,6 +1046,8 @@ def worker(status):
             if len(gen_txt) > 5:
                 gen_txt +=  "\n#きり要約 #きりぼっと"
                 toot("@" + acct + " :@" + acct + ":\n"  + gen_txt, g_vis, id, "勝手に要約サービス", interval=a)
+    elif re.search(r"チノチャレンジしてー", content + spoiler_text):
+        paint_chino()
     elif re.search(r'[^:]@%s'%BOT_ID, status['content']):
         SM.update(acct, 'reply')
         if content.strip().isdigit():
@@ -1279,6 +1273,14 @@ def show_rank(acct=None, target=None, id=None, g_vis=None):
         toot(toot_now, g_vis='private', spo=spo_text, interval=2)
 
 #######################################################
+# チノチャレンジ
+def paint_chino():
+    img_path = kiri_deep.make_chino()
+    media = mastodon.media_post(img_path, 'image/png')
+    toot_now = f"#きりぼのチノチャレンジ #exp15m"
+    toot(toot_now, g_vis="unlisted", media_ids=[media])
+
+#######################################################
 # ボトルメールサービス　メッセージ登録
 def bottlemail_service(content, acct, id, g_vis):
     fav_now(id)
@@ -1346,39 +1348,6 @@ def th_timerDel():
         sleep(30)
         th_timerDel()
 
-#######################################################
-# 定期ものまねさーびす！
-# def monomane_tooter():
-#     spoiler = "勝手にものまねサービス"
-#     random_acct = DAO.sample_acct()
-#     toots = ""
-#     for row in DAO.get_user_toots(random_acct):
-#         if len(kiri_util.hashtag(row[0])) > 0:
-#             continue
-#         content = kiri_util.content_cleanser(row[0])
-#         if len(content) == 0:
-#             continue
-#         toots += content + "。\n"
-#     chain = PrepareChain.PrepareChain("user_toots",toots)
-#     triplet_freqs = chain.make_triplet_freqs()
-#     chain.save(triplet_freqs, True)
-#     generator = GenerateText.GenerateText(5)
-#     gen_txt = generator.generate("user_toots")
-#     gen_txt = "@" + random_acct + " :@" + random_acct + ":＜「" + gen_txt + "」"
-#     gen_txt = gen_txt.replace('\n',"")
-#     #gen_txt +=  "\n#きりものまね #きりぼっと"
-#     SM.update(random_acct, 'func')
-#     if len(gen_txt) > 10:
-#         toot(gen_txt, "unlisted", None, spoiler)
-
-#######################################################
-# ○○○○
-def tangrkn_tooter():
-    spoiler = "○○モノマネ"
-    generator = GenerateText.GenerateText(5)
-    gen_txt = generator.generate("tangrkn")
-    if len(gen_txt) > 10:
-        toot(gen_txt, "private", spo=spoiler)
 
 #######################################################
 # 陣形
@@ -1388,25 +1357,6 @@ def jinkei_tooter():
     # gen_txt = '@kiritan\n' + gen_txt
     toot(gen_txt, "public", spo=spoiler)
 
-#######################################################
-# 定期ここ1時間のまとめ
-# def summarize_tooter():
-#     spoiler = "ＬＴＬここ1時間の自動まとめ"
-#     toots = ""
-#     for row in DAO.get_toots_1hour():
-#         if len(kiri_util.hashtag(row[0])) > 0:
-#             continue
-#         content = kiri_util.content_cleanser(row[0])
-#         if len(content) == 0:
-#             continue
-#         content = re.sub(r"(.+)\1{3,}","",content, flags=(re.DOTALL))
-#         toots += content + "\n"
-#     gen_txt = Toot_summary.summarize(pat1.sub("",pat2.sub("",toots)),limit=90, lmtpcs=5, m=1, f=4)
-#     if gen_txt[-1:1] == '#':
-#         gen_txt = gen_txt[:len(gen_txt)-1]
-#     if len(gen_txt) > 5:
-#         toot(gen_txt, "unlisted", None, spoiler)
-#
 #######################################################
 # ボトルメールサービス　配信処理
 def bottlemail_sending():
@@ -1427,23 +1377,6 @@ def bottlemail_sending():
         toots = "@" + acct + " 届けたメッセージは……\n:@" + acct + ": ＜「" + msg + "」"
         toots +=  "\n#ボトルメールサービス #きりぼっと"
         toot(toots, "direct",reply_id if reply_id != 0 else None, spoiler)
-
-    #漂流してるボトルの数
-    #ボトルが多い時は宣伝を減らすよー！
-    # bmcnt = bm.flow_count()
-    # if random.randint(0,bmcnt) <= 10:
-    #     sleep(DELAY)
-    #     spoiler = "現在漂流している🍾ボトルメール💌は%d本だよー！"%bmcnt
-    #     toots =  "\n※ボトルメールサービス：＜メッセージ＞　であなたも送れるよー！試してみてね！"
-    #     toots +=  "\n#ボトルメールサービス #きりぼっと"
-    #     toot(toots, "public", None, spoiler)
-
-#######################################################
-# 初めてのトゥートを探してぶーすとするよー！
-def timer_bst1st():
-    random_acct = DAO.sample_acct()
-    boost_now(DAO.get_random_1id(random_acct))
-    SM.update(random_acct, 'func')
 
 #######################################################
 # きりぼっとのつぶやき
@@ -1521,7 +1454,7 @@ def th_hint_de_pinto():
                 tmp = img.resize((int(img.width/i), int(img.height/i)),Image.NEAREST)  #LANCZOS BICUBIC NEAREST
                 tmp = tmp.resize((img.width, img.height),Image.NEAREST)
                 filename = path.split('.')[0] + '_{0}.png'.format(y)
-                tmp.save(filename,ex, optimize=True)
+                tmp.save(filename, "png")
                 media_files = []
                 media_files.append(mastodon.media_post(filename, 'image/' + ex))
                 toot_now = "さて、これは何/誰でしょうか？\nヒント：{0}\n#きりたんのヒントでピント #exp15m".format(hint_text)
@@ -1875,6 +1808,7 @@ def main():
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(th_follow_mente,['04:00'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(nyan_time,['22:22'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(show_rank,['07:00'])) )
+    threads.append( threading.Thread(target=kiri_util.scheduler, args=(paint_chino,['05:30'])) )
     #スケジュール起動系(間隔)
     # threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(monomane_tooter,120,0,15,CM)) )
     threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(lstm_tooter,10,-3,2,CM)) )

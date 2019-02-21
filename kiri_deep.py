@@ -1,7 +1,7 @@
 # coding: utf-8
 
-from tensorflow.keras.models import load_model, Model
-from tensorflow.keras import backend
+from keras.models import load_model, Model
+from keras import backend as backend
 from gensim.models.doc2vec import Doc2Vec
 import MeCab
 import numpy as np
@@ -9,6 +9,8 @@ import random,json
 import sys,io,re,gc,os
 import kiri_util
 from time import sleep
+from datetime import datetime,timedelta
+from pytz import timezone
 import unicodedata
 from PIL import Image, ImageOps, ImageFile, ImageChops, ImageFilter, ImageEnhance
 import cv2
@@ -49,6 +51,10 @@ Colors['white']  = 7
 Colors['black']  = 8
 Colors_rev = {v:k for k,v in Colors.items()}
 
+# 減色
+QNUM = 16
+color_pallete = np.load("db/color_pallete.npy")
+
 tagger = MeCab.Tagger('-Owakati -d /usr/lib/mecab/dic/mecab-ipadic-neologd -u dic/nicodic.dic')
 DAO = kiri_util.DAO_statuses()
 
@@ -65,32 +71,21 @@ char_idx = {c:i for i,c in enumerate(wl_chars)}
 char_idx[MU] = num_chars
 char_idx[END] = num_chars + 1
 
-d2v_path = 'db/d2v.model'
-lstm_vec_path = 'db/lstm_vec.h5'
-lstm_set_path = 'db/lstm_set.h5'
+d2vmodel = Doc2Vec.load('db/d2v.model')
+lstm_vec_model = load_model('db/lstm_vec.h5')
+lstm_set_model = load_model('db/lstm_set.h5')
 
-d2vmodel = Doc2Vec.load(d2v_path)
-lstm_vec_model = load_model(lstm_vec_path)
-lstm_set_model = load_model(lstm_set_path)
-lstm_vec_model._make_predict_function
-lstm_set_model._make_predict_function
-
-takomodel_path = 'db/cnn.h5'
-takomodel = load_model(takomodel_path)
-takomodel._make_predict_function
+takomodel = load_model('db/cnn.h5')
 
 gens1_model = load_model('db/g_model_s1.h5')
 gens2_model = load_model('db/g_model_s2.h5')
-# colorize_s1_model._make_predict_function
-# colorize_s2_model._make_predict_function
 colorize_model = Model(
         inputs=[gens1_model.inputs[0], gens1_model.inputs[1], gens2_model.inputs[0]], 
-        outputs=[gens2_model([gens2_model.inputs[0], gens1_model.outputs[0]])] 
-    )
-colorize_model._make_predict_function
+        outputs=[gens2_model([gens2_model.inputs[0], gens1_model.outputs[0]])] )
+
+chino_model = load_model('db/g_chino.h5')
 
 graph = tf.get_default_graph()
-
 
 def sample(preds, temperature=1.2):
     # helper function to sample an index from a probability array
@@ -195,14 +190,21 @@ def colorize(image_path, color=None):
     img = kiri_util.new_convert(img, 'L')
     line_image128 =  kiri_util.image_resize(img,STANDARD_SIZE_S1)
     line_image128 = (np.asarray(line_image128)-127.5)/127.5
+    line_image128 = np.reshape(line_image128,(1,128,128))
     line_image512 =  kiri_util.image_resize(img,STANDARD_SIZE_S2)
     line_image512 = (np.asarray(line_image512)-127.5)/127.5
+    line_image512 = np.reshape(line_image512,(1,512,512))
     if color == None:
-        colorvec = random.randrange(len(Colors))
+        color_num = random.randrange(len(Colors))
     else:
-        colorvec = color
+        color_num = color
+
+    r = random.randint(0,9)
+    hist = color_pallete[color_num,r]
+    hist = np.reshape(hist, (1, QNUM, 4))
+
     with graph.as_default():
-        gen2 = colorize_model.predict([np.array([line_image128]), np.array([colorvec]), np.array([line_image512])])[0]
+        gen2 = colorize_model.predict([line_image128, hist, line_image512])[0]
 
     gen2 = (gen2*127.5+127.5).clip(0, 255).astype(np.uint8)
 
@@ -214,7 +216,27 @@ def colorize(image_path, color=None):
     tmp = tmp.resize(img.size, Image.LANCZOS )
     tmp = tmp.resize((max(img.size), max(img.size)) ,Image.LANCZOS)
     tmp = kiri_util.crop_center(tmp, img.width, img.height)
-    filename = savepath + image_path.split("/")[-1].split(".")[0] + "_" + Colors_rev[colorvec] + "_g2.png"
+    filename = savepath + image_path.split("/")[-1].split(".")[0] + "_" + Colors_rev[color_num] + "_g2.png"
+    tmp.save(filename, optimize=True)
+
+    return filename
+
+def make_chino():
+    noise = np.random.normal(0.0,1.5,(1,64))
+    # noise = np.random.uniform(-1.0,1.0,(1,64))
+    with graph.as_default():
+        chino_img = chino_model.predict_on_batch(noise)[0]
+
+    chino_img = (chino_img*127.5+127.5).clip(0, 255).astype(np.uint8)
+
+    savepath = 'chino_images/'
+    if not os.path.exists(savepath):
+        os.mkdir(savepath)
+
+    jst_now = datetime.now(timezone('Asia/Tokyo'))
+    jst_now_str = jst_now.strftime("%Y%m%d%H%M%S")
+    tmp = Image.fromarray(chino_img)
+    filename = savepath + jst_now_str + ".png"
     tmp.save(filename, optimize=True)
 
     return filename
