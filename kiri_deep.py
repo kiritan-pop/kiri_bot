@@ -1,7 +1,7 @@
 # coding: utf-8
 
 from keras.models import load_model, Model
-from keras import backend as backend
+# from keras import backend as backend
 from gensim.models.doc2vec import Doc2Vec
 import MeCab
 import numpy as np
@@ -15,10 +15,10 @@ import unicodedata
 from PIL import Image, ImageOps, ImageFile, ImageChops, ImageFilter, ImageEnhance
 import cv2
 import tensorflow as tf
-config = tf.ConfigProto(device_count={"GPU":1},
-                        gpu_options=tf.GPUOptions(allow_growth=False, visible_device_list="3"))
-session = tf.Session(config=config)
-backend.set_session(session)
+# config = tf.ConfigProto(device_count={"GPU":1},
+#                         gpu_options=tf.GPUOptions(allow_growth=False, visible_device_list="3"))
+# session = tf.Session(config=config)
+# backend.set_session(session)
 
 labels = {}
 with open('dic/.cnn_labels','r') as f:
@@ -55,7 +55,7 @@ Colors_rev = {v:k for k,v in Colors.items()}
 QNUM = 16
 color_pallete = np.load("db/color_pallete.npy")
 
-tagger = MeCab.Tagger('-Owakati -d /usr/lib/mecab/dic/mecab-ipadic-neologd -u dic/nicodic.dic')
+tagger = MeCab.Tagger('-Owakati -d /usr/local/lib/mecab/dic/mecab-ipadic-neologd -u dic/nicodic.dic')
 DAO = kiri_util.DAO_statuses()
 
 pat3 = re.compile(r'^\n')

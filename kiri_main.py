@@ -141,11 +141,11 @@ class public_listener(StreamListener):
         StatusQ.put(status)
         CM.count(status['created_at'])
 
-    def on_delete(self, status_id):
-        jst_now = datetime.now(timezone('Asia/Tokyo'))
-        ymdhms = jst_now.strftime("%Y%m%d %H%M%S")
-        print("{0}===public_listener on_delete【{1}】===".format(ymdhms,str(status_id)))
-        DelQ.put(status_id)
+    # def on_delete(self, status_id):
+    #     jst_now = datetime.now(timezone('Asia/Tokyo'))
+    #     ymdhms = jst_now.strftime("%Y%m%d %H%M%S")
+    #     print("{0}===public_listener on_delete【{1}】===".format(ymdhms,str(status_id)))
+    #     DelQ.put(status_id)
 
 #######################################################
 # トゥート処理
@@ -1783,7 +1783,7 @@ def th_pita():
         # toot[-1] + 1min < now -> pita!
         if len(pita_list) > 0 and pita_list[-1] + diff < jst_now:
             toot('◝( ・_・)◟ <ﾋﾟﾀｯ!', g_vis='public')
-            sleep(60.0)
+            sleep(3600.0)
 
 #######################################################
 # メイン
@@ -1794,7 +1794,7 @@ def main():
     threads.append( threading.Thread(target=t_user ) ) #LTL
     threads.append( threading.Thread(target=t_sub ) ) #LTL
     #タイムライン応答系
-    threads.append( threading.Thread(target=th_delete) )
+    # threads.append( threading.Thread(target=th_delete) )
     threads.append( threading.Thread(target=th_saver) )
     threads.append( threading.Thread(target=th_gettingnum) )
     threads.append( threading.Thread(target=th_hint_de_pinto) )
