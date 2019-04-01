@@ -17,6 +17,7 @@ import wikipedia
 import GenerateText, bottlemail, Toot_summary
 import kiri_util, kiri_game, kiri_romasaga, kiri_deep
 from PIL import Image, ImageOps, ImageFile, ImageChops, ImageFilter, ImageEnhance
+import argparse
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 MASTER_ID = 'kiritan'
@@ -89,6 +90,13 @@ for i in range(16):
     hanalist.append('👃')
 hanalist.append('🌷🌸🌹🌺🌻🌼大当たり！🌼🌻🌺🌹🌸🌷  @%s'%MASTER_ID)
 
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--gtime", type=int, default=30)
+    parser.add_argument("--htime", type=int, default=20)
+    args = parser.parse_args()
+    return args
+
 #######################################################
 # マストドンＡＰＩ用部品を継承して、通知時の処理を実装ー！
 class notification_listener(StreamListener):
@@ -141,11 +149,11 @@ class public_listener(StreamListener):
         StatusQ.put(status)
         CM.count(status['created_at'])
 
-    # def on_delete(self, status_id):
-    #     jst_now = datetime.now(timezone('Asia/Tokyo'))
-    #     ymdhms = jst_now.strftime("%Y%m%d %H%M%S")
-    #     print("{0}===public_listener on_delete【{1}】===".format(ymdhms,str(status_id)))
-    #     DelQ.put(status_id)
+    def on_delete(self, status_id):
+        jst_now = datetime.now(timezone('Asia/Tokyo'))
+        ymdhms = jst_now.strftime("%Y%m%d %H%M%S")
+        print("{0}===public_listener on_delete【{1}】===".format(ymdhms,str(status_id)))
+        DelQ.put(status_id)
 
 #######################################################
 # トゥート処理
@@ -208,7 +216,7 @@ def exe_enquete_vote(id,idx):
 #######################################################
 # ブースト
 def boost_now(id):  # ぶーすと！
-    PostQ.put((boost_now,(id,)))
+    PostQ.put((exe_boost_now,(id,)))
 
 def exe_boost_now(id):  # ぶーすと！
     try:
@@ -227,7 +235,7 @@ def exe_boost_now(id):  # ぶーすと！
 #######################################################
 # ブーキャン
 def boocan_now(id):  # ぶーすと！
-    PostQ.put((boocan_now,(id,)))
+    PostQ.put((exe_boocan_now,(id,)))
 
 def exe_boocan_now(id):  # ぶーすと！
     status = mastodon.status(id)
@@ -329,12 +337,15 @@ def ana_image(media_attachments,sensitive,acct,g_vis,id,content):
         elif result == 'イラスト男':
             toot_now += 'かっこいい！'
         elif result == 'イラスト線画':
-            r = random.randint(0,100)
-            if r > 50:
-                coloring_image(filename,acct,g_vis,id)
-                return ''
-            elif r > 30:
-                toot_now += '色塗ってー！'
+            if '.mp' in filename or '.webm' in filename:
+                pass
+            else:
+                r = random.randint(0,100)
+                if r > 50:
+                    coloring_image(filename,acct,g_vis,id)
+                    return ''
+                elif r > 30:
+                    toot_now += '色塗ってー！'
         elif result == 'ろびすて':
             toot_now += '🙏ろびすてとうとい！'
         elif result == '漫画':
@@ -663,11 +674,6 @@ def worker(status):
         if rnd <= 6 and len(word) < 10:
             toot_now = f'{word}じゃが！'
             id_now = None
-    elif re.search(r"^はいじゃないが$", content+spoiler_text):
-        SM.update(acct, 'func')
-        if rnd <= 6:
-            toot_now = 'はいじゃが！'
-            id_now = None
     elif re.search(r"惚気|ほっけ|ホッケ", content+spoiler_text):
         SM.update(acct, 'func',score=-1)
         if rnd <= 2:
@@ -686,6 +692,12 @@ def worker(status):
         SM.update(acct, 'func')
         if rnd <= 3:
             recipe_service(content=content, acct=acct, id=id, g_vis=g_vis)
+    elif re.search(r"^.+じゃね[ぇえ]ぞ", content+spoiler_text):
+        word = re.search(r"^(.+)じゃね[ぇえ]ぞ", content+spoiler_text).group(1)
+        SM.update(acct, 'func')
+        if rnd <= 4 and len(word) <= 5:
+            toot_now = f'{word}じゃぞ……💃'
+            id_now = None
     elif re.search(r"止まるんじゃね[ぇえ]ぞ", content+spoiler_text):
         SM.update(acct, 'func')
         if rnd <= 4:
@@ -863,7 +875,7 @@ def worker(status):
             acct_score = SM.show(acct)[0][1]
             toot('@%s\n%sハズレ〜〜（%d点消費／合計%d点）'%(acct, sl_txt ,int(slot_rate*3),acct_score), 'direct', rep=id, interval=a)
 
-    elif re.search(r"(ヒントでピント)[：:]", content):
+    elif re.search(r"(ヒントでピント)[：:](.+)", content):
         if g_vis == 'direct':
             word = re.search(r"(ヒントでピント)[：:](.+)", str(content)).group(2).strip()
             hintPinto_words = []
@@ -994,7 +1006,7 @@ def worker(status):
         show_rank(acct=acct, target=acct, id=id, g_vis=g_vis)
         SM.update(acct, 'func')
     elif re.search(r":@(.+):.*の(ランク|ランキング|順位|スコア|成績|せいせき|らんく|らんきんぐ|すこあ)", content):
-        word = re.search(r":@(.+):.*の(ランク|ランキング|順位|スコア|成績)", str(content)).group(1)
+        word = re.search(r":@(.+):.*の(ランク|ランキング|順位|スコア|成績|せいせき|らんく|らんきんぐ|すこあ)", str(content)).group(1)
         show_rank(acct=acct, target=word, id=id, g_vis=g_vis)
         SM.update(acct, 'func')
     elif re.search(r"(数取りゲーム|かずとりげぇむ).*(おねがい|お願い)", content):
@@ -1403,6 +1415,9 @@ def th_delete():
         try:
             toot_now = '@%s \n'%MASTER_ID
             row = DAO.pickup_1toot(DelQ.get())
+            # 垢消し時は大量のトゥー消しが来るので、キューが溜まってる場合はスキップするよ〜
+            if DelQ.qsize() >= 3:
+                continue
             print('th_delete:',row)
             if row:
                 acct = row[0]
@@ -1414,8 +1429,8 @@ def th_delete():
                     toot_now += ':@%s: 🚓🚓🚓＜う〜う〜！トゥー消し警察でーす！\n'%row[0]
                     toot_now += ':@%s: ＜「%s」 at %s\n#exp10m'%(row[0], kiri_util.content_cleanser(row[1]) , ymdhms.strftime("%Y.%m.%d %H:%M:%S"))
                     toot(toot_now, 'direct', rep=None, spo=':@%s: がトゥー消ししたよー……'%row[0], media_ids=None, interval=0)
-                    acct_1b = row[0]
                     SM.update(row[0], 'func', score=-1)
+                    sleep(0.2)
 
                 del_accts.append(acct)
                 if len(del_accts) > 3:
@@ -1429,7 +1444,7 @@ def th_delete():
 
 #######################################################
 # ヒントでピントゲーム
-def th_hint_de_pinto():
+def th_hint_de_pinto(gtime=20):
     def th_shududai(acct,id,term):
         paths = gi.get_images_forQ(term)
         # paths = kiri_util.fetch_and_save_img(term)
@@ -1490,7 +1505,7 @@ def th_hint_de_pinto():
     # gi = kiri_util.get_images(BING_KEY)
     gi = kiri_util.get_images_GGL(GOOGLE_KEY,GOOGLE_ENGINE_KEY)
     junbiTM = kiri_util.KiriTimer(30*60)
-    junbiTM.reset(20*60)
+    junbiTM.reset(gtime*60)
     junbiTM.start()
     while True:
         tmp_list = HintPintoQ.get()
@@ -1533,10 +1548,10 @@ def th_hint_de_pinto():
 
 #######################################################
 # 数取りゲーム
-def th_gettingnum():
+def th_gettingnum(gtime=30):
     gamenum = 100
     junbiTM = kiri_util.KiriTimer(60*60)
-    junbiTM.reset(50*60)
+    junbiTM.reset(gtime*60)
     junbiTM.start()
     gameTM = kiri_util.KiriTimer(240)
     while True:
@@ -1788,16 +1803,17 @@ def th_pita():
 #######################################################
 # メイン
 def main():
+    args = get_args()
     threads = []
     #タイムライン受信系
     threads.append( threading.Thread(target=t_local ) ) #LTL
     threads.append( threading.Thread(target=t_user ) ) #LTL
     threads.append( threading.Thread(target=t_sub ) ) #LTL
     #タイムライン応答系
-    # threads.append( threading.Thread(target=th_delete) )
+    threads.append( threading.Thread(target=th_delete) )
     threads.append( threading.Thread(target=th_saver) )
-    threads.append( threading.Thread(target=th_gettingnum) )
-    threads.append( threading.Thread(target=th_hint_de_pinto) )
+    threads.append( threading.Thread(target=th_gettingnum, args=(args.gtime,)) )
+    threads.append( threading.Thread(target=th_hint_de_pinto, args=(args.htime,)) )
     threads.append( threading.Thread(target=th_worker) )
     threads.append( threading.Thread(target=th_timerDel) )
     threads.append( threading.Thread(target=th_post) )
