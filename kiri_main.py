@@ -727,6 +727,11 @@ def worker(status):
         if rnd <= 6:
             toot_now = 'えっ'
             id_now = None
+    elif re.search(r"^は？$", content):
+        SM.update(acct, 'func')
+        if rnd <= 6:
+            toot_now = 'ひ？'
+            id_now = None
     elif "マストドン閉じろ" in content:
         toot_now = 'はい'
         id_now = None
@@ -885,6 +890,10 @@ def worker(status):
 
             if word in hintPinto_words:
                 toot(f'@{acct} この前やったお題なので別のにして〜！', 'direct', rep=id, interval=a)
+                return
+
+            if len(word) < 3:
+                toot(f'@{acct} お題は３文字以上にしてね〜', 'direct', rep=id, interval=a)
                 return
 
             hintPinto_words.append(word)
@@ -1060,6 +1069,35 @@ def worker(status):
                 toot("@" + acct + " :@" + acct + ":\n"  + gen_txt, g_vis, id, "勝手に要約サービス", interval=a)
     elif re.search(r"チノチャレンジしてー", content + spoiler_text):
         paint_chino()
+    elif re.search(r"きりぼ.+:@(.+):.*の初", content):
+        target = re.search(r"きりぼ.+:@(.+):.*の初", str(content)).group(1)
+        toots = DAO.get_user_toots(target)
+        # トゥートの存在チェック
+        check_fg = False
+        for tid, tcontent, tdate, ttime in toots:
+            try:
+                status = mastodon.status(tid)
+            except:
+                sleep(2)
+                continue
+            else:
+                check_fg = True
+                tdate = '{0:08d}'.format(tdate)
+                ttime = '{0:06d}'.format(ttime)
+                ymdhms = f'on {tdate[:4]}/{tdate[4:6]}/{tdate[6:]} at {ttime[:2]}:{ttime[2:4]}:{ttime[4:]}'
+                tcontent = kiri_util.content_cleanser(tcontent)
+
+                spoiler_text = f":@{target}: の初トゥートは……"
+                body = f"@{acct} \n"
+                body += f":@{target}: ＜{tcontent} \n {ymdhms} \n"
+                body += f"https://friends.nico/@{target}/{tid}"
+                toot(body, g_vis=g_vis, rep=id, spo=spoiler_text)
+                break
+
+        if check_fg == False:
+            body = f"@{acct} 見つからなかったよ〜😢"
+            toot(body, g_vis=g_vis, rep=id)
+
     elif re.search(r'[^:]@%s'%BOT_ID, status['content']):
         SM.update(acct, 'reply')
         if content.strip().isdigit():

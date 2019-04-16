@@ -476,10 +476,10 @@ class DAO_statuses():
 
     #######################################################
     # モノマネ用
-    def get_user_toots(self,acct):
+    def get_user_toots(self, acct, limit=10):
         con = sqlite3.connect(self.STATUSES_DB_PATH, timeout=TIMEOUT, isolation_level='DEFERRED')
         c = con.cursor()
-        c.execute( r"select content from statuses where acct = ?", (acct,) )
+        c.execute( r"select id, content, date, time from statuses where acct = ? order by id asc limit ?", (acct,limit) )
         rows = c.fetchall()
         con.close()
         return rows

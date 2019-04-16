@@ -146,6 +146,9 @@ def lstm_gentxt(toots,num=0,sel_model=None):
     rtn_text = generated
     print(f'gen pre,rnd={rtn_text},{rnd:2f}')
     rtn_text = re.sub(END,r'',rtn_text, flags=(re.MULTILINE | re.DOTALL))
+    rtn_text = re.sub(r'(.)(.)(.)(.)(.)(.)(\1\2\3\4\5\6){4,}',r'\7\7',rtn_text, flags=(re.MULTILINE | re.DOTALL))
+    rtn_text = re.sub(r'(.)(.)(.)(.)(.)(\1\2\3\4\5){4,}',r'\6\6',rtn_text, flags=(re.MULTILINE | re.DOTALL))
+    rtn_text = re.sub(r'(.)(.)(.)(.)(\1\2\3\4){4,}',r'\5\5',rtn_text, flags=(re.MULTILINE | re.DOTALL))
     rtn_text = re.sub(r'(.)(.)(.)(\1\2\3){4,}',r'\4\4',rtn_text, flags=(re.MULTILINE | re.DOTALL))
     rtn_text = re.sub(r'(.)(.)(\1\2){4,}',r'\3\3',rtn_text, flags=(re.MULTILINE | re.DOTALL))
     rtn_text = re.sub(r'(.)\1{4,}',r'\1\1',rtn_text, flags=(re.MULTILINE | re.DOTALL))
