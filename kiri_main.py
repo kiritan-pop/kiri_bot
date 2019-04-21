@@ -1760,6 +1760,15 @@ def nyan_time():
     toot(gen_txt, "public")
 
 #######################################################
+# カウントダウン
+def countdown():
+    jst_now = datetime.now(timezone('Asia/Tokyo'))
+    xday = datetime.strptime('2019/04/28 19:00:00', "%Y/%m/%d %H:%M:%S").astimezone(timezone('Asia/Tokyo'))
+    diff = xday - jst_now
+    gen_txt = f'あと{int(diff.total_seconds()):,}秒だよ〜'
+    toot(gen_txt, "unlisted")
+
+#######################################################
 # フォロ外し
 def th_follow_mente():
     print('🌠フォローフォロワー整理処理ーー！！')
@@ -1863,6 +1872,7 @@ def main():
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(nyan_time,['22:22'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(show_rank,['07:00'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(paint_chino,['05:30'])) )
+    threads.append( threading.Thread(target=kiri_util.scheduler, args=(countdown,['**:00'])) )
     #スケジュール起動系(間隔)
     # threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(monomane_tooter,120,0,15,CM)) )
     threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(lstm_tooter,10,-3,2,CM)) )
