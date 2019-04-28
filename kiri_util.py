@@ -94,7 +94,7 @@ def content_cleanser(content):
     ng_words = set(word.strip() for word in open('.ng_words').readlines())
     for ng_word in ng_words:
         # rtext = rtext.replace(ng_word,'■■■')
-        rtext = re.sub(ng_word, '■■■', rtext)
+        rtext = re.sub(ng_word, '■'*len(ng_word), rtext)
     if hashtag != "":
         return rtext + " #" + hashtag
     else:
@@ -109,7 +109,7 @@ def content_cleanser_light(text):
     #NGワード
     ng_words = set(word.strip() for word in open('.ng_words').readlines())
     for ng_word in ng_words:
-        rtext = re.sub(ng_word, '■■■', rtext)
+        rtext = re.sub(ng_word, '■'*len(ng_word), rtext)
     return rtext
 
 #######################################################
@@ -911,7 +911,7 @@ def newyear_icon_maker(path, mode=0):
 
 def auto_alpha(path, icon=True):
     print("auto_alpha")
-    DVR = 20
+    DVR = 40
     img = Image.open(path).convert("RGB")
     if icon:
         SIZE = (img.width*400//max(img.size),
@@ -948,7 +948,7 @@ def auto_alpha(path, icon=True):
     for h, w in [(0, 0), (0, img.width//2), (0, img.width-1), (img.height//2, 0), (img.height//2, img.width-1), (img.height-1, 0), (img.height-1, img.width//2), (img.height-1, img.width-1)]:
         CS.add(img_mat[h, w])
 
-    EDGE_VAL = 255
+    EDGE_VAL = 250
     max_mask = np.zeros((img_mat.shape), dtype=np.uint8)
     for c_min, c_max in [(max([0, i-DVR]), min([i+DVR, 255])) for i in CS]:
         mask = np.ones((img_mat.shape), dtype=np.uint8)
@@ -1003,6 +1003,7 @@ def auto_alpha(path, icon=True):
     max_mask = Image.fromarray(max_mask)
     max_mask = max_mask.filter(ImageFilter.MaxFilter(3))
     max_mask = max_mask.filter(ImageFilter.MinFilter(3))
+    max_mask = max_mask.filter(ImageFilter.MaxFilter(3))
     max_mask = max_mask.filter(ImageFilter.GaussianBlur(2.0))
     max_mask.save("media/mask.png")
     img.putalpha(max_mask)

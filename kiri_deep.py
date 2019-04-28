@@ -120,11 +120,13 @@ def lstm_gentxt(toots,num=0,sel_model=None):
     with graph.as_default():
         output_vec = lstm_vec_model.predict_on_batch(input_mean_vec)[0]
 
-    ret = d2vmodel.docvecs.most_similar([output_vec])
-    print("  目標のトゥート")
-    for toot_id, score in ret[:4]:
-        row = DAO.pickup_1toot(toot_id)
-        print(f"{score:2f}:{kiri_util.content_cleanser(row[1])}")
+    # ret = d2vmodel.docvecs.most_similar([output_vec])
+    # print("  目標のトゥート")
+    # for toot_id, score in ret[:4]:
+    #     row = DAO.pickup_1toot(toot_id)
+    #     print(score)
+    #     print(row)
+    #     print(f"{score:2f}:{kiri_util.content_cleanser(row[1])}")
 
     # 推定したベクトルから文章生成
     generated = ''

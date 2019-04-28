@@ -436,7 +436,7 @@ def worker(status):
     #     return
     content = kiri_util.content_cleanser(status['content'])
     hashtags = kiri_util.hashtag(status['content'])
-    if status['application'] == None:
+    if 'application' not in status or status['application'] == None:
         application = ''
     else:
         application = status['application']['name']
@@ -450,16 +450,16 @@ def worker(status):
     media_attachments = status["media_attachments"]
     sensitive = status['sensitive']
     enquete = None
-    if status['enquete'] != None:
-        enquete = json.loads(status['enquete'])
+    # if status['enquete'] != None:
+    #     enquete = json.loads(status['enquete'])
 
     rentou.append(acct)
     if len(rentou) > 20:
         rentou.pop(0)
     tmpcnt = sum([1 for x in rentou if x==acct]) 
     # 占有率50%超える人は異常なのでスルー
-    if tmpcnt/len(rentou) > 0.5:
-        return
+    # if tmpcnt/len(rentou) > 0.5:
+    #     return
     a = int(CM.get_coolingtime())
     rnd = random.randint(0,9+a+tmpcnt//5)
     if acct == MASTER_ID:
@@ -467,6 +467,7 @@ def worker(status):
 
     #botはスルー
     botlist = set([tmp.strip() for tmp in open('.botlist').readlines()])
+    botlist.add(BOT_ID)
 
     if  acct in botlist:
         #bot例外
@@ -1090,7 +1091,7 @@ def worker(status):
                 spoiler_text = f":@{target}: の初トゥートは……"
                 body = f"@{acct} \n"
                 body += f":@{target}: ＜{tcontent} \n {ymdhms} \n"
-                body += f"https://friends.nico/@{target}/{tid}"
+                body += f"{MASTODON_URL}/@{target}/{tid}"
                 toot(body, g_vis=g_vis, rep=id, spo=spoiler_text)
                 break
 
@@ -1191,7 +1192,7 @@ def business_contact(status):
 #######################################################
 # 画像検索サービス
 def get_file_name(url):
-    return url.split("/")[-1]
+    return url.split("/")[-1].split("?")[0]
 
 def download(url, save_path):
     ret_path = save_path + "/" + get_file_name(url)
@@ -1827,7 +1828,7 @@ def th_post():
         try:
             func,args = PostQ.get()
             func(*args)
-            sleep(2.0)
+            sleep(4.0)
             # sleep(2.0+CM.get_coolingtime())
         except Exception as e:
             print(e)
@@ -1862,20 +1863,20 @@ def main():
     threads.append( threading.Thread(target=th_gettingnum, args=(args.gtime,)) )
     threads.append( threading.Thread(target=th_hint_de_pinto, args=(args.htime,)) )
     threads.append( threading.Thread(target=th_worker) )
-    threads.append( threading.Thread(target=th_timerDel) )
+    # threads.append( threading.Thread(target=th_timerDel) )
     threads.append( threading.Thread(target=th_post) )
-    threads.append( threading.Thread(target=th_pita) )
+    # threads.append( threading.Thread(target=th_pita) )
     #スケジュール起動系(時刻)
     # threads.append( threading.Thread(target=kiri_util.scheduler, args=(summarize_tooter,['**:02'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(bottlemail_sending,['**:05'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(th_follow_mente,['04:00'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(nyan_time,['22:22'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(show_rank,['07:00'])) )
-    threads.append( threading.Thread(target=kiri_util.scheduler, args=(paint_chino,['05:30'])) )
-    threads.append( threading.Thread(target=kiri_util.scheduler, args=(countdown,['**:00'])) )
+    # threads.append( threading.Thread(target=kiri_util.scheduler, args=(paint_chino,['05:30'])) )
+    # threads.append( threading.Thread(target=kiri_util.scheduler, args=(countdown,['**:00'])) )
     #スケジュール起動系(間隔)
     # threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(monomane_tooter,120,0,15,CM)) )
-    threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(lstm_tooter,10,-3,2,CM)) )
+    threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(lstm_tooter,20,-3,2,CM)) )
     # threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(timer_bst1st,90,0,15,CM)) )
     # threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(th_nicoru,60,0,60,CM)) )
     # threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(tangrkn_tooter,20,-10,10,CM)) )
