@@ -1034,15 +1034,15 @@ def worker(status):
 def business_contact(status):
     id = status["id"]
     acct = status["account"]["acct"]
-    g_vis = status["visibility"]
+    # g_vis = status["visibility"]
     content = kiri_util.content_cleanser(status['content'])
     statuses_count = status["account"]["statuses_count"]
-    spoiler_text = status["spoiler_text"]
+    # spoiler_text = status["spoiler_text"]
     created_at = status['created_at']
     display_name = status["account"]['display_name']
     ac_created_at = status["account"]["created_at"]
     ac_created_at = ac_created_at.astimezone(timezone('Asia/Tokyo'))
-    ac_ymd = ac_created_at.strftime("%Y.%m.%d %H:%M:%S")
+    # ac_ymd = ac_created_at.strftime("%Y.%m.%d %H:%M:%S")
     #最後にトゥートしてから3時間以上？ 
     if acct in acct_least_created_at:
         ymdhms = acct_least_created_at[acct]
@@ -1056,12 +1056,13 @@ def business_contact(status):
     jst_now_str = jst_now.strftime("%Y%m%d %H%M%S")
     print('%s===「%s」by %s'%(jst_now_str,('\n'+' '*20).join(content.split('\n')), acct))
 
+    kaomoji = random.choice([tmp.strip() for tmp in open('.kaomoji','r').readlines()])
     if statuses_count == 1:
-        toot_now = ':@%s: （%s）ご新規さんかもー！(๑•᎑•๑)♬*゜\n #挨拶部'%(acct,display_name)
+        toot_now = f':@{acct}: （{display_name}）ご新規さんかもー！{kaomoji}\n #挨拶部'
         toot(toot_now, g_vis='public',interval=3)
     elif ymdhms == None or ymdhms + diff < created_at:
         fav_now(id)
-        toot_now = ':@%s: %s!おかえりー！(๑́ºㅿº๑̀)💦\n #挨拶部'%(acct,display_name)
+        toot_now = f':@{acct}: {display_name} おかえりー！{kaomoji}\n #挨拶部'
         toot(toot_now, g_vis='public',interval=3)
 
     pita_list.append(created_at)
