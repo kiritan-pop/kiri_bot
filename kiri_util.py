@@ -453,26 +453,15 @@ class DAO_statuses():
     #######################################################
     # 陣形用５人ピックアップ
     def get_five(self, num=5,minutes=30):
-        #過去n分のアクティブユーザ数をベース
-        jst_now = datetime.now(timezone('Asia/Tokyo'))
-        ymd = int((jst_now - timedelta(minutes=minutes)).strftime("%Y%m%d"))
-        hms = int((jst_now - timedelta(minutes=minutes)).strftime("%H%M%S"))
-        ymd2 = int(jst_now.strftime("%Y%m%d"))
-        hms2 = int(jst_now.strftime("%H%M%S"))
+        #アクティブユーザ数ピックアップ
         con = sqlite3.connect(self.STATUSES_DB_PATH, timeout=TIMEOUT, isolation_level='DEFERRED')
         c = con.cursor()
-        if ymd == ymd2 and int(hms) <= int(hms2):
-            c.execute( r"select distinct acct from statuses where (date = ? and time >= ? and time <= ? )",
-                        (ymd,hms,hms2) )
-        else:
-            c.execute( r"select distinct acct from statuses where (date = ? and time >= ?) or (date = ? and time <= ? ) or (date > ? and date < ?)",
-                        (ymd,hms,ymd2,hms2,ymd,ymd2) )
-
+        c.execute( r"select distinct acct from statuses order by id desc limit 20")
         acct_list = set([])
         for row in c.fetchall():
             acct_list.add(row[0])
         con.close()
-        return random.sample(acct_list,num)
+        return random.sample(acct_list,min([num, len(acct_list)]))
 
     #######################################################
     # モノマネ用

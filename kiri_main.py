@@ -41,10 +41,8 @@ SM = kiri_util.ScoreManager()
 CM = kiri_util.CoolingManager(3)
 DAO = kiri_util.DAO_statuses()
 TRANS = kiri_util.trans(GOOGLE_KEY)
-# painter = kiri_coloring.Painter(gpu=-1)
 #しりとり用
 StMG = kiri_game.Siritori_manager()
-
 
 publicdon = Mastodon(api_base_url=MASTODON_URL)  # インスタンス
 
@@ -72,7 +70,6 @@ acct_least_created_at = {}
 pita_list = []
 
 toots_for_rep = defaultdict(list)
-
 
 # 花宅配サービス用の花リスト
 hanalist = []
@@ -103,14 +100,12 @@ class notification_listener(StreamListener):
     def on_notification(self, notification):
         jst_now = datetime.now(timezone('Asia/Tokyo'))
         ymdhms = jst_now.strftime("%Y%m%d %H%M%S")
-        # print("%s===notification_listener on_notification==="%ymdhms)
 
         if notification["type"] == "mention":
             status = notification["status"]
             CM.count(status['created_at'])
             WorkerQ.put(status)
             vote_check(status)
-            # SM.update(notification["status"]["account"]["acct"], 'reply')
         elif notification["type"] == "favourite":
             SM.update(notification["account"]["acct"], 'fav', ymdhms)
         elif notification["type"] == "reblog":
@@ -129,9 +124,6 @@ class notification_listener(StreamListener):
 # マストドンＡＰＩ用部品を継承して、ローカルタイムライン受信時の処理を実装ー！
 class ltl_listener(StreamListener):
     def on_update(self, status):
-        # jst_now = datetime.now(timezone('Asia/Tokyo'))
-        # ymdhms = jst_now.strftime("%Y%m%d %H%M%S")
-        # print("%s===ltl_listener on_update==="%ymdhms)
         #mentionはnotificationで受けるのでLTLのはスルー！(｢・ω・)｢ 二重レス防止！
         if re.search(r'[^:]@' + BOT_ID, status['content']):
             return
@@ -143,9 +135,6 @@ class ltl_listener(StreamListener):
 # タイムライン保存用（認証なし）
 class public_listener(StreamListener):
     def on_update(self, status):
-        # jst_now = datetime.now(timezone('Asia/Tokyo'))
-        # ymdhms = jst_now.strftime("%Y%m%d %H%M%S")
-        # print("%s===public_listener on_update==="%ymdhms)
         StatusQ.put(status)
         CM.count(status['created_at'])
 
@@ -171,7 +160,6 @@ def exe_toot(toot_now, g_vis='direct', rep=None, spo=None, media_ids=None, inter
         spo_len = 0
     if rep != None:
         try:
-            # status = mastodon.status(rep)
             mastodon.status_post(status=toot_now[0:490-spo_len], visibility=g_vis, in_reply_to_id=rep, spoiler_text=spo, media_ids=media_ids)
         except Exception:
             sleep(2)
@@ -179,8 +167,6 @@ def exe_toot(toot_now, g_vis='direct', rep=None, spo=None, media_ids=None, inter
     else:
         mastodon.status_post(status=toot_now[0:490-spo_len], visibility=g_vis, in_reply_to_id=None, spoiler_text=spo, media_ids=media_ids)
 
-    # th = threading.Timer(interval=interval,function=th_toot,args=(toot_now, g_vis, rep, spo, media_ids))
-    # th.start()
     jst_now = datetime.now(timezone('Asia/Tokyo'))
     ymdhms = jst_now.strftime("%Y%m%d %H%M%S")
     print("%s🆕toot:"%ymdhms + toot_now[0:300] + ":" + g_vis )
@@ -197,21 +183,11 @@ def exe_fav_now(id):  # ニコります
         print(e)
     else:
         if status['favourited'] == False:
-            #mastodon.status_favourite(id)
             th = threading.Timer(interval=2,function=mastodon.status_favourite,args=(id,))
             th.start()
             jst_now = datetime.now(timezone('Asia/Tokyo'))
             ymdhms = jst_now.strftime("%Y%m%d %H%M%S")
             print("%s🙆Fav"%ymdhms)
-
-#######################################################
-# アンケ回答
-def enquete_vote(id,idx):
-    PostQ.put((exe_enquete_vote,(id,idx)))
-
-def exe_enquete_vote(id,idx):
-    th = threading.Timer(interval=2,function=mastodon.vote,args=(id, idx))
-    th.start()
 
 #######################################################
 # ブースト
@@ -250,8 +226,6 @@ def follow(id):
 
 def exe_follow(id):
     mastodon.account_follow(id)
-    # th = threading.Timer(interval=8,function=mastodon.account_follow,args=(id,))
-    # th.start()
     print("♥follow")
 
 #######################################################
@@ -337,15 +311,7 @@ def ana_image(media_attachments,sensitive,acct,g_vis,id,content):
         elif result == 'イラスト男':
             toot_now += 'かっこいい！'
         elif result == 'イラスト線画':
-            if '.mp' in filename or '.webm' in filename:
-                pass
-            else:
-                r = random.randint(0,100)
-                if r > 50:
-                    coloring_image(filename,acct,g_vis,id)
-                    return ''
-                elif r > 30:
-                    toot_now += '色塗ってー！'
+            toot_now += '色塗ってー！'
         elif result == 'ろびすて':
             toot_now += '🙏ろびすてとうとい！'
         elif result == '漫画':
@@ -389,24 +355,6 @@ def ana_image(media_attachments,sensitive,acct,g_vis,id,content):
     return toot_now
 
 #######################################################
-# 着色サービス
-def coloring_image(filename, acct, g_vis, id, color=None):
-    media_files = []
-    try:
-        # tmp_file = painter.colorize(filename)
-        tmp_file = kiri_deep.colorize(filename, color=color)
-        result = kiri_deep.takoramen(tmp_file)
-        if g_vis != 'direct' and result == 'にじえろ':
-            toot_now = f"@{acct} えっち！"
-        else:
-            media_files.append(mastodon.media_post(tmp_file, 'image/png'))
-            toot_now = f"@{acct} 色塗ったー！ \n#exp15m"
-        toot(toot_now, g_vis=g_vis, rep=id, media_ids=media_files)
-    except Exception as e:
-        print(e)
-        kiri_util.error_log()
-
-#######################################################
 # 顔マーク
 def face_search(filename, acct, g_vis, id):
     media_files = []
@@ -432,10 +380,8 @@ def worker(status):
     acct = status["account"]["acct"]
     username = "@" +  acct
     g_vis = status["visibility"]
-    # if len(kiri_util.hashtag(status['content'])) > 0:
-    #     return
     content = kiri_util.content_cleanser(status['content'])
-    hashtags = kiri_util.hashtag(status['content'])
+    # hashtags = kiri_util.hashtag(status['content'])
     if 'application' not in status or status['application'] == None:
         application = ''
     else:
@@ -449,9 +395,6 @@ def worker(status):
     now_ymd = jst_now.strftime("%Y%m%d")
     media_attachments = status["media_attachments"]
     sensitive = status['sensitive']
-    enquete = None
-    # if status['enquete'] != None:
-    #     enquete = json.loads(status['enquete'])
 
     rentou.append(acct)
     if len(rentou) > 20:
@@ -461,7 +404,7 @@ def worker(status):
     # if tmpcnt/len(rentou) > 0.5:
     #     return
     a = int(CM.get_coolingtime())
-    rnd = random.randint(0,9+a+tmpcnt//5)
+    rnd = random.randint(0,5+a+tmpcnt//5)
     if acct == MASTER_ID:
         rnd = 0
 
@@ -908,20 +851,6 @@ def worker(status):
             SM.update(acct, 'func')
         else:
             toot('@%s ＤＭで依頼してねー！周りの人に答え見えちゃうよー！'%acct, 'direct', rep=id, interval=a)
-    elif enquete != None:
-        if random.randint(0,4) == 0:
-            if enquete['type'] == 'enquete':     #enquete_result
-                x = len(enquete['items'])
-                i = random.randrange(0,x-1)
-                t = kiri_util.content_cleanser(enquete['items'][i])
-                tmp = []
-                tmp.append('う〜ん、やっぱ「%s」かなー'%t)
-                tmp.append('断然「%s」だよねー！'%t)
-                tmp.append('強いて言えば「%s」かもー？'%t)
-                tmp.append('「%s」でいいや……'%t)
-                toot_now = random.choice(tmp)
-                enquete_vote(id, i)
-                toot(toot_now, g_vis, None, None,interval=a*2)
 
     elif re.search(r"([ぼボ][とト][るル][メめ]ー[るル])([サさ]ー[ビび][スす])[：:]", content):
         print("★ボトルメールサービス")
@@ -950,40 +879,7 @@ def worker(status):
 
     elif len(media_attachments) > 0 and re.search(r"色[ぬ塗]って", content + spoiler_text):
         fav_now(id)
-        for media in media_attachments:
-            filename = download(media["url"] , "media")
-            if '.mp' in filename or '.webm' in filename:
-                pass
-            else:
-                if "赤" in content + spoiler_text:
-                    colorvec = 0
-                elif "青" in content + spoiler_text:
-                    colorvec = 1
-                elif "緑" in content + spoiler_text:
-                    colorvec = 2
-                elif "紫" in content + spoiler_text or "パープル" in content + spoiler_text:
-                    colorvec = 3
-                elif "茶" in content + spoiler_text or "ブラウン" in content + spoiler_text:
-                    colorvec = 4
-                elif "ピンク" in content + spoiler_text or "桃" in content + spoiler_text:
-                    colorvec = 5
-                elif "金" in content + spoiler_text or "黃" in content + spoiler_text:
-                    colorvec = 6
-                elif "白" in content + spoiler_text or "銀" in content + spoiler_text:
-                    colorvec = 7
-                elif "黒" in content + spoiler_text:
-                    colorvec = 8
-                else:
-                    colorvec = None
-
-                result = kiri_deep.takoramen(filename)
-                if result in ["イラスト線画"]:
-                    # 線画はそのまま塗る
-                    coloring_image(filename,acct,g_vis,id, color=colorvec)
-                else:
-                    # それ以外は一旦線画に変換してから
-                    line_path = kiri_util.image_to_line(filename)
-                    coloring_image(line_path,acct,g_vis,id, color=colorvec)
+        toot('@%s 色塗りサービスは終了したよ〜₍₍ ◝(╹ᗜ╹๑◝) ⁾⁾ ₍₍ (◟๑╹ᗜ╹)◟ ⁾⁾'%(acct,word), g_vis, id, None, interval=a)
 
     elif len(media_attachments) > 0 and re.search(r"きりぼ.*アイコン作", content):
         SM.update(acct, 'func', score=1)
@@ -1068,8 +964,6 @@ def worker(status):
             if len(gen_txt) > 5:
                 gen_txt +=  "\n#きり要約 #きりぼっと"
                 toot("@" + acct + " :@" + acct + ":\n"  + gen_txt, g_vis, id, "勝手に要約サービス", interval=a)
-    elif re.search(r"チノチャレンジしてー", content + spoiler_text):
-        paint_chino()
     elif re.search(r"きりぼ.+:@(.+):.*の初", content):
         target = re.search(r"きりぼ.+:@(.+):.*の初", str(content)).group(1)
         toots = DAO.get_user_toots(target)
@@ -1120,9 +1014,6 @@ def worker(status):
         seeds.extend(toots_for_rep[acct])
         tmp = kiri_deep.lstm_gentxt(seeds,num=1)
         tmp = kiri_util.content_cleanser_light(tmp)
-        # toots_for_rep[acct].append(tmp)
-        # if len(toots_for_rep[acct]) > 20:
-        #     toots_for_rep[acct].pop(0)
         toot_now += tmp
         toot(toot_now, g_vis, id, None,interval=a)
     elif re.search(r"(きり|キリ).*(ぼっと|ボット|[bB][oO][tT])|[きキ][りリ][ぼボ]", content + spoiler_text):
@@ -1166,19 +1057,12 @@ def business_contact(status):
     print('%s===「%s」by %s'%(jst_now_str,('\n'+' '*20).join(content.split('\n')), acct))
 
     if statuses_count == 1:
-        fav_now(id)
-        toot_now = '@%s 新規さんかも−！\n:@%s:(%s)＜「%s」(created at %s)\n#exp10m'%(MASTER_ID, acct, display_name, content, ac_ymd)
-        toot(toot_now, rep=id)
-
-        # toot_now = ':@%s: （%s）ご新規さんかもー！(๑•᎑•๑)♬*゜\n #ももな代理 #ニコフレ挨拶部 #しんかこ'%(acct,display_name)
-        # toot(toot_now, g_vis='public',interval=3)
+        toot_now = ':@%s: （%s）ご新規さんかもー！(๑•᎑•๑)♬*゜\n #挨拶部'%(acct,display_name)
+        toot(toot_now, g_vis='public',interval=3)
     elif ymdhms == None or ymdhms + diff < created_at:
         fav_now(id)
-        # toot_now = '@%s 帰ってきたよ−！(前回書込：%s)\n:@%s:(%s)＜「%s」'%(MASTER_ID, ymdhms.strftime("%Y.%m.%d %H:%M:%S"), acct, display_name, content)
-        # toot(toot_now, rep=id)
-
-        # toot_now = ':@%s: %s!おかえりー！(๑́ºㅿº๑̀)💦\n #ももな代理 #ニコフレ挨拶部'%(acct,display_name)
-        # toot(toot_now, g_vis='public',interval=3)
+        toot_now = ':@%s: %s!おかえりー！(๑́ºㅿº๑̀)💦\n #挨拶部'%(acct,display_name)
+        toot(toot_now, g_vis='public',interval=3)
 
     pita_list.append(created_at)
     if len(pita_list) > 1:
@@ -1217,13 +1101,11 @@ def is_japanese(string):
 #######################################################
 # レシピ提案
 def recipe_service(content=None, acct=MASTER_ID, id=None, g_vis='unlisted'):
-    # print('recipe_service parm ',content, acct, id, g_vis)
     fav_now(id)
     generator = GenerateText.GenerateText(1)
     #料理名を取得ー！
     gen_txt = ''
     spoiler = generator.generate("recipe")
-    # print('料理名：%s'%spoiler)
 
     #材料と分量を取得ー！
     zairyos = []
@@ -1245,7 +1127,6 @@ def recipe_service(content=None, acct=MASTER_ID, id=None, g_vis='unlisted'):
     while len(text_chu) <= 3 or len(text_end) < 1:
         tmp_texts = generator.generate("recipe_text").split('\n')
         for tmp_text in tmp_texts:
-            #print('料理のレシピ：%s'%tmp_text)
             if re.search(r'完成|出来上|召し上が|できあがり|最後|終わり',tmp_text):
                 if len(text_end) <= 0:
                     text_end.append(tmp_text)
@@ -1321,15 +1202,7 @@ def show_rank(acct=None, target=None, id=None, g_vis=None):
             if i >= 9:
                 break
 
-        toot(toot_now, g_vis='private', spo=spo_text, interval=2)
-
-#######################################################
-# チノチャレンジ
-def paint_chino():
-    img_path = kiri_deep.make_chino()
-    media = mastodon.media_post(img_path, 'image/png')
-    toot_now = f"#きりぼのチノチャレンジ #exp15m"
-    toot(toot_now, g_vis="unlisted", media_ids=[media])
+        toot(toot_now, g_vis='unlisted', spo=spo_text, interval=2)
 
 #######################################################
 # ボトルメールサービス　メッセージ登録
@@ -1357,7 +1230,9 @@ def th_worker():
     try:
         while True:
             status = WorkerQ.get() #キューからトゥートを取り出すよー！なかったら待機してくれるはずー！
-            worker(status)
+            sleep(0.5)
+            if WorkerQ.qsize() <= 1: #キューが詰まってたらスルー
+                worker(status)
     except Exception as e:
         print(e)
         kiri_util.error_log()
@@ -1405,8 +1280,8 @@ def th_timerDel():
 def jinkei_tooter():
     spoiler = "勝手に陣形サービス"
     gen_txt = kiri_romasaga.gen_jinkei()
-    # gen_txt = '@kiritan\n' + gen_txt
-    toot(gen_txt, "public", spo=spoiler)
+    if gen_txt:
+        toot(gen_txt, "public", spo=spoiler)
 
 #######################################################
 # ボトルメールサービス　配信処理
@@ -1512,7 +1387,7 @@ def th_hint_de_pinto(gtime=20):
                 media_files = []
                 media_files.append(mastodon.media_post(filename, 'image/' + ex))
                 toot_now = "さて、これは何/誰でしょうか？\nヒント：{0}\n#きりたんのヒントでピント #exp15m".format(hint_text)
-                toot(toot_now, g_vis='private', rep=None, spo=None, media_ids=media_files)
+                toot(toot_now, g_vis='unlisted', rep=None, spo=None, media_ids=media_files)
                 for tt in range(60):
                     sleep(1)
                     if len(break_flg) > 0:
@@ -1539,7 +1414,7 @@ def th_hint_de_pinto(gtime=20):
         media_files = []
         media_files.append(mastodon.media_post(path, 'image/' + ex))
         toot_now = "正解は{0}でした〜！\n（出題 :@{1}: ） #exp15m".format(term,acct)
-        toot(toot_now, g_vis='private', rep=None, spo=None, media_ids=media_files,interval=4)
+        toot(toot_now, g_vis='unlisted', rep=None, spo=None, media_ids=media_files,interval=4)
 
     # gi = kiri_util.get_images(BING_KEY)
     gi = kiri_util.get_images_GGL(GOOGLE_KEY,GOOGLE_ENGINE_KEY)
@@ -1571,11 +1446,11 @@ def th_hint_de_pinto(gtime=20):
             if g_acct != acct and term in ans:
                 loop = len(loop_cnt)
                 score = min([10,len(term)])*8//(2**loop)
-                toot(':@{0}: 正解〜！'.format(acct), g_vis='private', rep=None, spo=None)
+                toot(':@{0}: 正解〜！'.format(acct), g_vis='unlisted', rep=None, spo=None)
                 SM.update(acct, 'getnum', score=score//1)
                 SM.update(g_acct, 'getnum', score=score//2)
                 break_flg.append('ON')
-                toot('正解者には{0}点、出題者には{1}点入るよー！'.format(score//1, score//2), g_vis='private', rep=None, spo=None, interval=8)
+                toot('正解者には{0}点、出題者には{1}点入るよー！'.format(score//1, score//2), g_vis='unlisted', rep=None, spo=None, interval=8)
 
                 break
 
@@ -1602,10 +1477,10 @@ def th_gettingnum(gtime=30):
                 continue
 
             #アクティブ人数確認
-            i = DAO.get_gamenum()
-            if  i <= 10:
-                toot('@%s\n人少ないからまた後でねー！'%g_acct, 'unlisted', g_id, None)
-                continue
+            # i = DAO.get_gamenum()
+            # if  i <= 10:
+            #     toot('@%s\n人少ないからまた後でねー！'%g_acct, 'unlisted', g_id, None)
+            #     continue
 
             #ゲーム開始ー！
             fav_now(g_id)
@@ -1746,28 +1621,12 @@ def t_user():
         sleep(5)
         t_user()
 
-#######################################################
-# randomニコルくん
-def th_nicoru():
-    gen_txt = ''
-    while len(gen_txt) < 430:
-        gen_txt += ':nicoru{0}:'.format(random.randint(0,360))
-    toot('@%s '%MASTER_ID + gen_txt, "direct", None, None)
 
 #######################################################
 # にゃんタイム
 def nyan_time():
     gen_txt = 'にゃんにゃんにゃんにゃん！\n₍₍(ฅ=˘꒳ ˘=)ฅ ⁾⁾ ₍₍ ฅ(=╹꒳ ╹=ฅ)⁾⁾'
     toot(gen_txt, "public")
-
-#######################################################
-# カウントダウン
-def countdown():
-    jst_now = datetime.now(timezone('Asia/Tokyo'))
-    xday = datetime.strptime('2019/04/28 19:00:00', "%Y/%m/%d %H:%M:%S").astimezone(timezone('Asia/Tokyo'))
-    diff = xday - jst_now
-    gen_txt = f'あと{int(diff.total_seconds()):,}秒だよ〜'
-    toot(gen_txt, "unlisted")
 
 #######################################################
 # フォロ外し
@@ -1828,25 +1687,12 @@ def th_post():
         try:
             func,args = PostQ.get()
             func(*args)
-            sleep(4.0)
-            # sleep(2.0+CM.get_coolingtime())
+            sleep(2.0)
         except Exception as e:
             print(e)
             kiri_util.error_log()
-            # sleep(10)
+            sleep(10)
             # th_post()
-
-#######################################################
-# pita
-def th_pita():
-    while True:
-        sleep(10.0)
-        jst_now = datetime.now(timezone('Asia/Tokyo'))
-        diff = timedelta(seconds=60)
-        # toot[-1] + 1min < now -> pita!
-        if len(pita_list) > 0 and pita_list[-1] + diff < jst_now:
-            toot('◝( ・_・)◟ <ﾋﾟﾀｯ!', g_vis='public')
-            sleep(3600.0)
 
 #######################################################
 # メイン
@@ -1865,27 +1711,17 @@ def main():
     threads.append( threading.Thread(target=th_worker) )
     # threads.append( threading.Thread(target=th_timerDel) )
     threads.append( threading.Thread(target=th_post) )
-    # threads.append( threading.Thread(target=th_pita) )
     #スケジュール起動系(時刻)
-    # threads.append( threading.Thread(target=kiri_util.scheduler, args=(summarize_tooter,['**:02'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(bottlemail_sending,['**:05'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(th_follow_mente,['04:00'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(nyan_time,['22:22'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(show_rank,['07:00'])) )
-    # threads.append( threading.Thread(target=kiri_util.scheduler, args=(paint_chino,['05:30'])) )
-    # threads.append( threading.Thread(target=kiri_util.scheduler, args=(countdown,['**:00'])) )
     #スケジュール起動系(間隔)
-    # threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(monomane_tooter,120,0,15,CM)) )
     threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(lstm_tooter,20,-3,2,CM)) )
-    # threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(timer_bst1st,90,0,15,CM)) )
-    # threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(th_nicoru,60,0,60,CM)) )
-    # threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(tangrkn_tooter,20,-10,10,CM)) )
     threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(jinkei_tooter,120,-10,10,CM)) )
 
     for th in threads:
         th.start()
-    # for th in threads:
-    #     th.join()
 
 if __name__ == '__main__':
     main()

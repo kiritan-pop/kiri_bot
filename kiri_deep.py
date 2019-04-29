@@ -1,7 +1,6 @@
 # coding: utf-8
 
 from keras.models import load_model, Model
-# from keras import backend as backend
 from gensim.models.doc2vec import Doc2Vec
 import MeCab
 import numpy as np
@@ -29,7 +28,6 @@ for label,i in labels_index.items():
 STANDARD_SIZE = (299, 299)
 STANDARD_SIZE_S1 = (128, 128)
 STANDARD_SIZE_S2 = (512, 512)
-# STANDARD_SIZE = (512, 512)
 
 #いろいろなパラメータ
 #変更するとモデル再構築必要
@@ -39,21 +37,6 @@ AVE_LEN = 4        # vec推定で参照するトゥート(vecor)数
 TXT_MAXLEN = 5      # 
 MU = "🧪"       # 無
 END = "🦷"      # 終わりマーク
-Colors = {}
-Colors['red']    = 0
-Colors['blue']   = 1
-Colors['green']  = 2
-Colors['purple'] = 3
-Colors['brown']  = 4
-Colors['pink']   = 5
-Colors['blonde'] = 6
-Colors['white']  = 7
-Colors['black']  = 8
-Colors_rev = {v:k for k,v in Colors.items()}
-
-# 減色
-QNUM = 16
-color_pallete = np.load("db/color_pallete.npy")
 
 tagger = MeCab.Tagger('-Owakati -d /usr/local/lib/mecab/dic/mecab-ipadic-neologd -u dic/nicodic.dic')
 DAO = kiri_util.DAO_statuses()
@@ -76,14 +59,6 @@ lstm_vec_model = load_model('db/lstm_vec.h5')
 lstm_set_model = load_model('db/lstm_set.h5')
 
 takomodel = load_model('db/cnn.h5')
-
-gens1_model = load_model('db/g_model_s1.h5')
-gens2_model = load_model('db/g_model_s2.h5')
-colorize_model = Model(
-        inputs=[gens1_model.inputs[0], gens1_model.inputs[1], gens2_model.inputs[0]], 
-        outputs=[gens2_model([gens2_model.inputs[0], gens1_model.outputs[0]])] )
-
-chino_model = load_model('db/g_chino.h5')
 
 graph = tf.get_default_graph()
 
@@ -119,14 +94,6 @@ def lstm_gentxt(toots,num=0,sel_model=None):
     input_mean_vec = input_mean_vec.reshape((1,VEC_MAXLEN, VEC_SIZE))
     with graph.as_default():
         output_vec = lstm_vec_model.predict_on_batch(input_mean_vec)[0]
-
-    # ret = d2vmodel.docvecs.most_similar([output_vec])
-    # print("  目標のトゥート")
-    # for toot_id, score in ret[:4]:
-    #     row = DAO.pickup_1toot(toot_id)
-    #     print(score)
-    #     print(row)
-    #     print(f"{score:2f}:{kiri_util.content_cleanser(row[1])}")
 
     # 推定したベクトルから文章生成
     generated = ''
@@ -189,62 +156,6 @@ def takoramen(filepath):
         return labels[np.argmax(result[0])]
     else:
         return 'other'
-
-def colorize(image_path, color=None):
-    img = Image.open(image_path)
-    img = kiri_util.new_convert(img, 'L')
-    line_image128 =  kiri_util.image_resize(img,STANDARD_SIZE_S1)
-    line_image128 = (np.asarray(line_image128)-127.5)/127.5
-    line_image128 = np.reshape(line_image128,(1,128,128))
-    line_image512 =  kiri_util.image_resize(img,STANDARD_SIZE_S2)
-    line_image512 = (np.asarray(line_image512)-127.5)/127.5
-    line_image512 = np.reshape(line_image512,(1,512,512))
-    if color == None:
-        color_num = random.randrange(len(Colors))
-    else:
-        color_num = color
-
-    r = random.randint(0,9)
-    hist = color_pallete[color_num,r]
-    hist = np.reshape(hist, (1, QNUM, 4))
-
-    with graph.as_default():
-        gen2 = colorize_model.predict([line_image128, hist, line_image512])[0]
-
-    gen2 = (gen2*127.5+127.5).clip(0, 255).astype(np.uint8)
-
-    savepath = 'colorize_images/'
-    if not os.path.exists(savepath):
-        os.mkdir(savepath)
-
-    tmp = Image.fromarray(gen2)
-    tmp = tmp.resize(img.size, Image.LANCZOS )
-    tmp = tmp.resize((max(img.size), max(img.size)) ,Image.LANCZOS)
-    tmp = kiri_util.crop_center(tmp, img.width, img.height)
-    filename = savepath + image_path.split("/")[-1].split(".")[0] + "_" + Colors_rev[color_num] + "_g2.png"
-    tmp.save(filename, optimize=True)
-
-    return filename
-
-def make_chino():
-    noise = np.random.normal(0.0,1.5,(1,64))
-    # noise = np.random.uniform(-1.0,1.0,(1,64))
-    with graph.as_default():
-        chino_img = chino_model.predict_on_batch(noise)[0]
-
-    chino_img = (chino_img*127.5+127.5).clip(0, 255).astype(np.uint8)
-
-    savepath = 'chino_images/'
-    if not os.path.exists(savepath):
-        os.mkdir(savepath)
-
-    jst_now = datetime.now(timezone('Asia/Tokyo'))
-    jst_now_str = jst_now.strftime("%Y%m%d%H%M%S")
-    tmp = Image.fromarray(chino_img)
-    filename = savepath + jst_now_str + ".png"
-    tmp.save(filename, optimize=True)
-
-    return filename
 
 if __name__ == '__main__':
     text = ''

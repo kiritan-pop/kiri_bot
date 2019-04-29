@@ -100,7 +100,8 @@ bl = ':blank: '
 def gen_jinkei():
     DAO = kiri_util.DAO_statuses()
     accts = DAO.get_five()
-
+    if len(accts) != 5:
+        return
     jinkei = random.choice(jinkeis)
     j_name = jinkei['name']
     j_mat  = jinkei['mat']
