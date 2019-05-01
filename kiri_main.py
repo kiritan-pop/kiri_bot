@@ -87,6 +87,33 @@ for i in range(16):
     hanalist.append('👃')
 hanalist.append('🌷🌸🌹🌺🌻🌼大当たり！🌼🌻🌺🌹🌸🌷  @%s'%MASTER_ID)
 
+jihou_dict = {
+    "00":"🕛",
+    "01":"🕐",
+    "02":"🕑",
+    "03":"🕒",
+    "04":"🕓",
+    "05":"🕔",
+    "06":"🕕",
+    "07":"🕖",
+    "08":"🕗",
+    "09":"🕘",
+    "10":"🕙",
+    "11":"🕚",
+    "12":"🕛",
+    "13":"🕐",
+    "14":"🕑",
+    "15":"🕒",
+    "16":"🕓",
+    "17":"🕔",
+    "18":"🕕",
+    "19":"🕖",
+    "20":"🕗",
+    "21":"🕘",
+    "22":"🕙",
+    "23":"🕚",
+}
+
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--gtime", type=int, default=30)
@@ -612,6 +639,11 @@ def worker(status):
         if rnd <= 2:
             toot_now = '( *ˊᵕˋ)ﾉ:@%s: ﾅﾃﾞﾅﾃﾞ'%acct
             id_now = None
+    elif re.search(r"^桐乃じゃないが$", content+spoiler_text):
+        SM.update(acct, 'func')
+        if rnd <= 6:
+            toot_now = f'桐乃じゃないね〜'
+            id_now = None
     elif re.search(r"^.+じゃないが$", content+spoiler_text):
         word = re.search(r"^(.+)じゃないが$", content+spoiler_text).group(1)
         SM.update(acct, 'func')
@@ -628,10 +660,6 @@ def worker(status):
         if rnd <= 6:
             toot_now = '🔥🔥🔥🔥＜ごぉぉぉっ！'
             id_now = None
-    elif "今日もみなさんが素敵な一日を送れますように" in content and acct == 'lamazeP':
-        toot_now = '今み素一送！'
-        id_now = None
-        interval = random.uniform(0.01,0.7)
     elif re.search(r"[ご御夕昼朝][食飯][食た]べ[よるた]|(腹|はら)[へ減]った|お(腹|なか)[空す]いた|(何|なに)[食た]べよ", content):
         SM.update(acct, 'func')
         if rnd <= 3:
@@ -714,6 +742,12 @@ def worker(status):
                 toot_now = '!おみくじ10連'
             interval = 8
             id_now = None
+    elif re.search("寝(ます|る|マス)([よかぞね]?|[…。うぅー～！・]+)$|^寝(ます|る|よ)[…。うぅー～！・]*$|\
+                    寝(ます|る|マス)(.*)[ぽお]や[ユすしー]|きりぼ(.*)[ぽお]や[ユすしー]", content):
+        if not re.search("寝る(かた|方|人|ひと|民)", content):
+            toot_now = f":@{acct}: おやすみ〜 {random.choice([tmp.strip() for tmp in open('.kaomoji','r').readlines()])}\n#挨拶部"
+            id_now = None
+            interval = 5
     else:
         nicolist = set([tmp.strip() for tmp in open('.nicolist').readlines()])
         if acct in nicolist:
@@ -879,7 +913,7 @@ def worker(status):
 
     elif len(media_attachments) > 0 and re.search(r"色[ぬ塗]って", content + spoiler_text):
         fav_now(id)
-        toot('@%s 色塗りサービスは終了したよ〜₍₍ ◝(╹ᗜ╹๑◝) ⁾⁾ ₍₍ (◟๑╹ᗜ╹)◟ ⁾⁾'%(acct,word), g_vis, id, None, interval=a)
+        toot(f'@{acct} 色塗りサービスは終了したよ〜₍₍ ◝(╹ᗜ╹๑◝) ⁾⁾ ₍₍ (◟๑╹ᗜ╹)◟ ⁾⁾', g_vis, id, None, interval=a)
 
     elif len(media_attachments) > 0 and re.search(r"きりぼ.*アイコン作", content):
         SM.update(acct, 'func', score=1)
@@ -1054,6 +1088,7 @@ def business_contact(status):
 
     jst_now = datetime.now(timezone('Asia/Tokyo'))
     jst_now_str = jst_now.strftime("%Y%m%d %H%M%S")
+    jst_now_hh = int(jst_now.strftime("%H"))
     print('%s===「%s」by %s'%(jst_now_str,('\n'+' '*20).join(content.split('\n')), acct))
 
     kaomoji = random.choice([tmp.strip() for tmp in open('.kaomoji','r').readlines()])
@@ -1062,7 +1097,18 @@ def business_contact(status):
         toot(toot_now, g_vis='public',interval=3)
     elif ymdhms == None or ymdhms + diff < created_at:
         fav_now(id)
-        toot_now = f':@{acct}: {display_name} おかえりー！{kaomoji}\n #挨拶部'
+        aisatsu = "おかえり〜！"
+        bure = random.randint(-1,1)
+        if 0<= jst_now_hh <=3 + bure:
+            aisatsu = "こんばんは〜！"
+        elif 5<= jst_now_hh <=11 + bure:
+            aisatsu = "おはよ〜！"
+        elif 12<= jst_now_hh <=17 + bure:
+            aisatsu = "こんにちは〜！"
+        elif 19<= jst_now_hh <=24:
+            aisatsu = "こんばんは〜！"
+
+        toot_now = f':@{acct}: {display_name} {aisatsu} {kaomoji}\n #挨拶部'
         toot(toot_now, g_vis='public',interval=3)
 
     pita_list.append(created_at)
@@ -1146,6 +1192,7 @@ def recipe_service(content=None, acct=MASTER_ID, id=None, g_vis='unlisted'):
 def show_rank(acct=None, target=None, id=None, g_vis=None):
     ############################################################
     # 数取りゲームスコアなど
+    print(f"show_rank target={target}")
     if id:
         fav_now(id)
     sm = kiri_util.ScoreManager()
@@ -1231,7 +1278,7 @@ def th_worker():
     try:
         while True:
             status = WorkerQ.get() #キューからトゥートを取り出すよー！なかったら待機してくれるはずー！
-            sleep(0.5)
+            sleep(1.2)
             if WorkerQ.qsize() <= 1: #キューが詰まってたらスルー
                 worker(status)
     except Exception as e:
@@ -1389,7 +1436,7 @@ def th_hint_de_pinto(gtime=20):
                 media_files.append(mastodon.media_post(filename, 'image/' + ex))
                 toot_now = "さて、これは何/誰でしょうか？\nヒント：{0}\n#きりたんのヒントでピント #exp15m".format(hint_text)
                 toot(toot_now, g_vis='unlisted', rep=None, spo=None, media_ids=media_files)
-                for tt in range(60):
+                for _ in range(60):
                     sleep(1)
                     if len(break_flg) > 0:
                         break
@@ -1439,9 +1486,7 @@ def th_hint_de_pinto(gtime=20):
         th = threading.Thread(target=th_shududai, args=(g_acct,g_id,term))
         th.start()
         while True:
-            tmp_list = HintPinto_ansQ.get()
-            acct, id, ans = tmp_list[0], tmp_list[1], tmp_list[2]
-            # print('ans=',ans)
+            acct, _, ans, *_ = HintPinto_ansQ.get()
             if not th.is_alive():
                 break
             if g_acct != acct and term in ans:
@@ -1630,6 +1675,13 @@ def nyan_time():
     toot(gen_txt, "public")
 
 #######################################################
+# 時報
+def jihou():
+    jst_now = datetime.now(timezone('Asia/Tokyo'))
+    hh_now = jst_now.strftime("%H")
+    toot(f"{jihou_dict[hh_now]}ぽっぽ〜", "public")
+
+#######################################################
 # フォロ外し
 def th_follow_mente():
     print('🌠フォローフォロワー整理処理ーー！！')
@@ -1688,7 +1740,7 @@ def th_post():
         try:
             func,args = PostQ.get()
             func(*args)
-            sleep(2.0)
+            sleep(0.5)
         except Exception as e:
             print(e)
             kiri_util.error_log()
@@ -1717,6 +1769,7 @@ def main():
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(th_follow_mente,['04:00'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(nyan_time,['22:22'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(show_rank,['07:00'])) )
+    threads.append( threading.Thread(target=kiri_util.scheduler, args=(jihou,['**:00'])) )
     #スケジュール起動系(間隔)
     threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(lstm_tooter,20,-3,2,CM)) )
     threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(jinkei_tooter,120,-10,10,CM)) )

@@ -86,7 +86,7 @@ def content_cleanser(content):
         ps.append(p.text)
     rtext += '。\n'.join(ps)
     rtext = unicodedata.normalize("NFKC", rtext)
-    rtext = re.sub(r'([^:])@', r'\1', rtext)
+    # rtext = re.sub(r'([^:])@', r'\1', rtext)
     rtext = rtext.replace("#","")
     rtext = re.sub(r'(___R___)\1{2,}', r'\1', rtext)
     rtext = re.sub(r'___R___', r'\n', rtext)
