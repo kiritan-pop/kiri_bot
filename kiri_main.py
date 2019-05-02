@@ -1492,7 +1492,7 @@ def th_hint_de_pinto(gtime=20):
             if g_acct != acct and term in ans:
                 loop = len(loop_cnt)
                 score = min([10,len(term)])*8//(2**loop)
-                toot(':@{0}: 正解〜！'.format(acct), g_vis='unlisted', rep=None, spo=None)
+                toot(f'{{{{{{:@{acct}:}}}}}} 正解〜！', g_vis='unlisted', rep=None, spo=None)
                 SM.update(acct, 'getnum', score=score//1)
                 SM.update(g_acct, 'getnum', score=score//2)
                 break_flg.append('ON')
@@ -1575,16 +1575,18 @@ def th_gettingnum(gtime=30):
                     elif len(accts) == 1 and not hanamaru:
                         toot_now += '💮'
                         hanamaru = True
-                        # print('#######%sに%d点！'%(accts[0],val))
+                        toot_now += '{0:>2}：'.format(val)
+                        for acct1 in accts:
+                            toot_now += f'{{{{{{:@{acct1}:}}}}}}'
+                        toot_now += '\n'
                         score = val
                         SM.update(accts[0], 'getnum', score=score)
                     else:
                         toot_now += '❌'
-
-                    toot_now += '{0:>2}：'.format(val)
-                    for acct1 in accts:
-                        toot_now += ':@%s:'%acct1
-                    toot_now += '\n'
+                        toot_now += '{0:>2}：'.format(val)
+                        for acct1 in accts:
+                            toot_now += f':@{acct1}:'
+                        toot_now += '\n'
                 toot('%s\n得点は%d点だよー\n#数取りゲーム #きりぼっと'%(toot_now,score), 'public', None, '数取りゲーム、結果発表ーー！！')
 
         except Exception as e:
