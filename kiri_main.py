@@ -534,20 +534,20 @@ def worker(status):
             tmp.append('種')
             toot_now = random.choice(tmp)
             id_now = None
-    elif re.search(r"^:twitter:.+🔥$", content, flags=(re.MULTILINE | re.DOTALL)):
+    elif re.search(r"^:twitter:.+(((🔥)))$", content, flags=(re.MULTILINE | re.DOTALL)):
         SM.update(acct, 'func')
         if rnd <= 4:
             tmp = []
-            tmp.append(':twitter: ＜ﾊﾟﾀﾊﾟﾀｰ\n川\n\n🔥')
-            tmp.append('(ﾉ・_・)ﾉ ﾆｹﾞﾃ!⌒:twitter: ＜ｱﾘｶﾞﾄｩ!\n🔥')
-            tmp.append('(ﾉ・_・)ﾉ ﾆｹﾞﾃ!⌒🍗 ＜ｱﾘｶﾞﾄｩ!\n🔥')
+            tmp.append(':twitter: ＜ﾊﾟﾀﾊﾟﾀｰ\n川\n\n(((🔥)))')
+            tmp.append('(ﾉ・_・)ﾉ ﾆｹﾞﾃ!⌒:twitter: ＜ｱﾘｶﾞﾄｩ!\n(((🔥)))')
+            tmp.append('(ﾉ・_・)ﾉ ﾆｹﾞﾃ!⌒🍗 ＜ｱﾘｶﾞﾄｩ!\n(((🔥)))')
             toot_now = random.choice(tmp)
             id_now = None
     elif re.search(r"ブリブリ|ぶりぶり|うん[ちこ]|💩", content+spoiler_text):
         SM.update(acct, 'func',score=-2)
         if rnd <= 4:
             tmp = []
-            tmp.append( '🌊🌊🌊🌊 ＜ざばーっ！')
+            tmp.append( r'{{{🌊🌊🌊🌊}}} ＜ざばーっ！')
             tmp.append('( •́ฅ•̀ )ｸｯｻ')
             tmp.append('っ🚽')
             toot_now = random.choice(tmp)
@@ -555,25 +555,25 @@ def worker(status):
     elif re.search(r"^流して$|^水$", content+spoiler_text):
         SM.update(acct, 'func')
         if rnd <= 6:
-            toot_now = '🌊🌊🌊🌊 ＜ざばーっ！'
+            toot_now = r'{{{🌊🌊🌊🌊}}} ＜ざばーっ！'
             id_now = None
     elif re.search(r"^ふきふき$|^竜巻$|^風$", content):
         SM.update(acct, 'func')
         if rnd <= 4:
             tmp = []
-            tmp.append('🌪🌪🌪🌪＜ごぉ〜〜っ！')
-            tmp.append('💨💨💨🍃＜ぴゅ〜〜っ！')
+            tmp.append('(((🌪🌪🌪🌪)))＜ごぉ〜〜っ！')
+            tmp.append('(((💨💨💨)))[[[🍃]]]＜ぴゅ〜〜っ！')
             toot_now = random.choice(tmp)
             id_now = None
     elif re.search(r"^凍らせて$|^氷$", content):
         SM.update(acct, 'func')
         if rnd <= 2:
-            toot_now = '❄❄❄❄❄＜カチコチ〜ッ！'
+            toot_now = '[[[❄]]][[[❄]]][[[❄]]][[[❄]]][[[❄]]] ＜カチコチ〜ッ！'
             id_now = None
     elif re.search(r"^雷$", content):
         SM.update(acct, 'func')
         if rnd <= 2:
-            toot_now = '⚡️⚡️⚡️⚡️＜ゴロゴロ〜ッ！'
+            toot_now = r'{{{⚡️⚡️⚡️⚡️}}}＜ゴロゴロ〜ッ！'
             id_now = None
     elif re.search(r"^ぬるぽ$|^[Nn]ull[Pp]ointer[Ee]xception$", content):
         SM.update(acct, 'func',score=-1)
@@ -591,7 +591,7 @@ def worker(status):
     elif re.search(r"3.{0,1}3.{0,1}4", content):
         SM.update(acct, 'func',score=-1)
         if rnd <= 6:
-            toot_now = 'ﾅﾝ'
+            toot_now = 'ﾅﾝ :nan:'
             id_now = None
     elif re.search(r"^ちくわ大明神$", content):
         SM.update(acct, 'func',score=-1)
@@ -606,12 +606,12 @@ def worker(status):
     elif re.search(r"さむい$|寒い$", content):
         SM.update(acct, 'func',score=-1)
         if rnd <= 2:
-            toot_now = '🔥🔥🔥\n🔥:@%s:🔥\n🔥🔥🔥 '%acct
+            toot_now = '(((🔥)))(((🔥)))(((🔥)))\n(((🔥))) :@%s: (((🔥)))\n(((🔥)))(((🔥)))(((🔥))) '%acct
             id_now = None
     elif re.search(r"あつい$|暑い$", content):
         SM.update(acct, 'func',score=-1)
         if rnd <= 2:
-            toot_now = '❄❄❄\n❄:@%s:❄\n❄❄❄ '%acct
+            toot_now = '[[[❄]]][[[❄]]][[[❄]]]\n[[[❄]]] :@%s: [[[❄]]]\n[[[❄]]][[[❄]]][[[❄]]] '%acct
             id_now = None
     elif re.search(r"^(今|いま)の[な|無|ナ][し|シ]$", content):
         SM.update(acct, 'func',score=-1)
@@ -637,7 +637,7 @@ def worker(status):
     elif re.search(r"泣いてる|泣いた|涙が出[るた(そう)]", content):
         SM.update(acct, 'func')
         if rnd <= 2:
-            toot_now = '( *ˊᵕˋ)ﾉ:@%s: ﾅﾃﾞﾅﾃﾞ'%acct
+            toot_now = '( *ˊᵕˋ)ﾉ :@%s: ﾅﾃﾞﾅﾃﾞ'%acct
             id_now = None
     elif re.search(r"^桐乃じゃないが$", content+spoiler_text):
         SM.update(acct, 'func')
@@ -653,12 +653,12 @@ def worker(status):
     elif re.search(r"惚気|ほっけ|ホッケ", content+spoiler_text):
         SM.update(acct, 'func',score=-1)
         if rnd <= 2:
-            toot_now = '🔥🔥🔥🔥＜ごぉぉぉっ！'
+            toot_now = '(((🔥🔥🔥🔥)))＜ごぉぉぉっ！'
             id_now = None
     elif re.search(r"^燃やして$|^火$|^炎$", content+spoiler_text):
         SM.update(acct, 'func')
         if rnd <= 6:
-            toot_now = '🔥🔥🔥🔥＜ごぉぉぉっ！'
+            toot_now = '(((🔥🔥🔥🔥)))＜ごぉぉぉっ！'
             id_now = None
     elif re.search(r"[ご御夕昼朝][食飯][食た]べ[よるた]|(腹|はら)[へ減]った|お(腹|なか)[空す]いた|(何|なに)[食た]べよ", content):
         SM.update(acct, 'func')
@@ -668,12 +668,12 @@ def worker(status):
         word = re.search(r"^(.+)じゃね[ぇえ]ぞ", content+spoiler_text).group(1)
         SM.update(acct, 'func')
         if rnd <= 4 and len(word) <= 5:
-            toot_now = f'{word}じゃぞ……💃'
+            toot_now = f'{word}じゃぞ……{{{{{{💃}}}}}}'
             id_now = None
     elif re.search(r"止まるんじゃね[ぇえ]ぞ", content+spoiler_text):
         SM.update(acct, 'func')
         if rnd <= 4:
-            toot_now = '止まるんじゃぞ……💃'
+            toot_now = r'止まるんじゃぞ……{{{💃}}}'
             id_now = None
     elif re.search(r"[おぉ][じぢ]|[おぉ][じぢ]さん", content+spoiler_text):
         SM.update(acct, 'func')
@@ -976,7 +976,7 @@ def worker(status):
                         pass
                     else:
                         toot_now +=  "\n#きり翻訳 #きりぼっと"
-                        toot(toot_now, 'public', id, '翻訳したよ〜！なになに……？ :@%s:＜'%acct ,interval=a)
+                        toot(toot_now, 'public', id, '翻訳したよ〜！なになに……？ :@%s: ＜'%acct ,interval=a)
                         SM.update(acct, 'func')
     elif  '翻訳して' in spoiler_text:
         fav_now(id)
@@ -986,7 +986,7 @@ def worker(status):
                 pass
             else:
                 toot_now +=  "\n#きり翻訳 #きりぼっと"
-                toot(toot_now, 'public', id, '翻訳したよ〜！ :@%s:＜'%acct ,interval=a)
+                toot(toot_now, 'public', id, '翻訳したよ〜！ :@%s: ＜'%acct ,interval=a)
                 SM.update(acct, 'func')
     elif len(content) > 140 and (spoiler_text == None or spoiler_text == ''):
         content = re.sub(r"(.){3,}",r"\1",content, flags=(re.DOTALL))
@@ -1077,6 +1077,8 @@ def business_contact(status):
     ac_created_at = status["account"]["created_at"]
     ac_created_at = ac_created_at.astimezone(timezone('Asia/Tokyo'))
     # ac_ymd = ac_created_at.strftime("%Y.%m.%d %H:%M:%S")
+    if '@' in acct: #連合スルー
+        return        
     #最後にトゥートしてから3時間以上？ 
     if acct in acct_least_created_at:
         ymdhms = acct_least_created_at[acct]
@@ -1340,7 +1342,7 @@ def bottlemail_sending():
         spoiler = ":@" + acct + ": から🍾ボトルメール💌届いたよー！"
         random_acct = DAO.sample_acct()
         #お届け！
-        toots = "@" + random_acct + "\n:@" + acct + ":＜「" + msg + "」"
+        toots = "@" + random_acct + "\n:@" + acct + ": ＜「" + msg + "」"
         toots +=  "\n※ボトルメールサービス：＜メッセージ＞　であなたも送れるよー！試してみてね！"
         toots +=  "\n#ボトルメールサービス #きりぼっと"
         toot(toots, "direct",reply_id if reply_id != 0 else None, spoiler)
@@ -1492,7 +1494,7 @@ def th_hint_de_pinto(gtime=20):
             if g_acct != acct and term in ans:
                 loop = len(loop_cnt)
                 score = min([10,len(term)])*8//(2**loop)
-                toot(f'{{{{{{:@{acct}:}}}}}} 正解〜！', g_vis='unlisted', rep=None, spo=None)
+                toot(f'((( :@{acct}: ))) 正解〜！', g_vis='unlisted', rep=None, spo=None)
                 SM.update(acct, 'getnum', score=score//1)
                 SM.update(g_acct, 'getnum', score=score//2)
                 break_flg.append('ON')
@@ -1577,7 +1579,7 @@ def th_gettingnum(gtime=30):
                         hanamaru = True
                         toot_now += '{0:>2}：'.format(val)
                         for acct1 in accts:
-                            toot_now += f'{{{{{{:@{acct1}:}}}}}}'
+                            toot_now += f'((( :@{acct1}: )))'
                         toot_now += '\n'
                         score = val
                         SM.update(accts[0], 'getnum', score=score)
@@ -1585,7 +1587,7 @@ def th_gettingnum(gtime=30):
                         toot_now += '❌'
                         toot_now += '{0:>2}：'.format(val)
                         for acct1 in accts:
-                            toot_now += f':@{acct1}:'
+                            toot_now += f':@{acct1}: '
                         toot_now += '\n'
                 toot('%s\n得点は%d点だよー\n#数取りゲーム #きりぼっと'%(toot_now,score), 'public', None, '数取りゲーム、結果発表ーー！！')
 
@@ -1639,7 +1641,8 @@ def t_local():
 # ローカルタイムライン監視スレッド（認証なし）
 def t_sub():
     try:
-        publicdon.stream_local(public_listener(),timeout=20)
+        # publicdon.stream_local(public_listener(),timeout=20)
+        publicdon.stream_public(public_listener(),timeout=20)
     except requests.exceptions.ConnectionError as e:
         print("＊＊＊再接続するよ〜t_sub()＊＊＊")
         # print(e)
@@ -1673,7 +1676,7 @@ def t_user():
 #######################################################
 # にゃんタイム
 def nyan_time():
-    gen_txt = 'にゃんにゃんにゃんにゃん！\n₍₍(ฅ=˘꒳ ˘=)ฅ ⁾⁾ ₍₍ ฅ(=╹꒳ ╹=ฅ)⁾⁾'
+    gen_txt = 'にゃんにゃんにゃんにゃん！\n₍₍（（（｛｛｛(ฅ=˘꒳ ˘=)ฅ｝｝｝））） ⁾⁾ ₍₍ （（（｛｛｛ฅ(=╹꒳ ╹=ฅ)｝｝｝）））⁾⁾'
     toot(gen_txt, "public")
 
 #######################################################
@@ -1681,7 +1684,7 @@ def nyan_time():
 def jihou():
     jst_now = datetime.now(timezone('Asia/Tokyo'))
     hh_now = jst_now.strftime("%H")
-    toot(f"{jihou_dict[hh_now]}ぽっぽ〜", "public")
+    toot(f"((({jihou_dict[hh_now]})))ぽっぽ〜", "public")
 
 #######################################################
 # フォロ外し
@@ -1773,7 +1776,7 @@ def main():
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(show_rank,['07:00'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(jihou,['**:00'])) )
     #スケジュール起動系(間隔)
-    threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(lstm_tooter,20,-3,2,CM)) )
+    threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(lstm_tooter,8,-2,2,CM)) )
     threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(jinkei_tooter,120,-10,10,CM)) )
 
     for th in threads:
