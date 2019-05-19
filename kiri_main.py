@@ -64,8 +64,8 @@ HintPinto_ansQ = queue.Queue()
 HintPinto_flg = []
 
 slot_bal = []
-rep_cnt = []
-rentou = []
+toot_cnt = 0
+TCNT_MOD = 15
 acct_least_created_at = {}
 pita_list = []
 
@@ -403,6 +403,7 @@ def face_search(filename, acct, g_vis, id):
 #######################################################
 # ワーカー処理の実装
 def worker(status):
+    global toot_cnt
     id = status["id"]
     acct = status["account"]["acct"]
     username = "@" +  acct
@@ -423,36 +424,19 @@ def worker(status):
     media_attachments = status["media_attachments"]
     sensitive = status['sensitive']
 
-    rentou.append(acct)
-    if len(rentou) > 20:
-        rentou.pop(0)
-    tmpcnt = sum([1 for x in rentou if x==acct]) 
-    # 占有率50%超える人は異常なのでスルー
-    # if tmpcnt/len(rentou) > 0.5:
-    #     return
-    a = int(CM.get_coolingtime())
-    rnd = random.randint(0,5+a+tmpcnt//5)
-    if acct == MASTER_ID:
-        rnd = 0
-
     #botはスルー
+    if status["account"]["bot"]:
+        return
+
     botlist = set([tmp.strip() for tmp in open('.botlist').readlines()])
     botlist.add(BOT_ID)
-
     if  acct in botlist:
-        #bot例外
-        if  acct == 'JC' and application != '女子会':
-            pass
-        elif  acct == '5' and 'TootIe' not in application:
-            pass
-        elif  acct == 'JC' and 'マストドン閉じろ' in content:
-            pass
-        elif acct == '12222222' and 'ふきふき' in content:
-            pass
-        # elif acct == 'hihobot': #仮対応。機能増えたら対処
-        #     pass
-        else:
-            return
+        return
+
+    a = int(CM.get_coolingtime())
+    rnd = random.randint(0,5+a)
+    if acct == MASTER_ID:
+        rnd = 0
 
     if len(content) <= 0:
         return
@@ -469,29 +453,19 @@ def worker(status):
         sleep(10)
         os.kill(os.getpid(), signal.SIGKILL)
 
+#   定期トゥート
+    toot_cnt += 1
+    toot_cnt %= TCNT_MOD
+    if toot_cnt == 0:
+        lstm_tooter()
+
     ############################################################
     # 定型文応答処理
     toot_now = ''
     id_now = id
     vis_now = g_vis
     interval = 0
-    if re.search(r"(:nicoru[0-9]{0,3}:.?){4}", content):
-        if content_1b != None and acct == acct_1b:
-            if re.search(r"(:nicoru[0-9]{0,3}:.?){3}", content_1b):
-                SM.update(acct, 'func')
-                if rnd <= 8:
-                    #toot_now = '　　三(  っ˃̵ᴗ˂̵) 通りまーす！'
-                    toot_now = ':nicoru180: :nicoru180: :nicoru180: :nicoru180: :nicoru180: '
-                    id_now = None
-    elif re.search(r"(:nicoru[0-9]{0,3}:.?){2}", content):
-        if content_1b != None and acct == acct_1b:
-            if re.search(r"(:nicoru[0-9]{0,3}:.?){3}", content_1b):
-                SM.update(acct, 'func')
-                if rnd <= 8:
-                    #toot_now = '　　(˃̵ᴗ˂̵っ )三 通りまーす！'
-                    toot_now = ':nicoru180:'
-                    id_now = None
-    elif re.search(r"^貞$", content):
+    if re.search(r"^貞$", content):
         if content_1b != None and acct == acct_1b:
             SM.update(acct, 'func',score=-1)
             if re.search(r"^治$", content_1b):
@@ -499,8 +473,6 @@ def worker(status):
                 if rnd <= 8:
                     toot_now = '　　三(  っ˃̵ᴗ˂̵) 通りまーす！'
                     id_now = None
-    # elif acct == acct_1b:
-    #     return
 
     #ネイティオが半角スペース区切りで５つ以上あれば翻訳
     if (acct == MASTER_ID or acct == 'twotwo') and len(content.split(' ')) > 4 and content.count('トゥ') > 4 and content.count('ー') > 0:
@@ -1032,15 +1004,6 @@ def worker(status):
         if content.strip().isdigit():
             return
         if len(content) == 0:
-            return
-        rep_cnt.append(acct)
-        toots_for_rep[acct].append(content)
-        if len(toots_for_rep[acct]) > 20:
-            toots_for_rep[acct].pop(0)
-        if len(rep_cnt) > 30:
-            rep_cnt.pop(0)
-        tmpcnt = sum([1 for x in rep_cnt if x==acct]) 
-        if tmpcnt > 20:
             return
         fav_now(id)
         toot_now = "@%s\n"%acct
@@ -1641,8 +1604,8 @@ def t_local():
 # ローカルタイムライン監視スレッド（認証なし）
 def t_sub():
     try:
-        # publicdon.stream_local(public_listener(),timeout=20)
-        publicdon.stream_public(public_listener(),timeout=20)
+        publicdon.stream_local(public_listener(),timeout=20)
+        # publicdon.stream_public(public_listener(),timeout=20)
     except requests.exceptions.ConnectionError as e:
         print("＊＊＊再接続するよ〜t_sub()＊＊＊")
         # print(e)
@@ -1776,7 +1739,7 @@ def main():
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(show_rank,['07:00'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(jihou,['**:00'])) )
     #スケジュール起動系(間隔)
-    threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(lstm_tooter,8,-2,2,CM)) )
+    threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(lstm_tooter,60,-10,4,CM)) )
     threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(jinkei_tooter,120,-10,10,CM)) )
 
     for th in threads:
