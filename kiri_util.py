@@ -377,24 +377,38 @@ class DAO_statuses():
 
     #######################################################
     # 直近１０トゥートを返す
-    def get_least_10toots(self,acct=None,limit=15):
+    def get_least_10toots(self,acct=None,limit=15, time=False):
         seeds = []
         con = sqlite3.connect(self.STATUSES_DB_PATH, timeout=TIMEOUT, isolation_level='DEFERRED')
         c = con.cursor()
-        jst_now = datetime.now(timezone('Asia/Tokyo'))
-        sql = r"select content from statuses order by id desc limit ?"
-        exe = c.execute(sql,(limit,))
-        for row in exe:
-            content = content_cleanser(row[0])
-            if len(content) == 0:
-                continue
-            else:
-                seeds.append(content)
-                if len(seeds)>limit:
-                    break
-        con.close()
-        seeds.reverse()
-        return seeds
+        if time:
+            sql = r"select content,date,time from statuses order by id desc limit ?"
+            exe = c.execute(sql,(limit,))
+            for row in exe:
+                content = content_cleanser(row[0])
+                ymdhms = f'{row[1]:08d} {row[2]:06d}'
+                ymdhms = parser.parse(ymdhms).astimezone(timezone('Asia/Tokyo'))
+                if len(content) == 0:
+                    continue
+                else:
+                    seeds.append((content,ymdhms))
+            con.close()
+            seeds.reverse()
+            return seeds
+        else:
+            sql = r"select content from statuses order by id desc limit ?"
+            exe = c.execute(sql,(limit,))
+            for row in exe:
+                content = content_cleanser(row[0])
+                if len(content) == 0:
+                    continue
+                else:
+                    seeds.append(content)
+            con.close()
+            seeds.reverse()
+            return seeds
+
+
 
     #######################################################
     # ｉｄ指定でトゥート内容を返す

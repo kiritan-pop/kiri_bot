@@ -33,7 +33,7 @@ STANDARD_SIZE_S2 = (512, 512)
 #変更するとモデル再構築必要
 VEC_SIZE = 256  # Doc2vecの出力より
 VEC_MAXLEN = 10     # vec推定で参照するトゥート(vecor)数
-AVE_LEN = 4        # vec推定で参照するトゥート(vecor)数
+AVE_LEN = 2        # vec推定で参照するトゥート(vecor)数
 TXT_MAXLEN = 5      # 
 MU = "🧪"       # 無
 END = "🦷"      # 終わりマーク
@@ -113,7 +113,6 @@ def lstm_gentxt(toots,num=0,sel_model=None):
             break
 
     rtn_text = generated
-    print(f'gen pre,rnd={rtn_text},{rnd:2f}')
     rtn_text = re.sub(END,r'',rtn_text, flags=(re.MULTILINE | re.DOTALL))
     rtn_text = re.sub(r'(.)(.)(.)(.)(.)(.)(\1\2\3\4\5\6){4,}',r'\7\7',rtn_text, flags=(re.MULTILINE | re.DOTALL))
     rtn_text = re.sub(r'(.)(.)(.)(.)(.)(\1\2\3\4\5){4,}',r'\6\6',rtn_text, flags=(re.MULTILINE | re.DOTALL))

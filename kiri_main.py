@@ -65,7 +65,7 @@ HintPinto_flg = []
 
 slot_bal = []
 toot_cnt = 0
-TCNT_MOD = 15
+TCNT_RESET = 15
 acct_least_created_at = {}
 pita_list = []
 
@@ -423,6 +423,8 @@ def worker(status):
     now_ymd = jst_now.strftime("%Y%m%d")
     media_attachments = status["media_attachments"]
     sensitive = status['sensitive']
+    created_at = status['created_at']
+    created_at = created_at.astimezone(timezone('Asia/Tokyo'))
 
     #botはスルー
     if status["account"]["bot"]:
@@ -455,8 +457,8 @@ def worker(status):
 
 #   定期トゥート
     toot_cnt += 1
-    toot_cnt %= TCNT_MOD
-    if toot_cnt == 0:
+    if toot_cnt >= (TCNT_RESET + random.randint(-(3+a),2)):
+        toot_cnt = 0
         lstm_tooter()
 
     ############################################################
@@ -522,6 +524,15 @@ def worker(status):
             tmp.append( r'{{{🌊🌊🌊🌊}}} ＜ざばーっ！')
             tmp.append('( •́ฅ•̀ )ｸｯｻ')
             tmp.append('っ🚽')
+            toot_now = random.choice(tmp)
+            id_now = None
+    elif re.search(r"^木$|^林$|^森$", content+spoiler_text):
+        SM.update(acct, 'func')
+        if rnd <= 6:
+            tmp = []
+            tmp.append(r'{{{🌴🌴🌴🌴}}} ＜すくすくーっ！')
+            tmp.append(r'{{{🌲🌲🌲🌲}}} ＜すくすくーっ！')
+            tmp.append(r'{{{🌳🌳🌳🌳}}} ＜すくすくーっ！')
             toot_now = random.choice(tmp)
             id_now = None
     elif re.search(r"^流して$|^水$", content+spoiler_text):
@@ -1006,12 +1017,17 @@ def worker(status):
         if len(content) == 0:
             return
         fav_now(id)
+        toots_for_rep[acct].append((content.strip(),created_at))
         toot_now = "@%s\n"%acct
-        seeds = DAO.get_least_10toots()
+        seeds = DAO.get_least_10toots(time=True)
         seeds.extend(toots_for_rep[acct])
-        tmp = kiri_deep.lstm_gentxt(seeds,num=1)
+        #時系列ソート
+        seeds.sort(key=lambda x:(x[1]))
+        #文字だけ取り出し
+        tmp = kiri_deep.lstm_gentxt([c[0] for c in seeds],num=1)
         tmp = kiri_util.content_cleanser_light(tmp)
         toot_now += tmp
+        toots_for_rep[acct].append((tmp,jst_now))
         toot(toot_now, g_vis, id, None,interval=a)
     elif re.search(r"(きり|キリ).*(ぼっと|ボット|[bB][oO][tT])|[きキ][りリ][ぼボ]", content + spoiler_text):
         SM.update(acct, 'reply')
