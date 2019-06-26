@@ -36,6 +36,9 @@ MASTODON_ACCESS_TOKEN = os.environ.get("MASTODON_ACCESS_TOKEN")
 GOOGLE_KEY = os.environ.get("GOOGLE_KEY")
 GOOGLE_ENGINE_KEY = os.environ.get("GOOGLE_ENGINE_KEY")
 
+wikipedia.set_lang("ja")
+wikipedia.set_user_agent("kiri_bot (https://github.com/kiritan-pop/kiri_bot/)")
+
 #得点管理、流速監視
 SM = kiri_util.ScoreManager()
 CM = kiri_util.CoolingManager(3)
@@ -881,10 +884,11 @@ def worker(status):
         SM.update(acct, 'func')
         try:
             word = re.sub(r"きりぼ.*[、。]","",word)
-            wikipedia.set_lang("ja")
             page = wikipedia.page(word)
         except  wikipedia.exceptions.DisambiguationError as e:
-            toot('@%s 「%s」にはいくつか意味があるみたいだな〜'%(acct,word), g_vis, id, None, interval=a)
+            # toot('@%s 「%s」にはいくつか意味があるみたいだな〜'%(acct,word), g_vis, id, None, interval=a)
+            nl = "\n"
+            toot(f'@{acct} 「{word}」にはいくつか意味があるみたいだよ〜{nl}次のいずれかのキーワードでもう一度調べてね〜{nl}{",".join(e.options)}', g_vis, id, None, interval=a)
         except Exception as e:
             print(e)
             toot('@%s え？「%s」しらなーい！'%(acct,word), g_vis, id, None, interval=a)
