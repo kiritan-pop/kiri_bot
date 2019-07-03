@@ -15,7 +15,7 @@ from collections import defaultdict, Counter
 from dotenv import load_dotenv
 import wikipedia
 import GenerateText, bottlemail, Toot_summary
-import kiri_util, kiri_game, kiri_romasaga, kiri_deep
+import kiri_util, kiri_game, kiri_romasaga, kiri_deep, kiri_kishou
 from PIL import Image, ImageOps, ImageFile, ImageChops, ImageFilter, ImageEnhance
 import argparse
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -35,6 +35,9 @@ MASTODON_ACCESS_TOKEN = os.environ.get("MASTODON_ACCESS_TOKEN")
 # BING_KEY = os.environ.get("BING_KEY")
 GOOGLE_KEY = os.environ.get("GOOGLE_KEY")
 GOOGLE_ENGINE_KEY = os.environ.get("GOOGLE_ENGINE_KEY")
+
+KISHOU_WS = os.environ.get("KISHOU_WS")
+KISHOU_WS_PORT = os.environ.get("KISHOU_WS_PORT")
 
 wikipedia.set_lang("ja")
 wikipedia.set_user_agent("kiri_bot (https://github.com/kiritan-pop/kiri_bot/)")
@@ -115,6 +118,16 @@ jihou_dict = {
     "21":"🕘",
     "22":"🕙",
     "23":"🕚",
+}
+
+# 気象情報の取得対象
+kishou_target = {
+"震度速報":"VXSE51",
+"竜巻注意情報（目撃情報付き）":"VPHW51",
+"気象特別警報・警報・注意報":"VPWW53",
+"記録的短時間大雨情報":"VPOA50",
+"噴火速報":"VFVO56",
+"気象警報・注意報":"VPWW50"  #テスト用
 }
 
 def get_args():
@@ -1736,6 +1749,76 @@ def th_post():
             # th_post()
 
 #######################################################
+# 気象情報取得スレッド
+def th_kishou():
+    def on_msg_func(msg_doc):
+        spo_text = None
+        body_text = ""
+        if msg_doc['Report']['Control']['Title'] == "震度速報":
+            spo_text = "今揺れたかも〜！"
+            body_text += f"【{msg_doc['Report']['Head']['Title']}】\n" 
+            body_text += msg_doc['Report']['Head']['Headline']['Text'] + "\n"
+            tmp_item = []
+            if isinstance(msg_doc['Report']['Head']['Headline']['Information']['Item'], list):
+                tmp_item.extend(msg_doc['Report']['Head']['Headline']['Information']['Item'])
+            else:
+                tmp_item.append(msg_doc['Report']['Head']['Headline']['Information']['Item'])
+            # 震度別に地域名を出力
+            for i in tmp_item:
+                body_text += f"■{i['Kind']['Name']}\n"
+                tmp_areas = []
+                if isinstance(i['Areas']['Area'], list):
+                    tmp_areas.extend(i['Areas']['Area'])
+                else:
+                    tmp_areas.append(i['Areas']['Area'])
+
+                for a in tmp_areas:
+                    body_text += a['Name'] + "、"
+                else:
+                    body_text = body_text[:-1] + '\n'
+
+        elif msg_doc['Report']['Control']['Title'] == "竜巻注意情報（目撃情報付き）":
+            spo_text = "🌪竜巻だ〜！"
+            body_text += f"【{msg_doc['Report']['Head']['Title']}】\n" 
+            body_text += msg_doc['Report']['Head']['Headline']['Text'] + "\n"
+        elif msg_doc['Report']['Control']['Title'] == "気象特別警報・警報・注意報":
+            spo_text = "気象特別警報出てるよ〜！注意してね〜！"
+            body_text += f"【{msg_doc['Report']['Head']['Title']}】\n" 
+            if "特別警報" in msg_doc['Report']['Head']['Headline']['Text']:
+                body_text += msg_doc['Report']['Head']['Headline']['Text'] + "\n"
+            else:
+                return
+        elif msg_doc['Report']['Control']['Title'] == "記録的短時間大雨情報":
+            spo_text = "☔大雨注意してね〜！"
+            body_text += f"【{msg_doc['Report']['Head']['Title']}】\n" 
+            body_text += msg_doc['Report']['Head']['Headline']['Text'] + "\n"
+        elif msg_doc['Report']['Control']['Title'] == "噴火速報":
+            spo_text = "🌋噴火だ〜！"
+            body_text += f"【{msg_doc['Report']['Head']['Title']}】\n" 
+            body_text += msg_doc['Report']['Head']['Headline']['Text'] + "\n"
+        # elif msg_doc['Report']['Control']['Title'] == "気象警報・注意報":
+        #     spo_text = "テストでーす"
+        #     body_text += f"【{msg_doc['Report']['Head']['Title']}】\n" 
+        #     body_text += msg_doc['Report']['Head']['Headline']['Text'] + "\n"
+        else:
+            return
+        
+        body_text += "\n《from 気象庁防災情報》"
+        # toot(f"@kiritan \n{body_text}", g_vis='direct', spo=f"{spo_text}")
+        toot(body_text, g_vis='public', spo=f"{spo_text}")
+
+    kishou = kiri_kishou.Kirikishou(ws_url=KISHOU_WS, ws_port=KISHOU_WS_PORT, kishou_target=kishou_target, on_msg_func=on_msg_func)
+    # 一応１０回までリトライするやつ
+    for _ in range(10):
+        try:
+            # 待機中は帰ってこないやつ
+            kishou.connect_run_forever()
+        except Exception as e:
+            print(e)
+            kiri_util.error_log()
+            sleep(300)
+
+#######################################################
 # メイン
 def main():
     args = get_args()
@@ -1761,6 +1844,8 @@ def main():
     #スケジュール起動系(間隔)
     threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(lstm_tooter,60,-10,4,CM)) )
     threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(jinkei_tooter,120,-10,10,CM)) )
+    #外部ストリーム受信
+    threads.append( threading.Thread(target=th_kishou ) ) #LTL
 
     for th in threads:
         th.start()
