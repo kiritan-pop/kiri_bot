@@ -15,7 +15,7 @@ from collections import defaultdict, Counter
 from dotenv import load_dotenv
 import wikipedia
 import GenerateText, bottlemail, Toot_summary
-import kiri_util, kiri_game, kiri_romasaga, kiri_deep, kiri_kishou
+import kiri_util, kiri_game, kiri_romasaga, kiri_deep, kiri_kishou, kiri_tenki
 from PIL import Image, ImageOps, ImageFile, ImageChops, ImageFilter, ImageEnhance
 import argparse
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -426,10 +426,10 @@ def worker(status):
     g_vis = status["visibility"]
     content = kiri_util.content_cleanser(status['content'])
     # hashtags = kiri_util.hashtag(status['content'])
-    if 'application' not in status or status['application'] == None:
-        application = ''
-    else:
-        application = status['application']['name']
+    # if 'application' not in status or status['application'] == None:
+    #     application = ''
+    # else:
+    #     application = status['application']['name']
     statuses_count = status["account"]["statuses_count"]
     spoiler_text = status["spoiler_text"]
     ac_created_at = status["account"]["created_at"]
@@ -1016,16 +1016,39 @@ def worker(status):
                 ymdhms = f'on {tdate[:4]}/{tdate[4:6]}/{tdate[6:]} at {ttime[:2]}:{ttime[2:4]}:{ttime[4:]}'
                 tcontent = kiri_util.content_cleanser(tcontent)
 
-                spoiler_text = f":@{target}: の初トゥートは……"
+                sptxt = f":@{target}: の初トゥートは……"
                 body = f"@{acct} \n"
                 body += f":@{target}: ＜{tcontent} \n {ymdhms} \n"
                 body += f"{MASTODON_URL}/@{target}/{tid}"
-                toot(body, g_vis=g_vis, rep=id, spo=spoiler_text)
+                toot(body, g_vis=g_vis, rep=id, spo=sptxt)
                 break
 
         if check_fg == False:
             body = f"@{acct} 見つからなかったよ〜😢"
             toot(body, g_vis=g_vis, rep=id)
+
+    elif re.search(r"へいきりぼ[!！]?.+の.+の天気.*教えて", content):
+        word1 = re.search(
+            r"へいきりぼ[!！]?(.+)の(.+)の天気.*教えて", str(content)).group(1).strip()
+        word2 = re.search(
+            r"へいきりぼ[!！]?(.+)の(.+)の天気.*教えて", str(content)).group(2).strip()
+        if word1 in ["今日","明日","明後日"]:
+            tenki_area = word2
+            tenki_day = word1
+        elif word2 in ["今日","明日","明後日"]:
+            tenki_area = word1
+            tenki_day = word2
+        else:
+            return
+
+        sptxt, toot_now = kiri_tenki.get_tenki(quary=tenki_area, day=tenki_day)
+        if sptxt == "900":
+            toot(f"@{acct} 知らない場所の天気はわからないよ〜", g_vis=g_vis, rep=id)
+        elif sptxt == "901":
+            toot(f"@{acct} 複数地名が見つかったので、次の地名でもっかい呼んでみてー\n{toot_now}", g_vis=g_vis, rep=id)
+        else:
+            toot_now = f"@{acct}\n" + toot_now
+            toot(toot_now, g_vis=g_vis, rep=id, spo=sptxt)
 
     elif re.search(r'[^:]@%s'%BOT_ID, status['content']):
         SM.update(acct, 'reply')
@@ -1036,7 +1059,7 @@ def worker(status):
         fav_now(id)
         toots_for_rep[acct].append((content.strip(),created_at))
         toot_now = "@%s\n"%acct
-        seeds = DAO.get_least_10toots(time=True)
+        seeds = DAO.get_least_10toots(time=True,limit=30)
         seeds.extend(toots_for_rep[acct])
         #時系列ソート
         seeds.sort(key=lambda x:(x[1]))
@@ -1052,7 +1075,7 @@ def worker(status):
             return
         fav_now(id)
         toot_now = "@%s\n"%acct
-        seeds = DAO.get_least_10toots()
+        seeds = DAO.get_least_10toots(limit=30)
         tmp = kiri_deep.lstm_gentxt(seeds,num=1)
         tmp = kiri_util.content_cleanser_light(tmp)
         toot_now += tmp
@@ -1106,7 +1129,7 @@ def business_contact(status):
         elif 19<= jst_now_hh <=24:
             aisatsu = "こんばんは〜！"
 
-        toot_now = f':@{acct}: {display_name} {aisatsu} {kaomoji}\n #挨拶部'
+        toot_now = f':@{acct}: {display_name}\n{aisatsu} {kaomoji}\n #挨拶部'
         toot(toot_now, g_vis='public',interval=3)
 
     pita_list.append(created_at)
@@ -1353,7 +1376,7 @@ def bottlemail_sending():
 #######################################################
 # きりぼっとのつぶやき
 def lstm_tooter():
-    seeds = DAO.get_least_10toots()
+    seeds = DAO.get_least_10toots(limit=30)
     if len(seeds) <= 2:
         return
     spoiler = None
@@ -1607,12 +1630,12 @@ def th_saver():
                 #保存失敗したら、キューに詰めてリトライ！
                 print(e)
                 kiri_util.error_log()
-                sleep(2)
+                sleep(10)
                 StatusQ.put(status)
     except Exception as e:
         print(e)
         kiri_util.error_log()
-        sleep(10)
+        sleep(20)
         th_saver()
 
 #######################################################
@@ -1625,12 +1648,12 @@ def t_local():
         print("＊＊＊再接続するよ〜t_local()＊＊＊")
         # print(e)
         # kiri_util.error_log()
-        sleep(5)
+        sleep(30)
         t_local()
     except Exception as e:
         print(e)
         kiri_util.error_log()
-        sleep(5)
+        sleep(30)
         t_local()
 
 #######################################################
@@ -1643,12 +1666,12 @@ def t_sub():
         print("＊＊＊再接続するよ〜t_sub()＊＊＊")
         # print(e)
         # kiri_util.error_log()
-        sleep(5)
+        sleep(30)
         t_sub()
     except Exception as e:
         print(e)
         kiri_util.error_log()
-        sleep(5)
+        sleep(30)
         t_sub()
 
 #######################################################
@@ -1660,12 +1683,12 @@ def t_user():
         print("＊＊＊再接続するよ〜t_user()＊＊＊")
         # print(e)
         # kiri_util.error_log()
-        sleep(5)
+        sleep(30)
         t_user()
     except Exception as e:
         print(e)
         kiri_util.error_log()
-        sleep(5)
+        sleep(30)
         t_user()
 
 
@@ -1741,11 +1764,11 @@ def th_post():
         try:
             func,args = PostQ.get()
             func(*args)
-            sleep(0.5)
+            sleep(2)
         except Exception as e:
             print(e)
             kiri_util.error_log()
-            sleep(10)
+            sleep(120)
             # th_post()
 
 #######################################################
@@ -1755,7 +1778,7 @@ def th_kishou():
         spo_text = None
         body_text = ""
         if msg_doc['Report']['Control']['Title'] == "震度速報":
-            spo_text = "今揺れたかも〜！"
+            spo_text = "さっき揺れたかも〜！"
             body_text += f"【{msg_doc['Report']['Head']['Title']}】\n" 
             body_text += msg_doc['Report']['Head']['Headline']['Text'] + "\n"
             tmp_item = []

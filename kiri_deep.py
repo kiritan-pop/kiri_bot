@@ -31,9 +31,9 @@ STANDARD_SIZE_S2 = (512, 512)
 
 #いろいろなパラメータ
 #変更するとモデル再構築必要
-VEC_SIZE = 256  # Doc2vecの出力より
-VEC_MAXLEN = 10     # vec推定で参照するトゥート(vecor)数
-AVE_LEN = 2        # vec推定で参照するトゥート(vecor)数
+VEC_SIZE = 64  # Doc2vecの出力より
+VEC_MAXLEN = 5     # vec推定で参照するトゥート(vecor)数
+AVE_LEN = 2        # vec推定で平均化する幅
 TXT_MAXLEN = 5      # 
 MU = "🧪"       # 無
 END = "🦷"      # 終わりマーク
@@ -75,10 +75,11 @@ def lstm_gentxt(toots,num=0,sel_model=None):
     # 入力トゥート（VEC_MAXLEN）をベクトル化。
     input_vec = np.zeros((VEC_MAXLEN + AVE_LEN, VEC_SIZE))
     input_mean_vec = np.zeros((VEC_MAXLEN, VEC_SIZE))
-    if len(toots) >= VEC_MAXLEN + AVE_LEN:
-        toots_nrm = toots[-(VEC_MAXLEN + AVE_LEN):]
+    temp_toots = [t.strip() for t in toots if len(t.strip()) > 0]
+    if len(temp_toots) >= VEC_MAXLEN + AVE_LEN:
+        toots_nrm = temp_toots[-(VEC_MAXLEN + AVE_LEN):]
     else:
-        toots_nrm = toots + [toots[-1]]*(VEC_MAXLEN + AVE_LEN -len(toots))
+        toots_nrm = temp_toots + [temp_toots[-1]]*(VEC_MAXLEN + AVE_LEN -len(temp_toots))
 
     print("lstm_gen --------------------")
     print("  inputトゥート")
@@ -151,7 +152,7 @@ def takoramen(filepath):
 
     with open('image.log','a') as f:
         f.write("*** image:" + filepath.split('/')[-1] +  "  *** result:%s\n"%str(rslt_dict))
-    if max(result[0]) > 0.93:
+    if max(result[0]) > 0.8:
         return labels[np.argmax(result[0])]
     else:
         return 'other'
