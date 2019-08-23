@@ -15,7 +15,7 @@ from collections import defaultdict, Counter
 from dotenv import load_dotenv
 import wikipedia
 import GenerateText, bottlemail, Toot_summary
-import kiri_util, kiri_game, kiri_romasaga, kiri_deep, kiri_kishou, kiri_tenki
+import kiri_util, kiri_game, kiri_romasaga, kiri_deep, kiri_kishou, kiri_tenki, kiri_stat
 from PIL import Image, ImageOps, ImageFile, ImageChops, ImageFilter, ImageEnhance
 import argparse
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -1027,7 +1027,10 @@ def worker(status):
             body = f"@{acct} 見つからなかったよ〜😢"
             toot(body, g_vis=g_vis, rep=id)
 
-    elif re.search(r"へいきりぼ[!！]?.+の.+の天気.*教えて", content):
+    elif re.search(r"へいきりぼ[!！]?きりたん丼の(天気|状態|状況|ステータス|status).*(教えて|おせーて)|^!server.*stat", content):
+        stats = kiri_stat.sys_stat()
+        toot(f"@{acct} \nただいまの気温{stats['cpu_temp']}℃、忙しさ{stats['cpu']:.1f}％、気持ちの余裕{stats['mem_free']/(10**9):.1f}GB、クローゼットの空き{stats['disk_usage']/(10**9):.1f}GB" ,g_vis=g_vis, rep=id)
+    elif re.search(r"へいきりぼ[!！]?.+の.+の天気.*(教えて|おせーて)", content):
         word1 = re.search(
             r"へいきりぼ[!！]?(.+)の(.+)の天気.*教えて", str(content)).group(1).strip()
         word2 = re.search(

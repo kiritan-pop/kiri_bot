@@ -25,7 +25,7 @@ def parser():
         return '{}'.format(text_input(args.input_text))
 
 #m = mc.Tagger("-Ochasen")
-m = mc.Tagger('-Owakati -d /usr/local/lib/mecab/dic/mecab-ipadic-neologd -u ./dic/name.dic,./dic/id.dic,./dic/nicodic.dic')
+m = mc.Tagger('-Owakati -u ./dic/name.dic,./dic/id.dic,./dic/nicodic.dic')
 
 def mecab_senter(text):
     words = m.parse(text).split()
