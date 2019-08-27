@@ -963,21 +963,18 @@ def worker(status):
         else:
             GetNumQ.put([acct,id])
             SM.update(acct, 'func')
-    elif len(content) > 140:
-        cntdict = Counter(content)
-        abclen = sum([v for k,v in cntdict.items() if k in abc])
-        if len(content) * 0.8 < abclen:
-            fav_now(id)
-            lang = TRANS.detect(content)
-            if lang and lang != 'ja':
-                toot_now = TRANS.xx2ja(lang, content)
-                if toot_now:
-                    if re.search(r"[^:]@|^@", toot_now):
-                        pass
-                    else:
-                        toot_now +=  "\n#きり翻訳 #きりぼっと"
-                        toot(toot_now, 'public', id, '翻訳したよ〜！なになに……？ :@%s: ＜'%acct ,interval=a)
-                        SM.update(acct, 'func')
+    elif len(content) > 140 and len(content) * 0.8 < sum([v for k,v in Counter(content).items() if k in abc]):
+        fav_now(id)
+        lang = TRANS.detect(content)
+        if lang and lang != 'ja':
+            toot_now = TRANS.xx2ja(lang, content)
+            if toot_now:
+                if re.search(r"[^:]@|^@", toot_now):
+                    pass
+                else:
+                    toot_now +=  "\n#きり翻訳 #きりぼっと"
+                    toot(toot_now, 'public', id, '翻訳したよ〜！なになに……？ :@%s: ＜'%acct ,interval=a)
+                    SM.update(acct, 'func')
     elif  '翻訳して' in spoiler_text:
         fav_now(id)
         toot_now = TRANS.ja2en(content)
@@ -988,11 +985,10 @@ def worker(status):
                 toot_now +=  "\n#きり翻訳 #きりぼっと"
                 toot(toot_now, 'public', id, '翻訳したよ〜！ :@%s: ＜'%acct ,interval=a)
                 SM.update(acct, 'func')
-    elif len(content) > 140 and (spoiler_text == None or spoiler_text == ''):
-        content = re.sub(r"(.){3,}",r"\1",content, flags=(re.DOTALL))
-        gen_txt = Toot_summary.summarize(pat1.sub("",pat2.sub("",content)),limit=10,lmtpcs=1, m=1, f=4)
+    elif len(content) > 140 and len(spoiler_text) == 0:
+        gen_txt = Toot_summary.summarize(content,limit=10,lmtpcs=1, m=1, f=4)
         if gen_txt[-1] == '#':
-            gen_txt = gen_txt[:len(gen_txt)-1]
+            gen_txt = gen_txt[:-1]
         print('★要約結果：',gen_txt)
         if is_japanese(gen_txt):
             if len(gen_txt) > 5:
@@ -1029,7 +1025,7 @@ def worker(status):
 
     elif re.search(r"へいきりぼ[!！]?きりたん丼の(天気|状態|状況|ステータス|status).*(教えて|おせーて)|^!server.*stat", content):
         stats = kiri_stat.sys_stat()
-        toot(f"@{acct} \nただいまの気温{stats['cpu_temp']}℃、忙しさ{stats['cpu']:.1f}％、気持ちの余裕{stats['mem_free']/(10**9):.1f}GB、クローゼットの空き{stats['disk_usage']/(10**9):.1f}GB" ,g_vis=g_vis, rep=id)
+        toot(f"@{acct} \nただいまの気温{stats['cpu_temp']}℃、忙しさ{stats['cpu']:.1f}％、気持ちの余裕{stats['mem_available']/(10**9):.1f}GB、クローゼットの空き{stats['disk_usage']/(10**9):.1f}GB" ,g_vis=g_vis, rep=id)
     elif re.search(r"へいきりぼ[!！]?.+の.+の天気.*(教えて|おせーて)", content):
         word1 = re.search(
             r"へいきりぼ[!！]?(.+)の(.+)の天気.*教えて", str(content)).group(1).strip()
