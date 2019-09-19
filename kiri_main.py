@@ -572,7 +572,7 @@ def worker(status):
     elif re.search(r"^雷$", content):
         SM.update(acct, 'func')
         if rnd <= 2:
-            toot_now = r'{{{⚡️⚡️⚡️⚡️}}}＜ゴロゴロ〜ッ！'
+            toot_now = r'{{{⚡⚡⚡⚡}}}＜ゴロゴロ〜ッ！'
             id_now = None
     elif re.search(r"^ぬるぽ$|^[Nn]ull[Pp]ointer[Ee]xception$", content):
         SM.update(acct, 'func',score=-1)
@@ -625,7 +625,7 @@ def worker(status):
         elif rnd == 6:
             toot_now = 'つい〜……'
             id_now = None
-    elif "きりちゃん" in content+spoiler_text or "ニコって" in content+spoiler_text:
+    elif re.search(r"[な撫]でて", content):
         fav_now(id)
         SM.update(acct, 'reply')
     elif re.search(r"なんでも|何でも",content):
@@ -1063,7 +1063,7 @@ def worker(status):
         #時系列ソート
         seeds.sort(key=lambda x:(x[1]))
         #文字だけ取り出し
-        tmp = kiri_deep.lstm_gentxt([c[0] for c in seeds],num=1)
+        tmp = lstm_gen_rapper([c[0] for c in seeds])
         tmp = kiri_util.content_cleanser_light(tmp)
         toot_now += tmp
         toots_for_rep[acct].append((tmp,jst_now))
@@ -1075,11 +1075,23 @@ def worker(status):
         fav_now(id)
         toot_now = "@%s\n"%acct
         seeds = DAO.get_least_10toots(limit=30)
-        tmp = kiri_deep.lstm_gentxt(seeds,num=1)
+        tmp = lstm_gen_rapper(seeds)
         tmp = kiri_util.content_cleanser_light(tmp)
         toot_now += tmp
         toot(toot_now, g_vis, id, None,interval=a)
         SM.update(acct, 'reply')
+
+def lstm_gen_rapper(seeds):
+    words = ["おはよう","おはよー","おはよ〜","おっぱい"]
+    ret_txt = kiri_deep.lstm_gentxt(seeds).strip()
+    for word in words:
+        for _ in range(5):
+            if ret_txt == word:
+                ret_txt = kiri_deep.lstm_gentxt([w for w in seeds if word not in w.strip()])
+            else:
+                break
+
+    return ret_txt
 
 #######################################################
 # 即時応答処理ー！
@@ -1380,7 +1392,7 @@ def lstm_tooter():
         return
     spoiler = None
 
-    gen_txt = kiri_deep.lstm_gentxt(seeds,num=1)
+    gen_txt = lstm_gen_rapper(seeds)
     gen_txt = kiri_util.content_cleanser_light(gen_txt)
     if gen_txt[0:1] == '。':
         gen_txt = gen_txt[1:]
