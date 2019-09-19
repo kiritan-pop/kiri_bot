@@ -1082,6 +1082,7 @@ def worker(status):
         SM.update(acct, 'reply')
 
 def lstm_gen_rapper(seeds):
+    new_seeds = [s for s in seeds if random.randint(1,4) != 1]
     words = ["おはよう","おはよー","おはよ〜","おっぱい"]
     ret_txt = kiri_deep.lstm_gentxt(seeds).strip()
     for word in words:
