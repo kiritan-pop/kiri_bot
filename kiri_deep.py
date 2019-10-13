@@ -31,14 +31,14 @@ STANDARD_SIZE_S2 = (512, 512)
 
 #いろいろなパラメータ
 #変更するとモデル再構築必要
-VEC_SIZE = 64  # Doc2vecの出力より
-VEC_MAXLEN = 5     # vec推定で参照するトゥート(vecor)数
+VEC_SIZE = 256  # Doc2vecの出力より
+VEC_MAXLEN = 10     # vec推定で参照するトゥート(vecor)数
 AVE_LEN = 2        # vec推定で平均化する幅
 TXT_MAXLEN = 5      # 
 MU = "🧪"       # 無
 END = "🦷"      # 終わりマーク
 
-tagger = MeCab.Tagger('-Owakati -d /usr/local/lib/mecab/dic/mecab-ipadic-neologd -u dic/nicodic.dic')
+tagger = MeCab.Tagger('-Owakati -u dic/nicodic.dic')
 DAO = kiri_util.DAO_statuses()
 
 pat3 = re.compile(r'^\n')
@@ -71,7 +71,7 @@ def sample(preds, temperature=1.2):
     probas = np.random.multinomial(1, preds, 1)
     return np.argmax(probas)
 
-def lstm_gentxt(toots,num=0,sel_model=None):
+def lstm_gentxt(toots):
     # 入力トゥート（VEC_MAXLEN）をベクトル化。
     input_vec = np.zeros((VEC_MAXLEN + AVE_LEN, VEC_SIZE))
     input_mean_vec = np.zeros((VEC_MAXLEN, VEC_SIZE))

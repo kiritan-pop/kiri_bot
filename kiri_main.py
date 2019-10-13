@@ -15,7 +15,7 @@ from collections import defaultdict, Counter
 from dotenv import load_dotenv
 import wikipedia
 import GenerateText, bottlemail, Toot_summary
-import kiri_util, kiri_game, kiri_romasaga, kiri_deep, kiri_kishou, kiri_tenki
+import kiri_util, kiri_game, kiri_romasaga, kiri_deep, kiri_kishou, kiri_tenki, kiri_stat
 from PIL import Image, ImageOps, ImageFile, ImageChops, ImageFilter, ImageEnhance
 import argparse
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -572,7 +572,7 @@ def worker(status):
     elif re.search(r"^雷$", content):
         SM.update(acct, 'func')
         if rnd <= 2:
-            toot_now = r'{{{⚡️⚡️⚡️⚡️}}}＜ゴロゴロ〜ッ！'
+            toot_now = r'{{{⚡⚡⚡⚡}}}＜ゴロゴロ〜ッ！'
             id_now = None
     elif re.search(r"^ぬるぽ$|^[Nn]ull[Pp]ointer[Ee]xception$", content):
         SM.update(acct, 'func',score=-1)
@@ -625,7 +625,7 @@ def worker(status):
         elif rnd == 6:
             toot_now = 'つい〜……'
             id_now = None
-    elif "きりちゃん" in content+spoiler_text or "ニコって" in content+spoiler_text:
+    elif re.search(r"[な撫]でて", content):
         fav_now(id)
         SM.update(acct, 'reply')
     elif re.search(r"なんでも|何でも",content):
@@ -963,21 +963,18 @@ def worker(status):
         else:
             GetNumQ.put([acct,id])
             SM.update(acct, 'func')
-    elif len(content) > 140:
-        cntdict = Counter(content)
-        abclen = sum([v for k,v in cntdict.items() if k in abc])
-        if len(content) * 0.8 < abclen:
-            fav_now(id)
-            lang = TRANS.detect(content)
-            if lang and lang != 'ja':
-                toot_now = TRANS.xx2ja(lang, content)
-                if toot_now:
-                    if re.search(r"[^:]@|^@", toot_now):
-                        pass
-                    else:
-                        toot_now +=  "\n#きり翻訳 #きりぼっと"
-                        toot(toot_now, 'public', id, '翻訳したよ〜！なになに……？ :@%s: ＜'%acct ,interval=a)
-                        SM.update(acct, 'func')
+    elif len(content) > 140 and len(content) * 0.8 < sum([v for k,v in Counter(content).items() if k in abc]):
+        fav_now(id)
+        lang = TRANS.detect(content)
+        if lang and lang != 'ja':
+            toot_now = TRANS.xx2ja(lang, content)
+            if toot_now:
+                if re.search(r"[^:]@|^@", toot_now):
+                    pass
+                else:
+                    toot_now +=  "\n#きり翻訳 #きりぼっと"
+                    toot(toot_now, 'public', id, '翻訳したよ〜！なになに……？ :@%s: ＜'%acct ,interval=a)
+                    SM.update(acct, 'func')
     elif  '翻訳して' in spoiler_text:
         fav_now(id)
         toot_now = TRANS.ja2en(content)
@@ -988,11 +985,10 @@ def worker(status):
                 toot_now +=  "\n#きり翻訳 #きりぼっと"
                 toot(toot_now, 'public', id, '翻訳したよ〜！ :@%s: ＜'%acct ,interval=a)
                 SM.update(acct, 'func')
-    elif len(content) > 140 and (spoiler_text == None or spoiler_text == ''):
-        content = re.sub(r"(.){3,}",r"\1",content, flags=(re.DOTALL))
-        gen_txt = Toot_summary.summarize(pat1.sub("",pat2.sub("",content)),limit=10,lmtpcs=1, m=1, f=4)
+    elif len(content) > 140 and len(spoiler_text) == 0:
+        gen_txt = Toot_summary.summarize(content,limit=10,lmtpcs=1, m=1, f=4)
         if gen_txt[-1] == '#':
-            gen_txt = gen_txt[:len(gen_txt)-1]
+            gen_txt = gen_txt[:-1]
         print('★要約結果：',gen_txt)
         if is_japanese(gen_txt):
             if len(gen_txt) > 5:
@@ -1027,7 +1023,10 @@ def worker(status):
             body = f"@{acct} 見つからなかったよ〜😢"
             toot(body, g_vis=g_vis, rep=id)
 
-    elif re.search(r"へいきりぼ[!！]?.+の.+の天気.*教えて", content):
+    elif re.search(r"へいきりぼ[!！]?きりたん丼の(天気|状態|状況|ステータス|status).*(教えて|おせーて)|^!server.*stat", content):
+        stats = kiri_stat.sys_stat()
+        toot(f"@{acct} \nただいまの気温{stats['cpu_temp']}℃、忙しさ{stats['cpu']:.1f}％、気持ちの余裕{stats['mem_available']/(10**9):.1f}GB、クローゼットの空き{stats['disk_usage']/(10**9):.1f}GB" ,g_vis=g_vis, rep=id)
+    elif re.search(r"へいきりぼ[!！]?.+の.+の天気.*(教えて|おせーて)", content):
         word1 = re.search(
             r"へいきりぼ[!！]?(.+)の(.+)の天気.*教えて", str(content)).group(1).strip()
         word2 = re.search(
@@ -1064,7 +1063,7 @@ def worker(status):
         #時系列ソート
         seeds.sort(key=lambda x:(x[1]))
         #文字だけ取り出し
-        tmp = kiri_deep.lstm_gentxt([c[0] for c in seeds],num=1)
+        tmp = lstm_gen_rapper([c[0] for c in seeds])
         tmp = kiri_util.content_cleanser_light(tmp)
         toot_now += tmp
         toots_for_rep[acct].append((tmp,jst_now))
@@ -1076,11 +1075,24 @@ def worker(status):
         fav_now(id)
         toot_now = "@%s\n"%acct
         seeds = DAO.get_least_10toots(limit=30)
-        tmp = kiri_deep.lstm_gentxt(seeds,num=1)
+        tmp = lstm_gen_rapper(seeds)
         tmp = kiri_util.content_cleanser_light(tmp)
         toot_now += tmp
         toot(toot_now, g_vis, id, None,interval=a)
         SM.update(acct, 'reply')
+
+def lstm_gen_rapper(seeds):
+    new_seeds = [s for s in seeds if random.randint(1,3) != 1]
+    words = ["おはよう","おはよー","おはよ〜","おっぱい"]
+    ret_txt = kiri_deep.lstm_gentxt(seeds).strip()
+    for word in words:
+        for _ in range(5):
+            if ret_txt == word:
+                ret_txt = kiri_deep.lstm_gentxt([w for w in seeds if word not in w.strip()])
+            else:
+                break
+
+    return ret_txt
 
 #######################################################
 # 即時応答処理ー！
@@ -1381,7 +1393,7 @@ def lstm_tooter():
         return
     spoiler = None
 
-    gen_txt = kiri_deep.lstm_gentxt(seeds,num=1)
+    gen_txt = lstm_gen_rapper(seeds)
     gen_txt = kiri_util.content_cleanser_light(gen_txt)
     if gen_txt[0:1] == '。':
         gen_txt = gen_txt[1:]
