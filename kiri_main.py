@@ -1083,15 +1083,7 @@ def worker(status):
 
 def lstm_gen_rapper(seeds, rndvec=0):
     new_seeds = [s for s in seeds if random.randint(1,3) != 1]
-    # words = ["おはよう","おはよー","おはよ〜","おっぱい"]
     ret_txt = kiri_deep.lstm_gentxt(new_seeds, rndvec=rndvec).strip()
-    # for word in words:
-    #     for _ in range(5):
-    #         if ret_txt == word:
-    #             ret_txt = kiri_deep.lstm_gentxt([w for w in seeds if word not in w.strip()])
-    #         else:
-    #             break
-
     return ret_txt
 
 #######################################################
