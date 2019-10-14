@@ -1063,7 +1063,7 @@ def worker(status):
         #時系列ソート
         seeds.sort(key=lambda x:(x[1]))
         #文字だけ取り出し
-        tmp = lstm_gen_rapper([c[0] for c in seeds])
+        tmp = lstm_gen_rapper([c[0] for c in seeds], rndvec=random.uniform(0, min(len(toots_for_rep[acct])*0.1, 0.5)))
         tmp = kiri_util.content_cleanser_light(tmp)
         toot_now += tmp
         toots_for_rep[acct].append((tmp,jst_now))
@@ -1075,22 +1075,22 @@ def worker(status):
         fav_now(id)
         toot_now = "@%s\n"%acct
         seeds = DAO.get_least_10toots(limit=30)
-        tmp = lstm_gen_rapper(seeds)
+        tmp = lstm_gen_rapper(seeds, rndvec=random.uniform(0,0.1))
         tmp = kiri_util.content_cleanser_light(tmp)
         toot_now += tmp
         toot(toot_now, g_vis, id, None,interval=a)
         SM.update(acct, 'reply')
 
-def lstm_gen_rapper(seeds):
+def lstm_gen_rapper(seeds, rndvec=0):
     new_seeds = [s for s in seeds if random.randint(1,3) != 1]
-    words = ["おはよう","おはよー","おはよ〜","おっぱい"]
-    ret_txt = kiri_deep.lstm_gentxt(seeds).strip()
-    for word in words:
-        for _ in range(5):
-            if ret_txt == word:
-                ret_txt = kiri_deep.lstm_gentxt([w for w in seeds if word not in w.strip()])
-            else:
-                break
+    # words = ["おはよう","おはよー","おはよ〜","おっぱい"]
+    ret_txt = kiri_deep.lstm_gentxt(new_seeds, rndvec=rndvec).strip()
+    # for word in words:
+    #     for _ in range(5):
+    #         if ret_txt == word:
+    #             ret_txt = kiri_deep.lstm_gentxt([w for w in seeds if word not in w.strip()])
+    #         else:
+    #             break
 
     return ret_txt
 
@@ -1393,7 +1393,7 @@ def lstm_tooter():
         return
     spoiler = None
 
-    gen_txt = lstm_gen_rapper(seeds)
+    gen_txt = lstm_gen_rapper(seeds, rndvec=random.uniform(0,0.3))
     gen_txt = kiri_util.content_cleanser_light(gen_txt)
     if gen_txt[0:1] == '。':
         gen_txt = gen_txt[1:]

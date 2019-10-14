@@ -71,7 +71,7 @@ def sample(preds, temperature=1.2):
     probas = np.random.multinomial(1, preds, 1)
     return np.argmax(probas)
 
-def lstm_gentxt(toots):
+def lstm_gentxt(toots, rndvec=0):
     # 入力トゥート（VEC_MAXLEN）をベクトル化。
     input_vec = np.zeros((VEC_MAXLEN + AVE_LEN, VEC_SIZE))
     input_mean_vec = np.zeros((VEC_MAXLEN, VEC_SIZE))
@@ -95,6 +95,10 @@ def lstm_gentxt(toots):
     input_mean_vec = input_mean_vec.reshape((1,VEC_MAXLEN, VEC_SIZE))
     with graph.as_default():
         output_vec = lstm_vec_model.predict_on_batch(input_mean_vec)[0]
+
+    # ベクトルをランダム改変
+    for i in range(VEC_SIZE):
+        output_vec[i]+= random.gauss(0,rndvec)
 
     # 推定したベクトルから文章生成
     generated = ''
