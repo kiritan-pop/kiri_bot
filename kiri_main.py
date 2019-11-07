@@ -1080,6 +1080,22 @@ def worker(status):
         toot_now += tmp
         toot(toot_now, g_vis, id, None,interval=a)
         SM.update(acct, 'reply')
+    elif re.search(r"[へヘはハ][くク][しシ][ょョ][んン][出で]た", content):
+        r = min([max([1,int(random.gauss(30,20))]),100])
+        maoudict = {"大魔王":100,"中魔王":10,"小魔王":1}
+        result = {}
+        for k,v in maoudict.items():
+            if r>=v:
+                result[k]=int(r//v)
+                r=r%v
+
+        if len(result)>0:
+            toot_now = "只今の記録"
+            for k,v in result.items():
+                toot_now+= f"、{k}:{v}"
+
+            toot_now+= "、でしたー"
+            toot(toot_now,g_vis='public')
 
 def lstm_gen_rapper(seeds, rndvec=0):
     new_seeds = [s for s in seeds if random.randint(1,3) != 1]
