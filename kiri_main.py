@@ -896,7 +896,7 @@ def worker(status):
         word = re.search(r"\s?(.+)って(何|なに|ナニ|誰|だれ|ダレ|いつ|どこ)\?$", str(content)).group(1)
         SM.update(acct, 'func')
         try:
-            word = re.sub(r"きりぼ.*[、。]","",word)
+            word = re.sub(r".*きりぼ.*[！、。]?","",word)
             page = wikipedia.page(word)
         except  wikipedia.exceptions.DisambiguationError as e:
             # toot('@%s 「%s」にはいくつか意味があるみたいだな〜'%(acct,word), g_vis, id, None, interval=a)
@@ -1063,19 +1063,19 @@ def worker(status):
         #時系列ソート
         seeds.sort(key=lambda x:(x[1]))
         #文字だけ取り出し
-        tmp = lstm_gen_rapper([c[0] for c in seeds], rndvec=random.uniform(0, min(len(toots_for_rep[acct])*0.1, 0.5)))
+        tmp = lstm_gen_rapper([c[0] for c in seeds], rndvec=random.uniform(0, min(len(toots_for_rep[acct])*0.75, 0.4)))
         tmp = kiri_util.content_cleanser_light(tmp)
         toot_now += tmp
         toots_for_rep[acct].append((tmp,jst_now))
         toot(toot_now, g_vis, id, None,interval=a)
-    elif re.search(r"(きり|キリ).*(ぼっと|ボット|[bB][oO][tT])|[きキ][りリ][ぼボ]", content + spoiler_text):
+    elif re.search(r"(きり|キリ).*(ぼっと|ボット|[bB][oO][tT])|[きキ][りリ][ぼボ]|[きキ][りリ][ぽポ][っッ][ぽポ]", content + spoiler_text):
         SM.update(acct, 'reply')
         if random.randint(0,10+a) > 9:
             return
         fav_now(id)
         toot_now = "@%s\n"%acct
         seeds = DAO.get_least_10toots(limit=30)
-        tmp = lstm_gen_rapper(seeds, rndvec=random.uniform(0,0.1))
+        tmp = lstm_gen_rapper(seeds, rndvec=random.uniform(0.05,0.3))
         tmp = kiri_util.content_cleanser_light(tmp)
         toot_now += tmp
         toot(toot_now, g_vis, id, None,interval=a)
@@ -1385,7 +1385,7 @@ def lstm_tooter():
         return
     spoiler = None
 
-    gen_txt = lstm_gen_rapper(seeds, rndvec=random.uniform(0,0.3))
+    gen_txt = lstm_gen_rapper(seeds, rndvec=random.uniform(0.05,0.3))
     gen_txt = kiri_util.content_cleanser_light(gen_txt)
     if gen_txt[0:1] == '。':
         gen_txt = gen_txt[1:]
