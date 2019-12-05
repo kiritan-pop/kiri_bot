@@ -23,9 +23,8 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 MASTER_ID = 'kiritan'
 BOT_ID = 'kiri_bot01'
 DELAY = 2
-pat1 = re.compile(r' ([!-~ぁ-んァ-ン] )+|^([!-~ぁ-んァ-ン] )+| [!-~ぁ-んァ-ン]$',flags=re.MULTILINE)  #[!-~0-9a-zA-Zぁ-んァ-ン０-９ａ-ｚ]
-pat2 = re.compile(r'[ｗ！？!\?]')
 abc = list("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?.()+-=,")
+keisho = r"(くん|君|さん|様|さま|ちゃん|氏)"
 
 #.envファイルからトークンとかURLを取得ー！
 dotenv_path = join(dirname(__file__), '.env')
@@ -456,8 +455,8 @@ def worker(status):
     if acct == MASTER_ID:
         rnd = 0
 
-    if len(content) <= 0:
-        return
+#     if len(content) <= 0:
+#         return
     if  Toot1bQ.empty():
         content_1b, acct_1b = None,None
     else:
@@ -896,7 +895,7 @@ def worker(status):
         word = re.search(r"\s?(.+)って(何|なに|ナニ|誰|だれ|ダレ|いつ|どこ)\?$", str(content)).group(1)
         SM.update(acct, 'func')
         try:
-            word = re.sub(r".*きりぼ.*[！、。]?","",word)
+            word = re.sub(r".*へいきりぼ(っと)?(くん|君|さん|様|さま|ちゃん)?[!！,.、。]?","",word)
             page = wikipedia.page(word)
         except  wikipedia.exceptions.DisambiguationError as e:
             # toot('@%s 「%s」にはいくつか意味があるみたいだな〜'%(acct,word), g_vis, id, None, interval=a)
@@ -1023,14 +1022,14 @@ def worker(status):
             body = f"@{acct} 見つからなかったよ〜😢"
             toot(body, g_vis=g_vis, rep=id)
 
-    elif re.search(r"へいきりぼ[!！]?きりたん丼の(天気|状態|状況|ステータス|status).*(教えて|おせーて)|^!server.*stat", content):
+    elif re.search(r"へいきりぼ(くん|君|さん|様|さま|ちゃん)?[!！]?きりたん丼の(天気|状態|状況|ステータス|status).*(教えて|おせーて)|^!server.*stat", content):
         stats = kiri_stat.sys_stat()
         toot(f"@{acct} \nただいまの気温{stats['cpu_temp']}℃、忙しさ{stats['cpu']:.1f}％、気持ちの余裕{stats['mem_available']/(10**9):.1f}GB、クローゼットの空き{stats['disk_usage']/(10**9):.1f}GB" ,g_vis=g_vis, rep=id)
-    elif re.search(r"へいきりぼ[!！]?.+の.+の天気.*(教えて|おせーて)", content):
+    elif re.search(r"へいきりぼ(くん|君|さん|様|さま|ちゃん)?[!！]?.+の.+の天気.*(教えて|おせーて)", content):
         word1 = re.search(
-            r"へいきりぼ[!！]?(.+)の(.+)の天気.*教えて", str(content)).group(1).strip()
+            r"へいきりぼ(くん|君|さん|様|さま|ちゃん)?[!！]?(.+)の(.+)の天気.*教えて", str(content)).group(2).strip()
         word2 = re.search(
-            r"へいきりぼ[!！]?(.+)の(.+)の天気.*教えて", str(content)).group(2).strip()
+            r"へいきりぼ(くん|君|さん|様|さま|ちゃん)?[!！]?(.+)の(.+)の天気.*教えて", str(content)).group(3).strip()
         if word1 in ["今日","明日","明後日"]:
             tenki_area = word2
             tenki_day = word1
@@ -1063,7 +1062,7 @@ def worker(status):
         #時系列ソート
         seeds.sort(key=lambda x:(x[1]))
         #文字だけ取り出し
-        tmp = lstm_gen_rapper([c[0] for c in seeds], rndvec=random.uniform(0, min(len(toots_for_rep[acct])*0.75, 0.4)))
+        tmp = lstm_gen_rapper([c[0] for c in seeds], rndvec=random.uniform(0.05, min(len(toots_for_rep[acct])*0.05, 0.3)))
         tmp = kiri_util.content_cleanser_light(tmp)
         toot_now += tmp
         toots_for_rep[acct].append((tmp,jst_now))
@@ -1075,13 +1074,13 @@ def worker(status):
         fav_now(id)
         toot_now = "@%s\n"%acct
         seeds = DAO.get_least_10toots(limit=30)
-        tmp = lstm_gen_rapper(seeds, rndvec=random.uniform(0.05,0.3))
+        tmp = lstm_gen_rapper(seeds, rndvec=random.uniform(0.05,0.2))
         tmp = kiri_util.content_cleanser_light(tmp)
         toot_now += tmp
         toot(toot_now, g_vis, id, None,interval=a)
         SM.update(acct, 'reply')
-    elif re.search(r"[へヘはハ][くク][しシ][ょョ][んン][出で]た", content):
-        r = min([max([1,int(random.gauss(30,20))]),100])
+    elif re.search(r"[へヘはハ][くク].*[しシ][ょョ][んン].*[出でデ][たタ]", content):
+        r = max([0,int(random.gauss(30,20))])
         maoudict = {"大魔王":100,"中魔王":10,"小魔王":1}
         result = {}
         for k,v in maoudict.items():
@@ -1090,12 +1089,14 @@ def worker(status):
                 r=r%v
 
         if len(result)>0:
-            toot_now = "只今の記録"
+            toot_now = f":@{acct}: 只今の記録"
             for k,v in result.items():
                 toot_now+= f"、{k}:{v}"
 
-            toot_now+= "、でしたー"
+            toot_now+= "、でした〜\n#魔王チャレンジ"
             toot(toot_now,g_vis='public')
+        else:
+            toot(f":@{acct}: 只今の記録、０魔王でした〜\n#魔王チャレンジ",g_vis='public')
 
 def lstm_gen_rapper(seeds, rndvec=0):
     new_seeds = [s for s in seeds if random.randint(1,3) != 1]
@@ -1401,7 +1402,7 @@ def lstm_tooter():
         return
     spoiler = None
 
-    gen_txt = lstm_gen_rapper(seeds, rndvec=random.uniform(0.05,0.3))
+    gen_txt = lstm_gen_rapper(seeds, rndvec=random.uniform(0.05,0.2))
     gen_txt = kiri_util.content_cleanser_light(gen_txt)
     if gen_txt[0:1] == '。':
         gen_txt = gen_txt[1:]
