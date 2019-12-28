@@ -1780,7 +1780,7 @@ def th_follow_mente():
         except Exception as e:
             print('id=',u,e)
             kiri_util.error_log()
-        sleep(3)
+        sleep(8)
     for u in set(fids) - set(fers):
         print('id=',u)
         try:
@@ -1788,7 +1788,7 @@ def th_follow_mente():
         except Exception as e:
             print('id=',u,e)
             kiri_util.error_log()
-        sleep(3)
+        sleep(8)
 
 #######################################################
 # post用worker
@@ -1893,7 +1893,7 @@ def main():
     threads.append( threading.Thread(target=th_post) )
     #スケジュール起動系(時刻)
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(bottlemail_sending,['**:05'])) )
-    threads.append( threading.Thread(target=kiri_util.scheduler, args=(th_follow_mente,['04:00'])) )
+    threads.append( threading.Thread(target=kiri_util.scheduler, args=(th_follow_mente,['14:12'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(nyan_time,['22:22'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(show_rank,['07:00'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(jihou,['**:00'])) )
