@@ -1025,17 +1025,30 @@ def worker(status):
     elif re.search(r"へいきりぼ(くん|君|さん|様|さま|ちゃん)?[!！]?きりたん丼の(天気|状態|状況|ステータス|status).*(教えて|おせーて)|^!server.*stat", content):
         stats = kiri_stat.sys_stat()
         toot(f"@{acct} \nただいまの気温{stats['cpu_temp']}℃、忙しさ{stats['cpu']:.1f}％、気持ちの余裕{stats['mem_available']/(10**9):.1f}GB、クローゼットの空き{stats['disk_usage']/(10**9):.1f}GB" ,g_vis=g_vis, rep=id)
-    elif re.search(r"へいきりぼ(くん|君|さん|様|さま|ちゃん)?[!！]?.+の.+の天気.*(教えて|おせーて)", content):
+    elif re.search(r"きりぼ(くん|君|さん|様|さま|ちゃん)?[!！、\s]?.+の天気.*(教え|おせーて)?", content):
         word1 = re.search(
-            r"へいきりぼ(くん|君|さん|様|さま|ちゃん)?[!！]?(.+)の(.+)の天気.*教えて", str(content)).group(2).strip()
-        word2 = re.search(
-            r"へいきりぼ(くん|君|さん|様|さま|ちゃん)?[!！]?(.+)の(.+)の天気.*教えて", str(content)).group(3).strip()
-        if word1 in ["今日","明日","明後日"]:
-            tenki_area = word2
-            tenki_day = word1
-        elif word2 in ["今日","明日","明後日"]:
-            tenki_area = word1
-            tenki_day = word2
+            r"きりぼ(くん|君|さん|様|さま|ちゃん)?[!！、\s]?(.+)の天気.*(教え|おせーて)?", str(content)).group(2).strip()
+        if len(word1.split("の"))==2:
+            word1,word2 = word1.split("の")
+            if word1 in ["今日","明日","明後日"]:
+                tenki_area = word2
+                tenki_day = word1
+            elif word2 in ["今日","明日","明後日"]:
+                tenki_area = word1
+                tenki_day = word2
+            else:
+                return
+        elif len(word1.split("の"))==1:
+            if word1 in ["今日","明日","明後日"]:
+                tenki_area = "名寄"
+                tenki_day = word1
+            else:
+                tenki_area = word1
+                if datetime.now(timezone('Asia/Tokyo')).strftime("%H") >= "18":
+                    tenki_day = "明日"
+                else:
+                    tenki_day = "今日"
+
         else:
             return
 
@@ -1080,7 +1093,7 @@ def worker(status):
         toot(toot_now, g_vis, id, None,interval=a)
         SM.update(acct, 'reply')
     elif re.search(r"[へヘはハ][くク].*[しシ][ょョ][んン].*[出でデ][たタ]", content):
-        r = max([0,int(random.gauss(30,20))])
+        r = max([0,int(random.gauss(30,30))])
         maoudict = {"大魔王":100,"中魔王":10,"小魔王":1}
         result = {}
         for k,v in maoudict.items():
