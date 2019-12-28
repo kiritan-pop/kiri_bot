@@ -1750,12 +1750,11 @@ def th_follow_mente():
     fids = []
     for account in ret:
         fids.append(account['id'])
-    while '_pagination_next' in ret[-1].keys():
-        for account in ret:
-            fids.append(account['id'])
-        max_id = ret[-1]['_pagination_next']['max_id']
+    while hasattr(ret[-1], '_pagination_next'):
+        max_id = ret[-1]._pagination_next['max_id']
+        ret = mastodon.account_followers(
+            uid, max_id=max_id, since_id=None, limit=80)
         sleep(2)
-        ret = mastodon.account_following(uid, max_id=max_id, since_id=None, limit=80)
         for account in ret:
             fids.append(account['id'])
     print('　　フォロー：',len(fids))
@@ -1764,14 +1763,14 @@ def th_follow_mente():
     fers = []
     for account in ret:
         fers.append(account['id'])
-    while '_pagination_next' in ret[-1].keys():
-        for account in ret:
-            fers.append(account['id'])
-        max_id = ret[-1]['_pagination_next']['max_id']
+    while hasattr(ret[-1], '_pagination_next'):
+        max_id = ret[-1]._pagination_next['max_id']
+        ret = mastodon.account_followers(
+            uid, max_id=max_id, since_id=None, limit=80)
         sleep(2)
-        ret = mastodon.account_followers(uid, max_id=max_id, since_id=None, limit=80)
         for account in ret:
             fers.append(account['id'])
+
     print('　　フォロワー：',len(fers))
     sleep(1)
     for u in set(fers) - set(fids):
@@ -1894,7 +1893,7 @@ def main():
     threads.append( threading.Thread(target=th_post) )
     #スケジュール起動系(時刻)
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(bottlemail_sending,['**:05'])) )
-    threads.append( threading.Thread(target=kiri_util.scheduler, args=(th_follow_mente,['04:00'])) )
+    threads.append( threading.Thread(target=kiri_util.scheduler, args=(th_follow_mente,['13:20'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(nyan_time,['22:22'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(show_rank,['07:00'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(jihou,['**:00'])) )
