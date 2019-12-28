@@ -268,7 +268,16 @@ def follow(id):
 
 def exe_follow(id):
     mastodon.account_follow(id)
-    print("♥follow")
+    print("💖follow")
+
+#######################################################
+# アンフォロー
+def unfollow(id):
+    PostQ.put((exe_unfollow,(id,)))
+
+def exe_unfollow(id):
+    mastodon.account_unfollow(id)
+    print("💔unfollow")
 
 #######################################################
 # トゥー消し
@@ -1776,7 +1785,7 @@ def th_follow_mente():
     for u in set(fers) - set(fids):
         print('id=',u)
         try:
-            mastodon.account_follow(u)
+            follow(u)
         except Exception as e:
             print('id=',u,e)
             kiri_util.error_log()
@@ -1784,7 +1793,7 @@ def th_follow_mente():
     for u in set(fids) - set(fers):
         print('id=',u)
         try:
-            mastodon.account_unfollow(u)
+            unfollow(u)
         except Exception as e:
             print('id=',u,e)
             kiri_util.error_log()
@@ -1893,7 +1902,7 @@ def main():
     threads.append( threading.Thread(target=th_post) )
     #スケジュール起動系(時刻)
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(bottlemail_sending,['**:05'])) )
-    threads.append( threading.Thread(target=kiri_util.scheduler, args=(th_follow_mente,['14:12'])) )
+    threads.append( threading.Thread(target=kiri_util.scheduler, args=(th_follow_mente,['14:25'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(nyan_time,['22:22'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(show_rank,['07:00'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(jihou,['**:00'])) )
