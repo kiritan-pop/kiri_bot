@@ -1752,7 +1752,7 @@ def th_follow_mente():
         fids.append(account['id'])
     while hasattr(ret[-1], '_pagination_next'):
         max_id = ret[-1]._pagination_next['max_id']
-        ret = mastodon.account_followers(
+        ret = mastodon.account_following(
             uid, max_id=max_id, since_id=None, limit=80)
         sleep(2)
         for account in ret:
@@ -1780,7 +1780,7 @@ def th_follow_mente():
         except Exception as e:
             print('id=',u,e)
             kiri_util.error_log()
-        sleep(2)
+        sleep(3)
     for u in set(fids) - set(fers):
         print('id=',u)
         try:
@@ -1788,7 +1788,7 @@ def th_follow_mente():
         except Exception as e:
             print('id=',u,e)
             kiri_util.error_log()
-        sleep(2)
+        sleep(3)
 
 #######################################################
 # post用worker
@@ -1893,7 +1893,7 @@ def main():
     threads.append( threading.Thread(target=th_post) )
     #スケジュール起動系(時刻)
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(bottlemail_sending,['**:05'])) )
-    threads.append( threading.Thread(target=kiri_util.scheduler, args=(th_follow_mente,['13:20'])) )
+    threads.append( threading.Thread(target=kiri_util.scheduler, args=(th_follow_mente,['04:00'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(nyan_time,['22:22'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(show_rank,['07:00'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(jihou,['**:00'])) )
