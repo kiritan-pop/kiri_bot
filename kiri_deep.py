@@ -105,7 +105,7 @@ def lstm_gentxt(toots, rndvec=0):
     char_IDs = [char_idx[MU] for _ in range(TXT_MAXLEN)]    #初期値は無
     rnd = random.uniform(0.2,0.7)
 
-    for i in range(200):
+    for i in range(500):
         with graph.as_default():
             preds = lstm_set_model.predict_on_batch([ np.asarray([output_vec]),  np.asarray([char_IDs]) ])
 

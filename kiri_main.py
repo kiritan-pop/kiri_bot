@@ -202,9 +202,10 @@ def exe_toot(toot_now, g_vis='direct', rep=None, spo=None, media_ids=None, inter
         spo_len = 0
     if rep != None:
         try:
+            sleep(1.4)
             mastodon.status_post(status=toot_now[0:490-spo_len], visibility=g_vis, in_reply_to_id=rep, spoiler_text=spo, media_ids=media_ids)
         except Exception:
-            sleep(2)
+            sleep(1.4)
             mastodon.status_post(status=toot_now[0:490-spo_len], visibility=g_vis, in_reply_to_id=None, spoiler_text=spo, media_ids=media_ids)
     else:
         mastodon.status_post(status=toot_now[0:490-spo_len], visibility=g_vis, in_reply_to_id=None, spoiler_text=spo, media_ids=media_ids)
@@ -581,6 +582,21 @@ def worker(status):
         SM.update(acct, 'func')
         if rnd <= 2:
             toot_now = r'{{{⚡⚡⚡⚡}}}＜ゴロゴロ〜ッ！'
+            id_now = None
+    elif re.search(r"^雲$", content):
+        SM.update(acct, 'func')
+        if rnd <= 2:
+            toot_now = r'(((☁☁☁☁)))＜もくもく〜'
+            id_now = None
+    elif re.search(r"^雨$", content):
+        SM.update(acct, 'func')
+        if rnd <= 2:
+            toot_now = r'(((☔☔☔☔)))＜ざーざー'
+            id_now = None
+    elif re.search(r"^雪$", content):
+        SM.update(acct, 'func')
+        if rnd <= 2:
+            toot_now = r'[[[❄]]][[[❄]]][[[❄]]][[[❄]]][[[❄]]]＜こんこん〜'
             id_now = None
     elif re.search(r"^ぬるぽ$|^[Nn]ull[Pp]ointer[Ee]xception$", content):
         SM.update(acct, 'func',score=-1)
@@ -1120,6 +1136,32 @@ def worker(status):
         else:
             toot(f":@{acct}: 只今の記録、０魔王でした〜\n#魔王チャレンジ",g_vis='public')
 
+    elif re.search(r"(.+)[出でデ][たタ]$", content):
+        r = max([0,int(random.gauss(30,30))])
+        maoudict = {"大魔王":100,"中魔王":10,"小魔王":1}
+
+        word = re.search(r"(.+)[出でデ][たタ]$", str(content)).group(1).strip()
+        word = sorted([(s,len(s)) for s in kiri_deep.tagger.parse(word).strip().split()], key=lambda x:-x[1])[0][0]
+        if len(word) <= 1:
+            return
+
+        result = {}
+        for k,v in maoudict.items():
+            if r>=v:
+                result[k]=int(r//v)
+                r=r%v
+
+        if len(result)>0:
+            toot_now = f":@{acct}: 只今の記録"
+            for k,v in result.items():
+                toot_now+= f"、{word}{k}:{v}"
+
+            toot_now+= f"、でした〜\n#{word}魔王チャレンジ"
+            toot(toot_now,g_vis='public')
+        else:
+            toot(f":@{acct}: 只今の記録、０{word}魔王でした〜\n#{word}魔王チャレンジ",g_vis='public')
+
+        
 def lstm_gen_rapper(seeds, rndvec=0):
     new_seeds = [s for s in seeds if random.randint(1,3) != 1]
     ret_txt = kiri_deep.lstm_gentxt(new_seeds, rndvec=rndvec).strip()
@@ -1342,7 +1384,7 @@ def th_worker():
     try:
         while True:
             status = WorkerQ.get() #キューからトゥートを取り出すよー！なかったら待機してくれるはずー！
-            sleep(1.2)
+            sleep(1.8)
             if WorkerQ.qsize() <= 1: #キューが詰まってたらスルー
                 worker(status)
     except Exception as e:
@@ -1385,7 +1427,6 @@ def th_timerDel():
         kiri_util.error_log()
         sleep(30)
         th_timerDel()
-
 
 #######################################################
 # 陣形
@@ -1512,7 +1553,6 @@ def th_hint_de_pinto(gtime=20):
             if loop == 1:
                 hint_text = "○"*len(term)
             elif len(term) > loop - 1:
-                # hint_text = term[0:loop-1] + "○"*(len(term) - (loop-1))
                 random.shuffle(mask_map)
                 mask_map.pop()
                 hint_text = ""
@@ -1522,13 +1562,11 @@ def th_hint_de_pinto(gtime=20):
                     else:
                         hint_text += c
 
-        # sleep(1)
         media_files = []
         media_files.append(mastodon.media_post(path, 'image/' + ex))
         toot_now = "正解は{0}でした〜！\n（出題 :@{1}: ） #exp15m".format(term,acct)
         toot(toot_now, g_vis='unlisted', rep=None, spo=None, media_ids=media_files,interval=4)
 
-    # gi = kiri_util.get_images(BING_KEY)
     gi = kiri_util.get_images_GGL(GOOGLE_KEY,GOOGLE_ENGINE_KEY)
     junbiTM = kiri_util.KiriTimer(30*60)
     junbiTM.reset(gtime*60)
@@ -1585,12 +1623,6 @@ def th_gettingnum(gtime=30):
                 remaintm = junbiTM.check()
                 toot('@%s\n開催準備中だよー！あと%d分%d秒待ってねー！'%(g_acct,remaintm//60,remaintm%60), 'unlisted', g_id, None)
                 continue
-
-            #アクティブ人数確認
-            # i = DAO.get_gamenum()
-            # if  i <= 10:
-            #     toot('@%s\n人少ないからまた後でねー！'%g_acct, 'unlisted', g_id, None)
-            #     continue
 
             #ゲーム開始ー！
             fav_now(g_id)
@@ -1685,13 +1717,10 @@ def th_saver():
 # ローカルタイムライン監視スレッド
 def t_local():
     try:
-        # mastodon.stream_public(ltl_listener())
         mastodon.stream_local(ltl_listener(),timeout=20)
     except requests.exceptions.ConnectionError as e:
         print("＊＊＊再接続するよ〜t_local()＊＊＊")
-        # print(e)
-        # kiri_util.error_log()
-        sleep(30)
+        sleep(15)
         t_local()
     except Exception as e:
         print(e)
@@ -1704,12 +1733,9 @@ def t_local():
 def t_sub():
     try:
         publicdon.stream_local(public_listener(),timeout=20)
-        # publicdon.stream_public(public_listener(),timeout=20)
     except requests.exceptions.ConnectionError as e:
         print("＊＊＊再接続するよ〜t_sub()＊＊＊")
-        # print(e)
-        # kiri_util.error_log()
-        sleep(30)
+        sleep(15)
         t_sub()
     except Exception as e:
         print(e)
@@ -1724,16 +1750,13 @@ def t_user():
         mastodon.stream_user(notification_listener(),timeout=20)
     except requests.exceptions.ConnectionError as e:
         print("＊＊＊再接続するよ〜t_user()＊＊＊")
-        # print(e)
-        # kiri_util.error_log()
-        sleep(30)
+        sleep(15)
         t_user()
     except Exception as e:
         print(e)
         kiri_util.error_log()
         sleep(30)
         t_user()
-
 
 #######################################################
 # にゃんタイム
@@ -1790,14 +1813,14 @@ def th_follow_mente():
             print('id=',u,e)
             kiri_util.error_log()
         sleep(8)
-    for u in set(fids) - set(fers):
-        print('id=',u)
-        try:
-            unfollow(u)
-        except Exception as e:
-            print('id=',u,e)
-            kiri_util.error_log()
-        sleep(8)
+#    for u in set(fids) - set(fers):
+#        print('id=',u)
+#        try:
+#            unfollow(u)
+#        except Exception as e:
+#            print('id=',u,e)
+#            kiri_util.error_log()
+#        sleep(8)
 
 #######################################################
 # post用worker
@@ -1810,8 +1833,7 @@ def th_post():
         except Exception as e:
             print(e)
             kiri_util.error_log()
-            sleep(120)
-            # th_post()
+            sleep(2)
 
 #######################################################
 # 気象情報取得スレッド
@@ -1861,15 +1883,10 @@ def th_kishou():
             spo_text = "🌋噴火だ〜！"
             body_text += f"【{msg_doc['Report']['Head']['Title']}】\n" 
             body_text += msg_doc['Report']['Head']['Headline']['Text'] + "\n"
-        # elif msg_doc['Report']['Control']['Title'] == "気象警報・注意報":
-        #     spo_text = "テストでーす"
-        #     body_text += f"【{msg_doc['Report']['Head']['Title']}】\n" 
-        #     body_text += msg_doc['Report']['Head']['Headline']['Text'] + "\n"
         else:
             return
         
         body_text += "\n《from 気象庁防災情報》"
-        # toot(f"@kiritan \n{body_text}", g_vis='direct', spo=f"{spo_text}")
         toot(body_text, g_vis='public', spo=f"{spo_text}")
 
     kishou = kiri_kishou.Kirikishou(ws_url=KISHOU_WS, ws_port=KISHOU_WS_PORT, kishou_target=kishou_target, on_msg_func=on_msg_func)
@@ -1902,7 +1919,7 @@ def main():
     threads.append( threading.Thread(target=th_post) )
     #スケジュール起動系(時刻)
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(bottlemail_sending,['**:05'])) )
-    threads.append( threading.Thread(target=kiri_util.scheduler, args=(th_follow_mente,['14:25'])) )
+    threads.append( threading.Thread(target=kiri_util.scheduler, args=(th_follow_mente,['21:27'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(nyan_time,['22:22'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(show_rank,['07:00'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(jihou,['**:00'])) )
