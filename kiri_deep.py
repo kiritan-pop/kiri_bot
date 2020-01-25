@@ -38,7 +38,7 @@ TXT_MAXLEN = 5      #
 MU = "🧪"       # 無
 END = "🦷"      # 終わりマーク
 
-tagger = MeCab.Tagger('-Owakati -u dic/nicodic.dic')
+tagger = MeCab.Tagger('-Owakati -u dic/nicodic.dic -d /usr/lib/x86_64-linux-gnu/mecab/dic/mecab-ipadic-neologd/')
 DAO = kiri_util.DAO_statuses()
 
 pat3 = re.compile(r'^\n')

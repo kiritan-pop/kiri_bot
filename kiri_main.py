@@ -1132,6 +1132,8 @@ def worker(status):
                 toot_now+= f"、{k}:{v}"
 
             toot_now+= "、でした〜\n#魔王チャレンジ"
+            if r>=100:
+                toot_now+= " #大魔王"
             toot(toot_now,g_vis='public')
         else:
             toot(f":@{acct}: 只今の記録、０魔王でした〜\n#魔王チャレンジ",g_vis='public')
@@ -1157,11 +1159,13 @@ def worker(status):
                 toot_now+= f"、{word}{k}:{v}"
 
             toot_now+= f"、でした〜\n#{word}魔王チャレンジ"
+            if r>=100:
+                toot_now+= " #大魔王"
             toot(toot_now,g_vis='public')
         else:
             toot(f":@{acct}: 只今の記録、０{word}魔王でした〜\n#{word}魔王チャレンジ",g_vis='public')
 
-        
+
 def lstm_gen_rapper(seeds, rndvec=0):
     new_seeds = [s for s in seeds if random.randint(1,3) != 1]
     ret_txt = kiri_deep.lstm_gentxt(new_seeds, rndvec=rndvec).strip()
@@ -1356,7 +1360,7 @@ def show_rank(acct=None, target=None, id=None, g_vis=None):
             if i >= 9:
                 break
 
-        toot(toot_now, g_vis='unlisted', spo=spo_text, interval=2)
+        toot(toot_now, g_vis='public', spo=spo_text, interval=2)
 
 #######################################################
 # ボトルメールサービス　メッセージ登録
@@ -1540,7 +1544,7 @@ def th_hint_de_pinto(gtime=20):
                 media_files = []
                 media_files.append(mastodon.media_post(filename, 'image/' + ex))
                 toot_now = "さて、これは何/誰でしょうか？\nヒント：{0}\n#きりたんのヒントでピント #exp15m".format(hint_text)
-                toot(toot_now, g_vis='unlisted', rep=None, spo=None, media_ids=media_files)
+                toot(toot_now, g_vis='public', rep=None, spo=None, media_ids=media_files)
                 for _ in range(60):
                     sleep(1)
                     if len(break_flg) > 0:
@@ -1565,7 +1569,7 @@ def th_hint_de_pinto(gtime=20):
         media_files = []
         media_files.append(mastodon.media_post(path, 'image/' + ex))
         toot_now = "正解は{0}でした〜！\n（出題 :@{1}: ） #exp15m".format(term,acct)
-        toot(toot_now, g_vis='unlisted', rep=None, spo=None, media_ids=media_files,interval=4)
+        toot(toot_now, g_vis='public', rep=None, spo=None, media_ids=media_files,interval=4)
 
     gi = kiri_util.get_images_GGL(GOOGLE_KEY,GOOGLE_ENGINE_KEY)
     junbiTM = kiri_util.KiriTimer(30*60)
@@ -1594,11 +1598,11 @@ def th_hint_de_pinto(gtime=20):
             if g_acct != acct and term in ans:
                 loop = len(loop_cnt)
                 score = min([10,len(term)])*8//(2**loop)
-                toot(f'((( :@{acct}: ))) 正解〜！', g_vis='unlisted', rep=None, spo=None)
+                toot(f'((( :@{acct}: ))) 正解〜！', g_vis='public', rep=None, spo=None)
                 SM.update(acct, 'getnum', score=score//1)
                 SM.update(g_acct, 'getnum', score=score//2)
                 break_flg.append('ON')
-                toot('正解者には{0}点、出題者には{1}点入るよー！'.format(score//1, score//2), g_vis='unlisted', rep=None, spo=None, interval=8)
+                toot('正解者には{0}点、出題者には{1}点入るよー！'.format(score//1, score//2), g_vis='public', rep=None, spo=None, interval=8)
 
                 break
 
@@ -1621,7 +1625,7 @@ def th_gettingnum(gtime=30):
             g_acct,g_id = GetNumQ.get()
             if junbiTM.check() > 0:
                 remaintm = junbiTM.check()
-                toot('@%s\n開催準備中だよー！あと%d分%d秒待ってねー！'%(g_acct,remaintm//60,remaintm%60), 'unlisted', g_id, None)
+                toot('@%s\n開催準備中だよー！あと%d分%d秒待ってねー！'%(g_acct,remaintm//60,remaintm%60), 'public', g_id, None)
                 continue
 
             #ゲーム開始ー！
