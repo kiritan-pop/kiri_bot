@@ -1132,7 +1132,7 @@ def worker(status):
                 toot_now+= f"、{k}:{v}"
 
             toot_now+= "、でした〜\n#魔王チャレンジ"
-            if r>=100:
+            if "大魔王" in result.keys():
                 toot_now+= " #大魔王"
             toot(toot_now,g_vis='public')
         else:
@@ -1159,7 +1159,7 @@ def worker(status):
                 toot_now+= f"、{word}{k}:{v}"
 
             toot_now+= f"、でした〜\n#{word}魔王チャレンジ"
-            if r>=100:
+            if "大魔王" in result.keys():
                 toot_now+= " #大魔王"
             toot(toot_now,g_vis='public')
         else:
