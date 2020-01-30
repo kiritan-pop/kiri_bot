@@ -28,7 +28,7 @@ mccabe==0.6.1
 mecab-python3==0.996.2
 numpy==1.17.0
 opencv-python==4.1.0.25
-Pillow==6.1.0
+Pillow==6.2.0
 protobuf==3.9.1
 psutil==5.6.3
 pylint==2.3.1
@@ -45,7 +45,7 @@ smart-open==1.8.4
 socketIO-client-nexus==0.7.6
 soupsieve==1.9.3
 tensorboard==1.14.0
-tensorflow==1.14.0
+tensorflow==1.15.0
 tensorflow-estimator==1.14.0
 termcolor==1.1.0
 typed-ast==1.4.0
