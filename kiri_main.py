@@ -129,6 +129,8 @@ kishou_target = {
 "気象警報・注意報":"VPWW50"  #テスト用
 }
 
+# こら！
+kora_list = ["(๑˃́_˂̀๑)ﾋｬｯ","(๑˃́~˂̀๑)ﾋｬｯ","(๑˃́₃˂̀๑)ﾋｭｯ","(๑˃́︿˂̀๑)ﾋｬｯ","(๑˃́ㅿ˂̀๑)ｳﾍｯ","(๑˃́ꇴ˂̀๑)ｷｬｯｷｬｯ!","(๑˃́o˂̀๑)ｳﾜｯ","(๑˃́ω˂̀๑)ﾆｬｯ","(๑˃́ᴗ˂̀๑)ﾑﾋｯ","(๑˃́﹏˂̀๑)ﾋｬｰ","(๑˃́^˂̀๑)ﾋｬｯ","(๑˃́д˂̀๑)ｳﾜｰ"]
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--gtime", type=int, default=30)
@@ -771,13 +773,16 @@ def worker(status):
             toot_now = f":@{acct}: おやすみ〜 {random.choice([tmp.strip() for tmp in open('.kaomoji','r').readlines()])}\n#挨拶部"
             id_now = None
             interval = 5
+    elif re.search(r"^[こコ][らラ][きキ][りリ][ぼボぽポ]", content):
+            toot_now = random.choice(kora_list)
+            id_now = None
+
     else:
         nicolist = set([tmp.strip() for tmp in open('.nicolist').readlines()])
         if acct in nicolist:
             # rnd = random.randint(0,100)
             # if rnd % 4 == 0:
             fav_now(id_now)
-    #
     if len(toot_now) > 0:
         toot(toot_now, vis_now, id_now, None, None, interval)
         return
@@ -794,7 +799,6 @@ def worker(status):
         if StMG.is_game(acct):
             toot('@%s 今やってる！\n※やめる場合は「しりとり終了」って言ってね'%acct, 'direct', id, None,interval=2)
             return
-
         StMG.add_game(acct)
         SM.update(acct, 'func')
         word1,yomi1,tail1 = StMG.games[acct].random_choice()
@@ -830,13 +834,13 @@ def worker(status):
                         toot('@%s %s【%s】\n%sえ〜ん負けたー！\n(ラリー数：%d／%d点獲得)'%(acct, ret_word, ret_yomi,text2, StMG.games[acct].rcnt,tmp_score), 'direct',  id, None,interval=a)
                         SM.update(acct, 'getnum', score=tmp_score)
                         StMG.end_game(acct)
-
             else:
                 #辞書にない場合
                 toot('@%s %s\n※やめる場合は「しりとり終了」って言ってね！\n(ラリー数：%d)'%(acct,text, StMG.games[acct].rcnt), 'direct',  id, None,interval=a)
         else:
             toot('@%s %s\nわーい勝ったー！\n(ラリー数：%d)'%(acct, text, StMG.games[acct].rcnt), 'direct',  id, None,interval=a)
             StMG.end_game(acct)
+
     elif re.search(r"[!！]スロット", content) and g_vis == 'direct':
         fav_now(id)
         reelsize = 5
@@ -846,7 +850,6 @@ def worker(status):
         else:
             slot_rate = 1
             reel_num = 4
-
         #所持金チェック
         acct_score = SM.show(acct)[0][1]
         if acct_score < int(slot_rate*3):
@@ -888,22 +891,17 @@ def worker(status):
             if os.path.exists("hintPinto_words.txt"):
                 for line in open('hintPinto_words.txt','r'):
                     hintPinto_words.append(line.strip())
-
             if word in hintPinto_words:
                 toot(f'@{acct} この前やったお題なので別のにして〜！', 'direct', rep=id, interval=a)
                 return
-
             if len(word) < 3:
                 toot(f'@{acct} お題は３文字以上にしてね〜', 'direct', rep=id, interval=a)
                 return
-
             hintPinto_words.append(word)
             if len(hintPinto_words) > 10:
                 hintPinto_words.pop(0)
-
             with open('hintPinto_words.txt','w') as f:
                 f.write("\n".join(hintPinto_words))
-
             HintPintoQ.put([acct,id,word])
             SM.update(acct, 'func')
         else:
@@ -913,9 +911,11 @@ def worker(status):
         print("★ボトルメールサービス")
         bottlemail_service(content=content, acct=acct, id=id, g_vis=g_vis)
         SM.update(acct, 'func')
+
     elif re.search(r"(きょう|今日)の.?(料理|りょうり)", content):
         recipe_service(content=content, acct=acct, id=id, g_vis=g_vis)
         SM.update(acct, 'func')
+
     elif re.search(r"\s?(.+)って(何|なに|ナニ|誰|だれ|ダレ|いつ|どこ)\?$", content):
         word = re.search(r"\s?(.+)って(何|なに|ナニ|誰|だれ|ダレ|いつ|どこ)\?$", str(content)).group(1)
         SM.update(acct, 'func')
@@ -969,6 +969,7 @@ def worker(status):
     elif re.search(r"([わワ][てテ]|拙僧|小職|私|[わワ][たタ][しシ]|[わワ][たタ][くク][しシ]|自分|僕|[ぼボ][くク]|俺|[オお][レれ]|朕|ちん|余|[アあ][タた][シし]|ミー|あちき|あちし|あたち|[あア][たタ][いイ]|[わワ][いイ]|わっち|おいどん|[わワ][しシ]|[うウ][ちチ]|[おオ][らラ]|儂|[おオ][いイ][らラ]|あだす|某|麿|拙者|小生|あっし|手前|吾輩|我輩|わらわ|ぅゅ|のどに|ちゃそ)の(ランク|ランキング|順位|スコア|成績|せいせき|らんく|らんきんぐ|すこあ)", content):
         show_rank(acct=acct, target=acct, id=id, g_vis=g_vis)
         SM.update(acct, 'func')
+
     elif re.search(r":@(.+):.*の(ランク|ランキング|順位|スコア|成績|せいせき|らんく|らんきんぐ|すこあ)", content):
         word = re.search(r":@(.+):.*の(ランク|ランキング|順位|スコア|成績|せいせき|らんく|らんきんぐ|すこあ)", str(content)).group(1)
         show_rank(acct=acct, target=word, id=id, g_vis=g_vis)
@@ -981,12 +982,14 @@ def worker(status):
             fav_now(id)
             GetNumQ.put([acct,id])
             SM.update(acct, 'func')
+
     elif  '?トゥトゥトゥ' in content and acct == 'twotwo': #ネイティオ専用
         if len(GetNum_flg) > 0:
             toot("@%s 数取りゲーム開催中だよー！急いで投票してー！"%acct, 'public', id)
         else:
             GetNumQ.put([acct,id])
             SM.update(acct, 'func')
+
     elif len(content) > 140 and len(content) * 0.8 < sum([v for k,v in Counter(content).items() if k in abc]):
         fav_now(id)
         lang = TRANS.detect(content)
@@ -999,6 +1002,7 @@ def worker(status):
                     toot_now +=  "\n#きり翻訳 #きりぼっと"
                     toot(toot_now, 'public', id, '翻訳したよ〜！なになに……？ :@%s: ＜'%acct ,interval=a)
                     SM.update(acct, 'func')
+
     elif  '翻訳して' in spoiler_text:
         fav_now(id)
         toot_now = TRANS.ja2en(content)
@@ -1009,6 +1013,7 @@ def worker(status):
                 toot_now +=  "\n#きり翻訳 #きりぼっと"
                 toot(toot_now, 'public', id, '翻訳したよ〜！ :@%s: ＜'%acct ,interval=a)
                 SM.update(acct, 'func')
+
     elif len(content) > 140 and len(spoiler_text) == 0:
         gen_txt = Toot_summary.summarize(content,limit=10,lmtpcs=1, m=1, f=4)
         if gen_txt[-1] == '#':
@@ -1018,6 +1023,7 @@ def worker(status):
             if len(gen_txt) > 5:
                 gen_txt +=  "\n#きり要約 #きりぼっと"
                 toot("@" + acct + " :@" + acct + ":\n"  + gen_txt, g_vis, id, "勝手に要約サービス", interval=a)
+
     elif re.search(r"きりぼ.+:@(.+):.*の初", content):
         target = re.search(r"きりぼ.+:@(.+):.*の初", str(content)).group(1)
         toots = DAO.get_user_toots(target)
@@ -1035,14 +1041,12 @@ def worker(status):
                 ttime = '{0:06d}'.format(ttime)
                 ymdhms = f'on {tdate[:4]}/{tdate[4:6]}/{tdate[6:]} at {ttime[:2]}:{ttime[2:4]}:{ttime[4:]}'
                 tcontent = kiri_util.content_cleanser(tcontent)
-
                 sptxt = f":@{target}: の初トゥートは……"
                 body = f"@{acct} \n"
                 body += f":@{target}: ＜{tcontent} \n {ymdhms} \n"
                 body += f"{MASTODON_URL}/@{target}/{tid}"
                 toot(body, g_vis=g_vis, rep=id, spo=sptxt)
                 break
-
         if check_fg == False:
             body = f"@{acct} 見つからなかったよ〜😢"
             toot(body, g_vis=g_vis, rep=id)
@@ -1050,6 +1054,7 @@ def worker(status):
     elif re.search(r"へいきりぼ(くん|君|さん|様|さま|ちゃん)?[!！]?きりたん丼の(天気|状態|状況|ステータス|status).*(教えて|おせーて)|^!server.*stat", content):
         stats = kiri_stat.sys_stat()
         toot(f"@{acct} \nただいまの気温{stats['cpu_temp']}℃、忙しさ{stats['cpu']:.1f}％、気持ちの余裕{stats['mem_available']/(10**9):.1f}GB、クローゼットの空き{stats['disk_usage']/(10**9):.1f}GB" ,g_vis=g_vis, rep=id)
+
     elif re.search(r"きりぼ(くん|君|さん|様|さま|ちゃん)?[!！、\s]?.+の天気.*(教え|おせーて)?", content):
         word1 = re.search(
             r"きりぼ(くん|君|さん|様|さま|ちゃん)?[!！、\s]?(.+)の天気.*(教え|おせーて)?", str(content)).group(2).strip()
@@ -1073,10 +1078,8 @@ def worker(status):
                     tenki_day = "明日"
                 else:
                     tenki_day = "今日"
-
         else:
             return
-
         sptxt, toot_now = kiri_tenki.get_tenki(quary=tenki_area, day=tenki_day)
         if sptxt == "900":
             toot(f"@{acct} 知らない場所の天気はわからないよ〜", g_vis=g_vis, rep=id)
@@ -1105,6 +1108,7 @@ def worker(status):
         toot_now += tmp
         toots_for_rep[acct].append((tmp,jst_now))
         toot(toot_now, g_vis, id, None,interval=a)
+
     elif re.search(r"(きり|キリ).*(ぼっと|ボット|[bB][oO][tT])|[きキ][りリ][ぼボ]|[きキ][りリ][ぽポ][っッ][ぽポ]", content + spoiler_text):
         SM.update(acct, 'reply')
         if random.randint(0,10+a) > 9:
@@ -1117,6 +1121,7 @@ def worker(status):
         toot_now += tmp
         toot(toot_now, g_vis, id, None,interval=a)
         SM.update(acct, 'reply')
+
     elif re.search(r"[へヘはハ][くク].*[しシ][ょョ][んン].*[出でデ][たタ]", content):
         r = max([0,int(random.gauss(30,30))])
         maoudict = {"大魔王":100,"中魔王":10,"小魔王":1}
@@ -1125,12 +1130,10 @@ def worker(status):
             if r>=v:
                 result[k]=int(r//v)
                 r=r%v
-
         if len(result)>0:
             toot_now = f":@{acct}: 只今の記録"
             for k,v in result.items():
                 toot_now+= f"、{k}:{v}"
-
             toot_now+= "、でした〜\n#魔王チャレンジ"
             if "大魔王" in result.keys():
                 toot_now+= " #大魔王"
@@ -1141,23 +1144,19 @@ def worker(status):
     elif re.search(r"(.+)[出でデ][たタ]$", content):
         r = max([0,int(random.gauss(30,30))])
         maoudict = {"大魔王":100,"中魔王":10,"小魔王":1}
-
         word = re.search(r"(.+)[出でデ][たタ]$", str(content)).group(1).strip()
         word = sorted([(s,len(s)) for s in kiri_deep.tagger.parse(word).strip().split()], key=lambda x:-x[1])[0][0]
         if len(word) <= 1:
             return
-
         result = {}
         for k,v in maoudict.items():
             if r>=v:
                 result[k]=int(r//v)
                 r=r%v
-
         if len(result)>0:
             toot_now = f":@{acct}: 只今の記録"
             for k,v in result.items():
                 toot_now+= f"、{word}{k}:{v}"
-
             toot_now+= f"、でした〜\n#{word}魔王チャレンジ"
             if "大魔王" in result.keys():
                 toot_now+= " #大魔王"
