@@ -129,8 +129,6 @@ kishou_target = {
 "気象警報・注意報":"VPWW50"  #テスト用
 }
 
-# こら！
-kora_list = ["(๑˃́_˂̀๑)ﾋｬｯ","(๑˃́~˂̀๑)ﾋｬｯ","(๑˃́₃˂̀๑)ﾋｭｯ","(๑˃́︿˂̀๑)ﾋｬｯ","(๑˃́ㅿ˂̀๑)ｳﾍｯ","(๑˃́ꇴ˂̀๑)ｷｬｯｷｬｯ!","(๑˃́o˂̀๑)ｳﾜｯ","(๑˃́ω˂̀๑)ﾆｬｯ","(๑˃́ᴗ˂̀๑)ﾑﾋｯ","(๑˃́﹏˂̀๑)ﾋｬｰ","(๑˃́^˂̀๑)ﾋｬｯ","(๑˃́д˂̀๑)ｳﾜｰ"]
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--gtime", type=int, default=30)
@@ -457,7 +455,7 @@ def worker(status):
     if status["account"]["bot"]:
         return
 
-    botlist = set([tmp.strip() for tmp in open('.botlist').readlines()])
+    botlist = set([tmp.strip() for tmp in open('.botlist').readlines() if len(tmp.strip())>0])
     botlist.add(BOT_ID)
     if  acct in botlist:
         return
@@ -770,15 +768,15 @@ def worker(status):
     elif re.search("寝(ます|る|マス)([よかぞね]?|[…。うぅー～！・]+)$|^寝(ます|る|よ)[…。うぅー～！・]*$|\
                     寝(ます|る|マス)(.*)[ぽお]や[ユすしー]|きりぼ(.*)[ぽお]や[ユすしー]", content):
         if not re.search("寝る(かた|方|人|ひと|民)", content):
-            toot_now = f":@{acct}: おやすみ〜 {random.choice([tmp.strip() for tmp in open('.kaomoji','r').readlines()])}\n#挨拶部"
+            toot_now = f":@{acct}: おやすみ〜 {random.choice([tmp.strip() for tmp in open('.kaomoji','r').readlines() if len(tmp.strip())>0])}\n#挨拶部"
             id_now = None
             interval = 5
     elif re.search(r"^[こコ][らラ][きキ][りリ][ぼボぽポ]", content):
-            toot_now = random.choice(kora_list)
+            toot_now = random.choice([tmp.strip() for tmp in open('.kora','r').readlines() if len(tmp.strip())>0])
             id_now = None
 
     else:
-        nicolist = set([tmp.strip() for tmp in open('.nicolist').readlines()])
+        nicolist = set([tmp.strip() for tmp in open('.nicolist').readlines() if len(tmp.strip())>0])
         if acct in nicolist:
             # rnd = random.randint(0,100)
             # if rnd % 4 == 0:
@@ -1200,7 +1198,7 @@ def business_contact(status):
     jst_now_hh = int(jst_now.strftime("%H"))
     print('%s===「%s」by %s'%(jst_now_str,('\n'+' '*20).join(content.split('\n')), acct))
 
-    kaomoji = random.choice([tmp.strip() for tmp in open('.kaomoji','r').readlines()])
+    kaomoji = random.choice([tmp.strip() for tmp in open('.kaomoji','r').readlines() if len(tmp.strip())>0])
     if statuses_count == 1:
         toot_now = f':@{acct}: （{display_name}）ご新規さんかもー！{kaomoji}\n #挨拶部'
         toot(toot_now, g_vis='public',interval=3)
@@ -1224,7 +1222,7 @@ def business_contact(status):
     if len(pita_list) > 1:
         pita_list.pop(0)
 
-    watch_list = set([kansi_acct.strip() for kansi_acct in open('.watch_list').readlines()])
+    watch_list = set([kansi_acct.strip() for kansi_acct in open('.watch_list').readlines() if len(tmp.strip())>0])
     if acct in watch_list:
         toot_now = '@%s\n:@%s: %s\n「%s」\n#exp10m'%(MASTER_ID, acct, display_name, content)
         toot(toot_now)
