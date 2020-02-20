@@ -546,9 +546,9 @@ def worker(status):
         SM.update(acct, 'func',score=-2)
         if rnd <= 4:
             tmp = []
-            tmp.append( r'{{{🌊🌊🌊🌊}}} ＜ざばーっ！')
+            tmp.append(f":@{acct}: " + r'{{{🌊🌊🌊🌊}}} ＜ざばーっ！')
             tmp.append('( •́ฅ•̀ )ｸｯｻ')
-            tmp.append('っ🚽')
+            tmp.append( f"　:@{acct}:\nっ🚽")
             toot_now = random.choice(tmp)
             id_now = None
     elif re.search(r"^木$|^林$|^森$", content+spoiler_text):
@@ -792,6 +792,7 @@ def worker(status):
 
     ############################################################
     #各種機能
+    # pp(f"debug:g_vis={g_vis},is_game({acct})={StMG.is_game(acct)}")
     if re.search(r"きりぼ.*(しりとり).*(しよ|やろ|おねがい|お願い)", content):
         fav_now(id)
         if StMG.is_game(acct):
