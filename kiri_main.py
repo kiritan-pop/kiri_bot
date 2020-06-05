@@ -50,11 +50,13 @@ TRANS = kiri_util.trans(GOOGLE_KEY)
 #しりとり用
 StMG = kiri_game.Siritori_manager()
 
-publicdon = Mastodon(api_base_url=MASTODON_URL)  # インスタンス
+publicdon = Mastodon(api_base_url=MASTODON_URL,
+                    ratelimit_method="throw")  # インスタンス
 
 mastodon = Mastodon(
     access_token=MASTODON_ACCESS_TOKEN,
-    api_base_url=MASTODON_URL)  # インスタンス
+    api_base_url=MASTODON_URL,
+    ratelimit_method="throw")  # インスタンス
 
 PostQ = queue.Queue()
 WorkerQ = queue.Queue()
@@ -1731,56 +1733,6 @@ def th_saver():
         sleep(20)
         th_saver()
 
-#######################################################
-# ローカルタイムライン監視スレッド
-def t_local():
-    while True:
-        sleep(1)
-        try:
-            mastodon.stream_local(ltl_listener(),timeout=180)
-        except requests.exceptions.ConnectionError as e:
-            print("＊＊＊再接続するよ〜t_local()＊＊＊")
-        except requests.exceptions.ReadTimeout as e:
-            print("＊＊＊再接続するよ〜t_local()＊＊＊")
-        except Exception as e:
-            print(e)
-            kiri_util.error_log()
-        finally:
-            sleep(10)
-
-#######################################################
-# ローカルタイムライン監視スレッド（認証なし）
-def t_sub():
-    while True:
-        sleep(5)
-        try:
-            publicdon.stream_local(public_listener(),timeout=180)
-        except requests.exceptions.ConnectionError as e:
-            print("＊＊＊再接続するよ〜t_sub()＊＊＊")
-        except requests.exceptions.ReadTimeout as e:
-            print("＊＊＊再接続するよ〜t_sub()＊＊＊")
-        except Exception as e:
-            print(e)
-            kiri_util.error_log()
-        finally:
-            sleep(10)
-
-#######################################################
-# ホームタイムライン監視スレッド
-def t_user():
-    while True:
-        sleep(9)
-        try:
-            mastodon.stream_user(notification_listener(),timeout=180)
-        except requests.exceptions.ConnectionError as e:
-            print("＊＊＊再接続するよ〜t_user()＊＊＊")
-        except requests.exceptions.ReadTimeout as e:
-            print("＊＊＊再接続するよ〜t_user()＊＊＊")
-        except Exception as e:
-            print(e)
-            kiri_util.error_log()
-        finally:
-            sleep(10)
 
 #######################################################
 # にゃんタイム
@@ -1853,7 +1805,7 @@ def th_post():
         try:
             func,args = PostQ.get()
             func(*args)
-            sleep(1.2)
+            sleep(1.1)
         except Exception as e:
             print(e)
             kiri_util.error_log()
@@ -1930,9 +1882,9 @@ def main():
     args = get_args()
     threads = []
     #タイムライン受信系
-    threads.append( threading.Thread(target=t_local ) ) #LTL
-    threads.append( threading.Thread(target=t_user ) ) #LTL
-    threads.append( threading.Thread(target=t_sub ) ) #LTL
+    mastodon.stream_local(ltl_listener(),run_async=True, timeout=180, reconnect_async=True, reconnect_async_wait_sec=5)
+    publicdon.stream_local(public_listener(),run_async=True, timeout=180, reconnect_async=True, reconnect_async_wait_sec=5)
+    mastodon.stream_user(notification_listener(),run_async=True, timeout=180, reconnect_async=True, reconnect_async_wait_sec=5)
     #タイムライン応答系
     threads.append( threading.Thread(target=th_delete) )
     threads.append( threading.Thread(target=th_saver) )
