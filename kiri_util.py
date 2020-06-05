@@ -1098,3 +1098,5 @@ if __name__ == '__main__':
 
     sm = ScoreManager()
     print(sm.show('kiritan'))
+    sm.update(acct='kiritan',key='getnum',i_datetime=None,score=-150)
+    print(sm.show('kiritan'))

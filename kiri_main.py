@@ -15,7 +15,8 @@ from collections import defaultdict, Counter
 from dotenv import load_dotenv
 import wikipedia
 import GenerateText, bottlemail, Toot_summary
-import kiri_util, kiri_game, kiri_romasaga, kiri_deep, kiri_kishou, kiri_tenki, kiri_stat
+import kiri_util, kiri_game, kiri_romasaga, kiri_kishou, kiri_tenki, kiri_stat
+import kiri_deep_alt as kiri_deep
 from PIL import Image, ImageOps, ImageFile, ImageChops, ImageFilter, ImageEnhance
 import argparse
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -148,6 +149,7 @@ class notification_listener(StreamListener):
             CM.count(status['created_at'])
             WorkerQ.put(status)
             vote_check(status)
+            HintPinto_ans_check(status)
         elif notification["type"] == "favourite":
             SM.update(notification["account"]["acct"], 'fav', ymdhms)
         elif notification["type"] == "reblog":
@@ -156,7 +158,6 @@ class notification_listener(StreamListener):
             SM.update(notification["account"]["acct"], 'boost', ymdhms)
             follow(notification["account"]["id"])
     def on_update(self, status):
-        HintPinto_ans_check(status)
         # 時限トゥート用（自分のトゥートのみ）
         acct = status["account"]["acct"]
         if acct == BOT_ID:
@@ -172,6 +173,7 @@ class ltl_listener(StreamListener):
         acct = status["account"]["acct"]
         if acct != BOT_ID:
             WorkerQ.put(status)
+            HintPinto_ans_check(status)
 
 #######################################################
 # タイムライン保存用（認証なし）
@@ -896,6 +898,9 @@ def worker(status):
             if len(word) < 3:
                 toot(f'@{acct} お題は３文字以上にしてね〜', 'direct', rep=id, interval=a)
                 return
+            if len(word) > 30:
+                toot(f'@{acct} お題は３０文字以下にしてね〜', 'direct', rep=id, interval=a)
+                return
             hintPinto_words.append(word)
             if len(hintPinto_words) > 10:
                 hintPinto_words.pop(0)
@@ -1613,7 +1618,7 @@ def th_hint_de_pinto(gtime=20):
 #######################################################
 # 数取りゲーム
 def th_gettingnum(gtime=30):
-    gamenum = 100
+    gamenum = 5
     junbiTM = kiri_util.KiriTimer(60*60)
     junbiTM.reset(gtime*60)
     junbiTM.start()
@@ -1633,13 +1638,18 @@ def th_gettingnum(gtime=30):
             gameTM.start()
             toot('🔸1〜%dの中から誰とも被らない最大の整数に投票した人が勝ちだよー！\
                     \n🔸きりぼっとにメンション（ＤＭ可）で投票してね！\
-                    \n🔸制限時間は%d分だよー！はじめ！！\n#数取りゲーム #きりぼっと'%(gamenum,int(gameTM.check()/60)), 'public', None, '💸数取りゲーム（ミニ）始まるよー！🎮')
+                    \n🔸参加者が２人に満たない場合は無効になるよ〜\
+                    \n🔸得点は、取った数×参加人数×5点だよ〜\
+                    \n🔸制限時間は%d分だよー！はじめ！！\n#数取りゲーム #きりぼっと'%(gamenum,int(gameTM.check()/60)), 'public', None, '💸数取りゲームＲ３始まるよー！🎮')
             GetNum_flg.append('ON')
             try:
                 #残り１分処理
                 remaintm = gameTM.check()
-                toot('数取りゲーム（ミニ）残り１分だよー！(1〜%d)\
-                \n#数取りゲーム #きりぼっと'%(gamenum,), 'public',interval=remaintm - 60)
+
+                def rm_1m_func():
+                    toot(f'数取りゲームＲ３残り１分だよー！(1〜{gamenum})\n※現在の参加人数は{sum(list(map(len,gm.get_results().values() )))}人だよ〜\n#数取りゲーム #きりぼっと', 'public')
+                threading.Timer(interval=remaintm - 60, function=rm_1m_func).start()
+
                 while True:
                     remaintm = gameTM.check()
                     if remaintm > 0:
@@ -1661,12 +1671,14 @@ def th_gettingnum(gtime=30):
             junbiTM.reset()
             junbiTM.start()
             results = gm.get_results()
-            if sum( list(map(len,results.values())) ) <= 0:
-                toot('(ง •̀ω•́)ง✧数取りゲーム、０人だったよー！\n#数取りゲーム #きりぼっと', 'public', None, None)
+            sanka_ninzu = sum( list(map(len,results.values())) )
+            if sanka_ninzu <= 1:
+                toot('(ง •̀ω•́)ง✧参加者２人未満だったので無効試合になりましたー！\n#数取りゲーム #きりぼっと', 'public', None, None)
             else:
                 toot_now = ''
                 hanamaru = False
                 score = 0
+                hanaval = 0
                 for val,accts in sorted(results.items(), key=lambda x: -x[0]):
                     if len(accts) == 0:
                         continue
@@ -1677,7 +1689,8 @@ def th_gettingnum(gtime=30):
                         for acct1 in accts:
                             toot_now += f'((( :@{acct1}: )))'
                         toot_now += '\n'
-                        score = val
+                        score = val * sanka_ninzu * 5
+                        hanaval = val
                         SM.update(accts[0], 'getnum', score=score)
                     else:
                         toot_now += '❌'
@@ -1685,7 +1698,10 @@ def th_gettingnum(gtime=30):
                         for acct1 in accts:
                             toot_now += f':@{acct1}: '
                         toot_now += '\n'
-                toot('%s\n得点は%d点だよー\n#数取りゲーム #きりぼっと'%(toot_now,score), 'public', None, '数取りゲーム、結果発表ーー！！')
+                if score > 0:
+                    toot(f'{toot_now}\n得点は{score}点（取った数:{hanaval}×参加人数:{sanka_ninzu}×5点）だよー\n#数取りゲーム #きりぼっと', 'public', None, '数取りゲーム、結果発表ーー！！')
+                else:
+                    toot(f'{toot_now}\n勝者はいなかったよ〜😢\n#数取りゲーム #きりぼっと', 'public', None, '数取りゲーム、結果発表ーー！！')
 
         except Exception as e:
             print(e)
@@ -1718,47 +1734,53 @@ def th_saver():
 #######################################################
 # ローカルタイムライン監視スレッド
 def t_local():
-    try:
-        mastodon.stream_local(ltl_listener(),timeout=20)
-    except requests.exceptions.ConnectionError as e:
-        print("＊＊＊再接続するよ〜t_local()＊＊＊")
-        sleep(15)
-        t_local()
-    except Exception as e:
-        print(e)
-        kiri_util.error_log()
-        sleep(30)
-        t_local()
+    while True:
+        sleep(1)
+        try:
+            mastodon.stream_local(ltl_listener(),timeout=180)
+        except requests.exceptions.ConnectionError as e:
+            print("＊＊＊再接続するよ〜t_local()＊＊＊")
+        except requests.exceptions.ReadTimeout as e:
+            print("＊＊＊再接続するよ〜t_local()＊＊＊")
+        except Exception as e:
+            print(e)
+            kiri_util.error_log()
+        finally:
+            sleep(10)
 
 #######################################################
 # ローカルタイムライン監視スレッド（認証なし）
 def t_sub():
-    try:
-        publicdon.stream_local(public_listener(),timeout=20)
-    except requests.exceptions.ConnectionError as e:
-        print("＊＊＊再接続するよ〜t_sub()＊＊＊")
-        sleep(15)
-        t_sub()
-    except Exception as e:
-        print(e)
-        kiri_util.error_log()
-        sleep(30)
-        t_sub()
+    while True:
+        sleep(5)
+        try:
+            publicdon.stream_local(public_listener(),timeout=180)
+        except requests.exceptions.ConnectionError as e:
+            print("＊＊＊再接続するよ〜t_sub()＊＊＊")
+        except requests.exceptions.ReadTimeout as e:
+            print("＊＊＊再接続するよ〜t_sub()＊＊＊")
+        except Exception as e:
+            print(e)
+            kiri_util.error_log()
+        finally:
+            sleep(10)
 
 #######################################################
 # ホームタイムライン監視スレッド
 def t_user():
-    try:
-        mastodon.stream_user(notification_listener(),timeout=20)
-    except requests.exceptions.ConnectionError as e:
-        print("＊＊＊再接続するよ〜t_user()＊＊＊")
-        sleep(15)
-        t_user()
-    except Exception as e:
-        print(e)
-        kiri_util.error_log()
-        sleep(30)
-        t_user()
+    while True:
+        sleep(9)
+        try:
+            mastodon.stream_user(notification_listener(),timeout=180)
+        except requests.exceptions.ConnectionError as e:
+            print("＊＊＊再接続するよ〜t_user()＊＊＊")
+        except requests.exceptions.ReadTimeout as e:
+            print("＊＊＊再接続するよ〜t_user()＊＊＊")
+        except Exception as e:
+            print(e)
+            kiri_util.error_log()
+        finally:
+            sleep(10)
 
 #######################################################
 # にゃんタイム
@@ -1831,11 +1853,11 @@ def th_post():
         try:
             func,args = PostQ.get()
             func(*args)
-            sleep(2)
+            sleep(1.2)
         except Exception as e:
             print(e)
             kiri_util.error_log()
-            sleep(2)
+            sleep(3.2)
 
 #######################################################
 # 気象情報取得スレッド

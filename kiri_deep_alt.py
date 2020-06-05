@@ -31,7 +31,7 @@ STANDARD_SIZE_S2 = (512, 512)
 
 #いろいろなパラメータ
 #変更するとモデル再構築必要
-DOC_VEC_SIZE = 64  # Doc2vecの出力より
+DOC_VEC_SIZE = 128  # Doc2vecの出力より
 VEC_SIZE = 256  # Doc2vecの出力より
 VEC_MAXLEN = 10     # vec推定で参照するトゥート(vecor)数
 AVE_LEN = 2        # vec推定で平均化する幅
@@ -39,7 +39,7 @@ TXT_MAXLEN = 5      #
 MU = "🧪"       # 無
 END = "🦷"      # 終わりマーク
 
-tagger = MeCab.Tagger('-Owakati -d /usr/local/lib/mecab/dic/mecab-ipadic-neologd/')
+tagger = MeCab.Tagger('-Owakati -u dic/nicodic.dic -d /usr/lib/x86_64-linux-gnu/mecab/dic/mecab-ipadic-neologd/')
 # DAO = kiri_util.DAO_statuses()
 
 pat3 = re.compile(r'^\n')
@@ -97,8 +97,8 @@ def lstm_gentxt(toots, rndvec=0):
     # with graph.as_default():
     output_vec = lstm_vec_model.predict_on_batch(input_mean_vec)[0]
 
-    print(type(output_vec))
-    print(output_vec)
+    # print(type(output_vec))
+    # print(output_vec)
     output_vec2 = np.zeros((DOC_VEC_SIZE,))
     # ベクトルをランダム改変
     for i in range(DOC_VEC_SIZE):
