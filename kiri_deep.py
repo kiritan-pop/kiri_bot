@@ -1,6 +1,6 @@
 # coding: utf-8
 
-from keras.models import load_model, Model
+from tensorflow.keras.models import load_model, Model
 from gensim.models.doc2vec import Doc2Vec
 import MeCab
 import numpy as np
@@ -14,11 +14,8 @@ import unicodedata
 from PIL import Image, ImageOps, ImageFile, ImageChops, ImageFilter, ImageEnhance
 import cv2
 import tensorflow as tf
-# config = tf.ConfigProto(device_count={"GPU":1},
-#                         gpu_options=tf.GPUOptions(allow_growth=False, visible_device_list="3"))
-# session = tf.Session(config=config)
-# backend.set_session(session)
 
+# 画像判定用ラベル
 labels = {}
 with open('dic/.cnn_labels','r') as f:
     labels_index = json.load(f)
@@ -31,7 +28,7 @@ STANDARD_SIZE_S2 = (512, 512)
 
 #いろいろなパラメータ
 #変更するとモデル再構築必要
-VEC_SIZE = 256  # Doc2vecの出力より
+DOC_VEC_SIZE = 128  # Doc2vecの出力より
 VEC_MAXLEN = 10     # vec推定で参照するトゥート(vecor)数
 AVE_LEN = 2        # vec推定で平均化する幅
 TXT_MAXLEN = 5      # 
@@ -39,7 +36,6 @@ MU = "🧪"       # 無
 END = "🦷"      # 終わりマーク
 
 tagger = MeCab.Tagger('-Owakati -u dic/nicodic.dic -d /usr/lib/x86_64-linux-gnu/mecab/dic/mecab-ipadic-neologd/')
-DAO = kiri_util.DAO_statuses()
 
 pat3 = re.compile(r'^\n')
 pat4 = re.compile(r'\n')
@@ -60,7 +56,6 @@ lstm_set_model = load_model('db/lstm_set.h5')
 
 takomodel = load_model('db/cnn.h5')
 
-graph = tf.get_default_graph()
 
 def sample(preds, temperature=1.2):
     # helper function to sample an index from a probability array
@@ -73,8 +68,8 @@ def sample(preds, temperature=1.2):
 
 def lstm_gentxt(toots, rndvec=0):
     # 入力トゥート（VEC_MAXLEN）をベクトル化。
-    input_vec = np.zeros((VEC_MAXLEN + AVE_LEN, VEC_SIZE))
-    input_mean_vec = np.zeros((VEC_MAXLEN, VEC_SIZE))
+    input_vec = np.zeros((VEC_MAXLEN + AVE_LEN, DOC_VEC_SIZE))
+    input_mean_vec = np.zeros((VEC_MAXLEN, DOC_VEC_SIZE))
     temp_toots = [t.strip() for t in toots if len(t.strip()) > 0]
     if len(temp_toots) >= VEC_MAXLEN + AVE_LEN:
         toots_nrm = temp_toots[-(VEC_MAXLEN + AVE_LEN):]
@@ -92,13 +87,15 @@ def lstm_gentxt(toots, rndvec=0):
         input_mean_vec[i] = np.mean(input_vec[i:i+AVE_LEN], axis=0)
 
     # ベクトル推定
-    input_mean_vec = input_mean_vec.reshape((1,VEC_MAXLEN, VEC_SIZE))
-    with graph.as_default():
-        output_vec = lstm_vec_model.predict_on_batch(input_mean_vec)[0]
+    input_mean_vec = input_mean_vec.reshape((1,VEC_MAXLEN, DOC_VEC_SIZE))
+    output_vec = lstm_vec_model.predict_on_batch(input_mean_vec)[0]
 
+    # print(type(output_vec))
+    # print(output_vec)
+    output_vec2 = np.zeros((DOC_VEC_SIZE,))
     # ベクトルをランダム改変
-    for i in range(VEC_SIZE):
-        output_vec[i]+= random.gauss(0,rndvec)
+    for i in range(DOC_VEC_SIZE):
+        output_vec2[i] = output_vec[i] + random.gauss(0, rndvec)
 
     # 推定したベクトルから文章生成
     generated = ''
@@ -106,8 +103,7 @@ def lstm_gentxt(toots, rndvec=0):
     rnd = random.uniform(0.2,0.7)
 
     for i in range(500):
-        with graph.as_default():
-            preds = lstm_set_model.predict_on_batch([ np.asarray([output_vec]),  np.asarray([char_IDs]) ])
+        preds = lstm_set_model.predict_on_batch([ np.asarray([output_vec2]),  np.asarray([char_IDs]) ])
 
         next_index = sample(preds[0], rnd)
         char_IDs = char_IDs[1:]
@@ -144,8 +140,7 @@ def takoramen(filepath):
     else:
         return 'other'
 
-    with graph.as_default():
-        result = takomodel.predict(np.array([image/255.0]))
+    result = takomodel.predict(np.array([image/255.0]))
 
     rslt_dict = {}
     for i,rslt in enumerate(result[0]):
@@ -162,8 +157,8 @@ def takoramen(filepath):
         return 'other'
 
 if __name__ == '__main__':
-    text = ''
-    while text != 'exit':
+    toots=''
+    while toots != 'exit':
         print('input path')
-        text = input('>>>')
-        print(takoramen(text))
+        toots = input('>>>').split()
+        print(lstm_gentxt(toots))

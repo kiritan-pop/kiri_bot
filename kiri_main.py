@@ -15,8 +15,7 @@ from collections import defaultdict, Counter
 from dotenv import load_dotenv
 import wikipedia
 import GenerateText, bottlemail, Toot_summary
-import kiri_util, kiri_game, kiri_romasaga, kiri_kishou, kiri_tenki, kiri_stat
-import kiri_deep_alt as kiri_deep
+import kiri_util, kiri_game, kiri_romasaga, kiri_kishou, kiri_tenki, kiri_stat, kiri_deep
 from PIL import Image, ImageOps, ImageFile, ImageChops, ImageFilter, ImageEnhance
 import argparse
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -397,7 +396,7 @@ def ana_image(media_attachments,sensitive,acct,g_vis,id,content):
         elif result == '宇治松千夜':
             toot_now += 'こころぴょんぴょん！'
         elif result == 'る':
-            toot_now += 'インド人？'
+            toot_now += 'るの人だ！'
         elif result == 'スクショ':
             if random.randint(0,4) == 0:
                 toot_now += '📷スクショパシャパシャ！'
@@ -1450,7 +1449,12 @@ def jinkei_tooter():
 def bottlemail_sending():
     bm = bottlemail.Bottlemail()
     sendlist = bm.drifting()
+    no_bottle_list = set([tmp.strip() for tmp in open('.no_bottle').readlines() if len(tmp.strip())>0])
+
     for id,acct,msg,reply_id in sendlist:
+        if acct in no_bottle_list:
+            continue
+            
         spoiler = ":@" + acct + ": から🍾ボトルメール💌届いたよー！"
         random_acct = DAO.sample_acct()
         #お届け！
