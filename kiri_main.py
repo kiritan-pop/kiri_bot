@@ -38,6 +38,8 @@ GOOGLE_ENGINE_KEY = os.environ.get("GOOGLE_ENGINE_KEY")
 KISHOU_WS = os.environ.get("KISHOU_WS")
 KISHOU_WS_PORT = os.environ.get("KISHOU_WS_PORT")
 
+OPENWEATHER_APPID = os.environ.get("OPENWEATHER_APPID")
+
 wikipedia.set_lang("ja")
 wikipedia.set_user_agent("kiri_bot (https://github.com/kiritan-pop/kiri_bot/)")
 
@@ -1075,7 +1077,7 @@ def worker(status):
                 return
         elif len(word1.split("の"))==1:
             if word1 in ["今日","明日","明後日"]:
-                tenki_area = "名寄"
+                tenki_area = "東京都千代田区" # デフォルト地点
                 tenki_day = word1
             else:
                 tenki_area = word1
@@ -1085,14 +1087,17 @@ def worker(status):
                     tenki_day = "今日"
         else:
             return
-        sptxt, toot_now = kiri_tenki.get_tenki(quary=tenki_area, day=tenki_day)
-        if sptxt == "900":
+        retcode, sptxt, toot_now, weather_image_paths = kiri_tenki.get_tenki(quary=tenki_area, appid=OPENWEATHER_APPID)
+        if retcode == 900:
             toot(f"@{acct} 知らない場所の天気はわからないよ〜", g_vis=g_vis, rep=id)
-        elif sptxt == "901":
+        elif retcode == 901:
             toot(f"@{acct} 複数地名が見つかったので、次の地名でもっかい呼んでみてー\n{toot_now}", g_vis=g_vis, rep=id)
         else:
             toot_now = f"@{acct}\n" + toot_now
-            toot(toot_now, g_vis=g_vis, rep=id, spo=sptxt)
+            media_files = []
+            for p in weather_image_paths:
+                media_files.append(mastodon.media_post(p, 'image/png'))
+            toot(toot_now, g_vis=g_vis, rep=id, media_ids=media_files, spo=sptxt+"だよ〜")
 
     elif re.search(r'[^:]@%s'%BOT_ID, status['content']):
         SM.update(acct, 'reply')
@@ -1452,11 +1457,11 @@ def bottlemail_sending():
     no_bottle_list = set([tmp.strip() for tmp in open('.no_bottle').readlines() if len(tmp.strip())>0])
 
     for id,acct,msg,reply_id in sendlist:
-        if acct in no_bottle_list:
-            continue
             
         spoiler = ":@" + acct + ": から🍾ボトルメール💌届いたよー！"
         random_acct = DAO.sample_acct()
+        if random_acct in no_bottle_list:
+            continue
         #お届け！
         toots = "@" + random_acct + "\n:@" + acct + ": ＜「" + msg + "」"
         toots +=  "\n※ボトルメールサービス：＜メッセージ＞　であなたも送れるよー！試してみてね！"
@@ -1612,10 +1617,21 @@ def th_hint_de_pinto(gtime=20):
                 SM.update(g_acct, 'getnum', score=score//2)
                 break_flg.append('ON')
                 toot('正解者には{0}点、出題者には{1}点入るよー！'.format(score//1, score//2), g_vis='public', rep=None, spo=None, interval=8)
-
+                break
+            if g_acct == acct and term in ans:
+                score = min([10,len(term)])*8*3
+                toot(f'こら〜！ [[[ :@{acct}: ]]] 答えをばらしたのでペナルティ〜！\n減点{score}点だよ〜', g_vis='public', rep=None, spo=None)
+                SM.update(g_acct, 'getnum', score=score*-1)
+                break_flg.append('ON')
                 break
 
         th.join()
+        if len(break_flg) == 0:  # 正解者なし
+            loop = len(loop_cnt)
+            score = min([10,len(term)])*8//2
+            SM.update(g_acct, 'getnum', score=-1*score)
+            toot(f'正解者なしのため出題者[[[ :@{g_acct}:]]] にペナルティ〜！\n減点{score}点だよ〜', g_vis='public', rep=None, spo=None, interval=2)
+
         #ゲーム終了後、次回開始までの準備期間
         HintPinto_flg.remove('ON')
         junbiTM.reset()
@@ -1898,7 +1914,7 @@ def main():
     # threads.append( threading.Thread(target=th_timerDel) )
     threads.append( threading.Thread(target=th_post) )
     #スケジュール起動系(時刻)
-    threads.append( threading.Thread(target=kiri_util.scheduler, args=(bottlemail_sending,['**:05'])) )
+    threads.append( threading.Thread(target=kiri_util.scheduler, args=(bottlemail_sending,['23:05'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(th_follow_mente,['21:27'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(nyan_time,['22:22'])) )
     threads.append( threading.Thread(target=kiri_util.scheduler, args=(show_rank,['07:00'])) )
