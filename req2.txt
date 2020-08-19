@@ -36,7 +36,7 @@ opencv-python==4.1.0.25
 opt-einsum==3.2.0
 Pillow==6.1.0
 protobuf==3.9.1
-psutil==5.6.3
+psutil==5.6.6
 pyasn1==0.4.8
 pyasn1-modules==0.2.8
 pylint==2.3.1
