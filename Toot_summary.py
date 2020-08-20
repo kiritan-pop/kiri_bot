@@ -4,28 +4,32 @@
 import MeCab as mc
 import numpy as np
 import re
+import os
 from argparse import ArgumentParser
 
-f = open(".emoji", 'r')
-eos_list = list(f.read())
-f.close()
+# きりぼコンフィグ
+from config import EMOJI_PATH, NAME_DIC_PATH, ID_DIC_PATH, NICODIC_PATH, IPADIC_PATH
+
+eos_list = []
+if os.path.exists(EMOJI_PATH):
+    with open(EMOJI_PATH, 'r') as f:
+        eos_list = list(f.read())
+    
 #eos_list.extend(["!","♡","♪","、","。","\.","？","\?","！","\n","w","ｗ","」","）","「","（","＊","　"])
 #eos_list.extend(["!","♡","♪","、","。","\.","？","\?","！","\n","w","ｗ","＊","　"])
 eos_list.extend(["!","♡","♪","。","？","?","！","\n","w","ｗ","＊","*",",","　",":",";","：","；","…","・・・","...","〜"])
 eos_list.extend(["♥","★","☆","■","□","◆","◇","▲","△","▼","▽","●","○","(_)"])
 
+m = mc.Tagger(f"-Owakati -d {IPADIC_PATH} -u {NAME_DIC_PATH},{ID_DIC_PATH},{NICODIC_PATH}")
+
 def parser():
-    usage = 'Usage:python3 b_summary.py [-t <FILE.txt>] [--help]'\
-            .format(__file__)
+    usage = 'Usage:python3 b_summary.py [-t <FILE.txt>] [--help]'
     parser = ArgumentParser(usage=usage)
     parser.add_argument('-t','--text',dest='input_text',help='text file' )
 
     args = parser.parse_args()
     if args.input_text:
         return '{}'.format(text_input(args.input_text))
-
-#m = mc.Tagger("-Ochasen")
-m = mc.Tagger('-Owakati -u ./dic/name.dic,./dic/id.dic,./dic/nicodic.dic')
 
 def mecab_senter(text):
     words = m.parse(text).split()

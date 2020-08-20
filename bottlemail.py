@@ -6,10 +6,12 @@ from time import sleep
 import unicodedata
 import sqlite3
 
+# きりぼコンフィグ
+from config import BOTTLEMAIL_DB_PATH, BOTTLEMAIL_SCHEMA_PATH
 
 class Bottlemail():
-    DB_PATH = "db/bottlemail.db"
-    DB_SCHEMA_PATH = "bottlemail.sql"
+    DB_PATH = BOTTLEMAIL_DB_PATH
+    DB_SCHEMA_PATH = BOTTLEMAIL_SCHEMA_PATH
     def __init__(self, db=None):
         if db is not None:
             self.DB_PATH = db

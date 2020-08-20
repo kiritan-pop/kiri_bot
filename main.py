@@ -9,47 +9,48 @@ from time import sleep
 from pytz import timezone
 import dateutil
 from datetime import datetime,timedelta
-import warnings, traceback
-from os.path import join, dirname
+from os.path import join
 from collections import defaultdict, Counter
-from dotenv import load_dotenv
 import wikipedia
-import GenerateText, bottlemail, Toot_summary
-import kiri_util, kiri_game, kiri_romasaga, kiri_kishou, kiri_tenki, kiri_stat, kiri_deep
 from PIL import Image, ImageOps, ImageFile, ImageChops, ImageFilter, ImageEnhance
 import argparse
+
+# きりぼコンフィグ
+from config import *
+
+# きりぼサブモジュール
+import bottlemail
+import cooling_manager
+import dao
+import deep
+import game
+import generate_text
+import get_images_ggl
+import kishou
+import romasaga
+import score_manager
+import stat
+import tenki
+import timer
+import toot_summary
+import trans
+import util
+
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
-MASTER_ID = 'kiritan'
-BOT_ID = 'kiri_bot01'
-DELAY = 2
 abc = list("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?.()+-=,")
 keisho = r"(くん|君|さん|様|さま|ちゃん|氏)"
-
-#.envファイルからトークンとかURLを取得ー！
-dotenv_path = join(dirname(__file__), '.env')
-load_dotenv(dotenv_path)
-MASTODON_URL = os.environ.get("MASTODON_URL")
-MASTODON_ACCESS_TOKEN = os.environ.get("MASTODON_ACCESS_TOKEN")
-# BING_KEY = os.environ.get("BING_KEY")
-GOOGLE_KEY = os.environ.get("GOOGLE_KEY")
-GOOGLE_ENGINE_KEY = os.environ.get("GOOGLE_ENGINE_KEY")
-
-KISHOU_WS = os.environ.get("KISHOU_WS")
-KISHOU_WS_PORT = os.environ.get("KISHOU_WS_PORT")
-
-OPENWEATHER_APPID = os.environ.get("OPENWEATHER_APPID")
 
 wikipedia.set_lang("ja")
 wikipedia.set_user_agent("kiri_bot (https://github.com/kiritan-pop/kiri_bot/)")
 
 #得点管理、流速監視
-SM = kiri_util.ScoreManager()
-CM = kiri_util.CoolingManager(3)
-DAO = kiri_util.DAO_statuses()
-TRANS = kiri_util.trans(GOOGLE_KEY)
+SM = score_manager.ScoreManager()
+CM = cooling_manager.CoolingManager(3)
+DAO = dao.Dao()
+TRANS = trans.Trans(GOOGLE_KEY)
 #しりとり用
-StMG = kiri_game.Siritori_manager()
+StMG = game.Siritori_manager()
 
 publicdon = Mastodon(api_base_url=MASTODON_URL,
                     ratelimit_method="throw")  # インスタンス
@@ -252,7 +253,7 @@ def exe_boost_now(id):  # ぶーすと！
             mastodon.status_reblog(id)
         else:
             mastodon.status_unreblog(id)
-            sleep(DELAY)
+            sleep(3)
             mastodon.status_reblog(id)
         print("🙆boost")
 
@@ -304,9 +305,9 @@ def vote_check(status):
     acct = status["account"]["acct"]
     id = status["id"]
     if re.search(r'[^:]@%s'%BOT_ID, status['content']):
-        if len(kiri_util.hashtag(status['content'])) > 0:
+        if len(util.hashtag(status['content'])) > 0:
             return
-        content = kiri_util.content_cleanser(status['content'])
+        content = util.content_cleanser(status['content'])
         if len(content) == 0:
             return
         if acct == 'twotwo' and re.search(r'!', content):
@@ -328,7 +329,7 @@ def vote_check(status):
 def HintPinto_ans_check(status):
     acct = status["account"]["acct"]
     id = status["id"]
-    content = kiri_util.content_cleanser(status['content'])
+    content = util.content_cleanser(status['content'])
     if len(content) == 0 or acct == BOT_ID:
         return
     if len(HintPinto_flg) > 0:
@@ -344,7 +345,7 @@ def ana_image(media_attachments,sensitive,acct,g_vis,id,content):
 
     for media in media_attachments[:1]:
         filename = download(media["url"] , "media")
-        result = kiri_deep.takoramen(filename)
+        result = deep.takoramen(filename)
         print('   ',result)
         if result == 'other':
             if random.randint(0,50)  == 0:
@@ -416,7 +417,7 @@ def ana_image(media_attachments,sensitive,acct,g_vis,id,content):
 def face_search(filename, acct, g_vis, id):
     media_files = []
     try:
-        tmp = kiri_util.face_search(filename)
+        tmp = util.face_search(filename)
         if tmp:
             if tmp.rsplit('.')[-1] == 'jpg':
                 ex = 'jpeg'
@@ -428,7 +429,7 @@ def face_search(filename, acct, g_vis, id):
             return True
     except Exception as e:
         print(e)
-        kiri_util.error_log()
+        util.error_log()
 
 #######################################################
 # ワーカー処理の実装
@@ -438,8 +439,8 @@ def worker(status):
     acct = status["account"]["acct"]
     username = "@" +  acct
     g_vis = status["visibility"]
-    content = kiri_util.content_cleanser(status['content'])
-    # hashtags = kiri_util.hashtag(status['content'])
+    content = util.content_cleanser(status['content'])
+    # hashtags = util.hashtag(status['content'])
     # if 'application' not in status or status['application'] == None:
     #     application = ''
     # else:
@@ -460,7 +461,7 @@ def worker(status):
     if status["account"]["bot"]:
         return
 
-    botlist = set([tmp.strip() for tmp in open('.botlist').readlines() if len(tmp.strip())>0])
+    botlist = set([tmp.strip() for tmp in open(BOT_LIST_PATH).readlines() if os.path.exists(BOT_LIST_PATH) and len(tmp.strip())>0])
     botlist.add(BOT_ID)
     if  acct in botlist:
         return
@@ -508,7 +509,7 @@ def worker(status):
 
     #ネイティオが半角スペース区切りで５つ以上あれば翻訳
     if (acct == MASTER_ID or acct == 'twotwo') and len(content.split(' ')) > 4 and content.count('トゥ') > 4 and content.count('ー') > 0:
-        toot_now = ':@%s: ＜「'%acct + kiri_util.two2jp(content) + '」'
+        toot_now = ':@%s: ＜「'%acct + util.two2jp(content) + '」'
         id_now = None
         SM.update(acct, 'func')
     if statuses_count != 0 and  statuses_count%10000 == 0:
@@ -773,18 +774,15 @@ def worker(status):
     elif re.search("寝(ます|る|マス)([よかぞね]?|[…。うぅー～！・]+)$|^寝(ます|る|よ)[…。うぅー～！・]*$|\
                     寝(ます|る|マス)(.*)[ぽお]や[ユすしー]|きりぼ(.*)[ぽお]や[ユすしー]", content):
         if not re.search("寝る(かた|方|人|ひと|民)", content):
-            toot_now = f":@{acct}: おやすみ〜 {random.choice([tmp.strip() for tmp in open('.kaomoji','r').readlines() if len(tmp.strip())>0])}\n#挨拶部"
+            toot_now = f":@{acct}: おやすみ〜 {random.choice([tmp.strip() for tmp in open(KAOMOJI_PATH,'r').readlines() if os.path.exists(KAOMOJI_PATH) and len(tmp.strip())>0])}\n#挨拶部"
             id_now = None
             interval = 5
     elif re.search(r"^[こコ][らラ][きキ][りリ][ぼボぽポ]", content):
-            toot_now = random.choice([tmp.strip() for tmp in open('.kora','r').readlines() if len(tmp.strip())>0])
+            toot_now = random.choice([tmp.strip() for tmp in open(KORA_PATH,'r').readlines() if os.path.exists(KORA_PATH) and len(tmp.strip())>0])
             id_now = None
 
     else:
-        nicolist = set([tmp.strip() for tmp in open('.nicolist').readlines() if len(tmp.strip())>0])
-        if acct in nicolist:
-            # rnd = random.randint(0,100)
-            # if rnd % 4 == 0:
+        if acct in set([tmp.strip() for tmp in open(NADE_PATH).readlines() if os.path.exists(NADE_PATH) and len(tmp.strip())>0]):
             fav_now(id_now)
     if len(toot_now) > 0:
         toot(toot_now, vis_now, id_now, None, None, interval)
@@ -872,7 +870,7 @@ def worker(status):
         SM.update(acct, 'getnum', score=- int(slot_rate*3))
         #スロット回転
         slot_accts = DAO.get_five(num=reel_num,minutes=120)
-        slotgame = kiri_game.Friends_nico_slot(acct,slot_accts,slot_rate,reelsize)
+        slotgame = game.Friends_nico_slot(acct,slot_accts,slot_rate,reelsize)
         slot_rows,slot_score = slotgame.start()
         print(' '*20 + 'acct=%s reel_num=%d reelsize=%d'%(acct,reel_num,reelsize))
         sl_txt = ''
@@ -892,8 +890,8 @@ def worker(status):
         if g_vis == 'direct':
             word = re.search(r"(ヒントでピント)[：:](.+)", str(content)).group(2).strip()
             hintPinto_words = []
-            if os.path.exists("hintPinto_words.txt"):
-                for line in open('hintPinto_words.txt','r'):
+            if os.path.exists(HINPINED_WORDS_PATH):
+                for line in open(HINPINED_WORDS_PATH,'r'):
                     hintPinto_words.append(line.strip())
             if word in hintPinto_words:
                 toot(f'@{acct} この前やったお題なので別のにして〜！', 'direct', rep=id, interval=a)
@@ -907,7 +905,7 @@ def worker(status):
             hintPinto_words.append(word)
             if len(hintPinto_words) > 10:
                 hintPinto_words.pop(0)
-            with open('hintPinto_words.txt','w') as f:
+            with open(HINPINED_WORDS_PATH,'w') as f:
                 f.write("\n".join(hintPinto_words))
             HintPintoQ.put([acct,id,word])
             SM.update(acct, 'func')
@@ -956,7 +954,7 @@ def worker(status):
         else:
             mode = 1
 
-        ret = kiri_util.newyear_icon_maker(filename,mode=mode)
+        ret = util.newyear_icon_maker(filename,mode=mode)
         if ret:
             media = mastodon.media_post(ret, 'image/gif')
             toot_now = f"@{acct} できたよ〜 \n ここでgifに変換するといいよ〜 https://www.aconvert.com/jp/video/mp4-to-gif/ \n#exp15m"
@@ -968,7 +966,7 @@ def worker(status):
     elif len(media_attachments) > 0 and re.search(r"きりぼ.*透過して", content):
         SM.update(acct, 'func', score=1)
         filename = download(media_attachments[0]["url"], "media")
-        alpha_image_path = kiri_util.auto_alpha(filename, icon=False)
+        alpha_image_path = util.auto_alpha(filename, icon=False)
         media = mastodon.media_post(alpha_image_path, 'image/png')
         toot_now = f"@{acct} できたよ〜 \n#exp15m"
         toot(toot_now, g_vis=g_vis, rep=id, media_ids=[media])
@@ -1022,7 +1020,7 @@ def worker(status):
                 SM.update(acct, 'func')
 
     elif len(content) > 140 and len(spoiler_text) == 0:
-        gen_txt = Toot_summary.summarize(content,limit=10,lmtpcs=1, m=1, f=4)
+        gen_txt = toot_summary.summarize(content,limit=10,lmtpcs=1, m=1, f=4)
         if gen_txt[-1] == '#':
             gen_txt = gen_txt[:-1]
         print('★要約結果：',gen_txt)
@@ -1047,7 +1045,7 @@ def worker(status):
                 tdate = '{0:08d}'.format(tdate)
                 ttime = '{0:06d}'.format(ttime)
                 ymdhms = f'on {tdate[:4]}/{tdate[4:6]}/{tdate[6:]} at {ttime[:2]}:{ttime[2:4]}:{ttime[4:]}'
-                tcontent = kiri_util.content_cleanser(tcontent)
+                tcontent = util.content_cleanser(tcontent)
                 sptxt = f":@{target}: の初トゥートは……"
                 body = f"@{acct} \n"
                 body += f":@{target}: ＜{tcontent} \n {ymdhms} \n"
@@ -1059,7 +1057,7 @@ def worker(status):
             toot(body, g_vis=g_vis, rep=id)
 
     elif re.search(r"へいきりぼ(くん|君|さん|様|さま|ちゃん)?[!！]?きりたん丼の(天気|状態|状況|ステータス|status).*(教えて|おせーて)|^!server.*stat", content):
-        stats = kiri_stat.sys_stat()
+        stats = stat.sys_stat()
         toot(f"@{acct} \nただいまの気温{stats['cpu_temp']}℃、忙しさ{stats['cpu']:.1f}％、気持ちの余裕{stats['mem_available']/(10**9):.1f}GB、クローゼットの空き{stats['disk_usage']/(10**9):.1f}GB" ,g_vis=g_vis, rep=id)
 
     elif re.search(r"きりぼ(くん|君|さん|様|さま|ちゃん)?[!！、\s]?.+の天気.*(教え|おせーて)?", content):
@@ -1069,25 +1067,19 @@ def worker(status):
             word1,word2 = word1.split("の")
             if word1 in ["今日","明日","明後日"]:
                 tenki_area = word2
-                tenki_day = word1
             elif word2 in ["今日","明日","明後日"]:
                 tenki_area = word1
-                tenki_day = word2
             else:
                 return
         elif len(word1.split("の"))==1:
             if word1 in ["今日","明日","明後日"]:
                 tenki_area = "東京都千代田区" # デフォルト地点
-                tenki_day = word1
             else:
                 tenki_area = word1
-                if datetime.now(timezone('Asia/Tokyo')).strftime("%H") >= "18":
-                    tenki_day = "明日"
-                else:
-                    tenki_day = "今日"
         else:
             return
-        retcode, sptxt, toot_now, weather_image_paths = kiri_tenki.get_tenki(quary=tenki_area, appid=OPENWEATHER_APPID)
+
+        retcode, sptxt, toot_now, weather_image_paths, *_ = tenki.get_tenki(quary=tenki_area, appid=OPENWEATHER_APPID)
         if retcode == 900:
             toot(f"@{acct} 知らない場所の天気はわからないよ〜", g_vis=g_vis, rep=id)
         elif retcode == 901:
@@ -1114,7 +1106,7 @@ def worker(status):
         seeds.sort(key=lambda x:(x[1]))
         #文字だけ取り出し
         tmp = lstm_gen_rapper([c[0] for c in seeds], rndvec=random.uniform(0.05, min(len(toots_for_rep[acct])*0.05, 0.3)))
-        tmp = kiri_util.content_cleanser_light(tmp)
+        tmp = util.content_cleanser_light(tmp)
         toot_now += tmp
         toots_for_rep[acct].append((tmp,jst_now))
         toot(toot_now, g_vis, id, None,interval=a)
@@ -1127,7 +1119,7 @@ def worker(status):
         toot_now = "@%s\n"%acct
         seeds = DAO.get_least_10toots(limit=30)
         tmp = lstm_gen_rapper(seeds, rndvec=random.uniform(0.05,0.2))
-        tmp = kiri_util.content_cleanser_light(tmp)
+        tmp = util.content_cleanser_light(tmp)
         toot_now += tmp
         toot(toot_now, g_vis, id, None,interval=a)
         SM.update(acct, 'reply')
@@ -1155,7 +1147,7 @@ def worker(status):
         r = max([0,int(random.gauss(30,30))])
         maoudict = {"大魔王":100,"中魔王":10,"小魔王":1}
         word = re.search(r"(.+)[出でデ][たタ]$", str(content)).group(1).strip()
-        word = sorted([(s,len(s)) for s in kiri_deep.tagger.parse(word).strip().split()], key=lambda x:-x[1])[0][0]
+        word = sorted([(s,len(s)) for s in deep.tagger.parse(word).strip().split()], key=lambda x:-x[1])[0][0]
         if len(word) <= 1:
             return
         result = {}
@@ -1177,7 +1169,7 @@ def worker(status):
 
 def lstm_gen_rapper(seeds, rndvec=0):
     new_seeds = [s for s in seeds if random.randint(1,3) != 1]
-    ret_txt = kiri_deep.lstm_gentxt(new_seeds, rndvec=rndvec).strip()
+    ret_txt = deep.lstm_gentxt(new_seeds, rndvec=rndvec).strip()
     return ret_txt
 
 #######################################################
@@ -1186,7 +1178,7 @@ def business_contact(status):
     id = status["id"]
     acct = status["account"]["acct"]
     # g_vis = status["visibility"]
-    content = kiri_util.content_cleanser(status['content'])
+    content = util.content_cleanser(status['content'])
     statuses_count = status["account"]["statuses_count"]
     # spoiler_text = status["spoiler_text"]
     created_at = status['created_at']
@@ -1210,7 +1202,7 @@ def business_contact(status):
     jst_now_hh = int(jst_now.strftime("%H"))
     print('%s===「%s」by %s'%(jst_now_str,('\n'+' '*20).join(content.split('\n')), acct))
 
-    kaomoji = random.choice([tmp.strip() for tmp in open('.kaomoji','r').readlines() if len(tmp.strip())>0])
+    kaomoji = random.choice([tmp.strip() for tmp in open(KAOMOJI_PATH,'r').readlines() if os.path.exists(KAOMOJI_PATH) and len(tmp.strip())>0])
     if statuses_count == 1:
         toot_now = f':@{acct}: （{display_name}）ご新規さんかもー！{kaomoji}\n #挨拶部'
         toot(toot_now, g_vis='public',interval=3)
@@ -1234,7 +1226,7 @@ def business_contact(status):
     if len(pita_list) > 1:
         pita_list.pop(0)
 
-    watch_list = set([kansi_acct.strip() for kansi_acct in open('.watch_list').readlines() if len(tmp.strip())>0])
+    watch_list = set([tmp.strip() for tmp in open(WATCH_LIST_PATH).readlines() if os.path.exists(WATCH_LIST_PATH) and len(tmp.strip())>0])
     if acct in watch_list:
         toot_now = '@%s\n:@%s: %s\n「%s」\n#exp10m'%(MASTER_ID, acct, display_name, content)
         toot(toot_now)
@@ -1268,7 +1260,7 @@ def is_japanese(string):
 # レシピ提案
 def recipe_service(content=None, acct=MASTER_ID, id=None, g_vis='unlisted'):
     fav_now(id)
-    generator = GenerateText.GenerateText(1)
+    generator = generate_text.GenerateText(1)
     #料理名を取得ー！
     gen_txt = ''
     spoiler = generator.generate("recipe")
@@ -1276,9 +1268,9 @@ def recipe_service(content=None, acct=MASTER_ID, id=None, g_vis='unlisted'):
     #材料と分量を取得ー！
     zairyos = []
     amounts = []
-    for line in open('recipe/zairyos.txt','r'):
+    for line in open(RECIPE_Z_PATH,'r'):
         zairyos.append(line.strip())
-    for line in open('recipe/amounts.txt','r'):
+    for line in open(RECIPE_A_PATH,'r'):
         amounts.append(line.strip())
     zairyos = random.sample(zairyos, 4)
     amounts = random.sample(amounts, 4)
@@ -1289,7 +1281,7 @@ def recipe_service(content=None, acct=MASTER_ID, id=None, g_vis='unlisted'):
     #作り方を取得ー！途中の手順と終了手順を分けて取得するよー！
     text_chu = []
     text_end = []
-    generator = GenerateText.GenerateText(50)
+    generator = generate_text.GenerateText(50)
     while len(text_chu) <= 3 or len(text_end) < 1:
         tmp_texts = generator.generate("recipe_text").split('\n')
         for tmp_text in tmp_texts:
@@ -1314,7 +1306,7 @@ def show_rank(acct=None, target=None, id=None, g_vis=None):
     print(f"show_rank target={target}")
     if id:
         fav_now(id)
-    sm = kiri_util.ScoreManager()
+    sm = score_manager.ScoreManager()
     score = defaultdict(int)
     like = defaultdict(int)
 
@@ -1402,7 +1394,7 @@ def th_worker():
                 worker(status)
     except Exception as e:
         print(e)
-        kiri_util.error_log()
+        util.error_log()
         sleep(30)
         th_worker()
 
@@ -1414,7 +1406,7 @@ def th_timerDel():
             status = TimerDelQ.get() #キューからトゥートを取り出すよー！なかったら待機してくれるはずー！
             id = status["id"]
             acct = status["account"]["acct"]
-            hashtags = kiri_util.hashtag(status['content'])
+            hashtags = util.hashtag(status['content'])
 
             if acct == BOT_ID:
                 sec = 0
@@ -1437,7 +1429,7 @@ def th_timerDel():
 
     except Exception as e:
         print(e)
-        kiri_util.error_log()
+        util.error_log()
         sleep(30)
         th_timerDel()
 
@@ -1445,7 +1437,7 @@ def th_timerDel():
 # 陣形
 def jinkei_tooter():
     spoiler = "勝手に陣形サービス"
-    gen_txt = kiri_romasaga.gen_jinkei()
+    gen_txt = romasaga.gen_jinkei()
     if gen_txt:
         toot(gen_txt, "public", spo=spoiler)
 
@@ -1454,7 +1446,7 @@ def jinkei_tooter():
 def bottlemail_sending():
     bm = bottlemail.Bottlemail()
     sendlist = bm.drifting()
-    no_bottle_list = set([tmp.strip() for tmp in open('.no_bottle').readlines() if len(tmp.strip())>0])
+    no_bottle_list = set([tmp.strip() for tmp in open(NO_BOTTLE_PATH).readlines() if os.path.exists(NO_BOTTLE_PATH) and len(tmp.strip())>0])
 
     for id,acct,msg,reply_id in sendlist:
             
@@ -1484,7 +1476,7 @@ def lstm_tooter():
     spoiler = None
 
     gen_txt = lstm_gen_rapper(seeds, rndvec=random.uniform(0.05,0.2))
-    gen_txt = kiri_util.content_cleanser_light(gen_txt)
+    gen_txt = util.content_cleanser_light(gen_txt)
     if gen_txt[0:1] == '。':
         gen_txt = gen_txt[1:]
     if len(gen_txt) > 60:
@@ -1512,7 +1504,7 @@ def th_delete():
                     ymdhms = '%s %s'%(date,time)
                     ymdhms = dateutil.parser.parse(ymdhms).astimezone(timezone('Asia/Tokyo'))
                     toot_now += ':@%s: 🚓🚓🚓＜う〜う〜！トゥー消し警察でーす！\n'%row[0]
-                    toot_now += ':@%s: ＜「%s」 at %s\n#exp10m'%(row[0], kiri_util.content_cleanser(row[1]) , ymdhms.strftime("%Y.%m.%d %H:%M:%S"))
+                    toot_now += ':@%s: ＜「%s」 at %s\n#exp10m'%(row[0], util.content_cleanser(row[1]) , ymdhms.strftime("%Y.%m.%d %H:%M:%S"))
                     toot(toot_now, 'direct', rep=None, spo=':@%s: がトゥー消ししたよー……'%row[0], media_ids=None, interval=0)
                     SM.update(row[0], 'func', score=-1)
                     sleep(0.2)
@@ -1523,7 +1515,7 @@ def th_delete():
 
         except Exception as e:
             print(e)
-            kiri_util.error_log()
+            util.error_log()
             # sleep(30)
             # th_delete()
 
@@ -1532,7 +1524,7 @@ def th_delete():
 def th_hint_de_pinto(gtime=20):
     def th_shududai(acct,id,term):
         paths = gi.get_images_forQ(term)
-        # paths = kiri_util.fetch_and_save_img(term)
+        # paths = util.fetch_and_save_img(term)
         if len(paths) > 0:
             path = random.choice(paths)
         else:
@@ -1585,8 +1577,8 @@ def th_hint_de_pinto(gtime=20):
         toot_now = "正解は{0}でした〜！\n（出題 :@{1}: ） #exp15m".format(term,acct)
         toot(toot_now, g_vis='public', rep=None, spo=None, media_ids=media_files,interval=4)
 
-    gi = kiri_util.get_images_GGL(GOOGLE_KEY,GOOGLE_ENGINE_KEY)
-    junbiTM = kiri_util.KiriTimer(30*60)
+    gi = get_images_ggl.GetImagesGGL(GOOGLE_KEY,GOOGLE_ENGINE_KEY)
+    junbiTM = timer.Timer(30*60)
     junbiTM.reset(gtime*60)
     junbiTM.start()
     while True:
@@ -1641,10 +1633,10 @@ def th_hint_de_pinto(gtime=20):
 # 数取りゲーム
 def th_gettingnum(gtime=30):
     gamenum = 5
-    junbiTM = kiri_util.KiriTimer(60*60)
+    junbiTM = timer.Timer(60*60)
     junbiTM.reset(gtime*60)
     junbiTM.start()
-    gameTM = kiri_util.KiriTimer(240)
+    gameTM = timer.Timer(240)
     while True:
         try:
             g_acct,g_id = GetNumQ.get()
@@ -1655,7 +1647,7 @@ def th_gettingnum(gtime=30):
 
             #ゲーム開始ー！
             fav_now(g_id)
-            gm = kiri_game.GettingNum(gamenum)
+            gm = game.GettingNum(gamenum)
             gameTM.reset()
             gameTM.start()
             toot('🔸1〜%dの中から誰とも被らない最大の整数に投票した人が勝ちだよー！\
@@ -1727,7 +1719,7 @@ def th_gettingnum(gtime=30):
 
         except Exception as e:
             print(e)
-            kiri_util.error_log()
+            util.error_log()
 
 #######################################################
 # トゥートをいろいろ
@@ -1744,12 +1736,12 @@ def th_saver():
             except Exception as e:
                 #保存失敗したら、キューに詰めてリトライ！
                 print(e)
-                kiri_util.error_log()
+                util.error_log()
                 sleep(10)
                 StatusQ.put(status)
     except Exception as e:
         print(e)
-        kiri_util.error_log()
+        util.error_log()
         sleep(20)
         th_saver()
 
@@ -1807,7 +1799,7 @@ def th_follow_mente():
             follow(u)
         except Exception as e:
             print('id=',u,e)
-            kiri_util.error_log()
+            util.error_log()
         sleep(8)
 #    for u in set(fids) - set(fers):
 #        print('id=',u)
@@ -1815,7 +1807,7 @@ def th_follow_mente():
 #            unfollow(u)
 #        except Exception as e:
 #            print('id=',u,e)
-#            kiri_util.error_log()
+#            util.error_log()
 #        sleep(8)
 
 #######################################################
@@ -1828,7 +1820,7 @@ def th_post():
             sleep(1.1)
         except Exception as e:
             print(e)
-            kiri_util.error_log()
+            util.error_log()
             sleep(3.2)
 
 #######################################################
@@ -1885,15 +1877,15 @@ def th_kishou():
         body_text += "\n《from 気象庁防災情報》"
         toot(body_text, g_vis='public', spo=f"{spo_text}")
 
-    kishou = kiri_kishou.Kirikishou(ws_url=KISHOU_WS, ws_port=KISHOU_WS_PORT, kishou_target=kishou_target, on_msg_func=on_msg_func)
+    kishou_sv = kishou.Kirikishou(ws_url=KISHOU_WS, ws_port=KISHOU_WS_PORT, kishou_target=kishou_target, on_msg_func=on_msg_func)
     # 一応１０回までリトライするやつ
     for _ in range(10):
         try:
             # 待機中は帰ってこないやつ
-            kishou.connect_run_forever()
+            kishou_sv.connect_run_forever()
         except Exception as e:
             print(e)
-            kiri_util.error_log()
+            util.error_log()
             sleep(300)
 
 #######################################################
@@ -1914,14 +1906,14 @@ def main():
     # threads.append( threading.Thread(target=th_timerDel) )
     threads.append( threading.Thread(target=th_post) )
     #スケジュール起動系(時刻)
-    threads.append( threading.Thread(target=kiri_util.scheduler, args=(bottlemail_sending,['23:05'])) )
-    threads.append( threading.Thread(target=kiri_util.scheduler, args=(th_follow_mente,['21:27'])) )
-    threads.append( threading.Thread(target=kiri_util.scheduler, args=(nyan_time,['22:22'])) )
-    threads.append( threading.Thread(target=kiri_util.scheduler, args=(show_rank,['07:00'])) )
-    threads.append( threading.Thread(target=kiri_util.scheduler, args=(jihou,['**:00'])) )
+    threads.append( threading.Thread(target=util.scheduler, args=(bottlemail_sending,['23:05'])) )
+    threads.append( threading.Thread(target=util.scheduler, args=(th_follow_mente,['21:27'])) )
+    threads.append( threading.Thread(target=util.scheduler, args=(nyan_time,['22:22'])) )
+    threads.append( threading.Thread(target=util.scheduler, args=(show_rank,['07:00'])) )
+    threads.append( threading.Thread(target=util.scheduler, args=(jihou,['**:00'])) )
     #スケジュール起動系(間隔)
-    threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(lstm_tooter,60,-10,4,CM)) )
-    threads.append( threading.Thread(target=kiri_util.scheduler_rnd, args=(jinkei_tooter,120,-10,10,CM)) )
+    threads.append( threading.Thread(target=util.scheduler_rnd, args=(lstm_tooter,60,-10,4,CM)) )
+    threads.append( threading.Thread(target=util.scheduler_rnd, args=(jinkei_tooter,120,-10,10,CM)) )
     #外部ストリーム受信
     threads.append( threading.Thread(target=th_kishou ) ) #LTL
 

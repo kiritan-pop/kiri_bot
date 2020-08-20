@@ -10,6 +10,9 @@ from pytz import timezone
 from dateutil import parser
 from datetime import datetime,timedelta
 
+# きりぼコンフィグ
+from config import SIRITORI_DIC_PATH
+
 class GettingNum():
     def __init__(self,maxval=10):
         #数取りゲームの上限値
@@ -133,7 +136,7 @@ class Siritori_game():
 class Siritori_manager():
 #しりとり用
     def __init__(self):
-        self.wdict = { tmp.strip().split(',')[0]:tmp.strip().split(',')[1] for tmp in open('dic/siritori.csv').readlines() }
+        self.wdict = { tmp.strip().split(',')[0]:tmp.strip().split(',')[1] for tmp in open(SIRITORI_DIC_PATH).readlines() }
         self.games = {}
         self.yure = {'ァ':'ア','ィ':'イ','ゥ':'ウ','ェ':'エ','ォ':'オ','ャ':'ヤ','ュ':'ユ','ョ':'ヨ','ッ':'ツ','ヮ':'ワ','ヶ':'ケ'}
 

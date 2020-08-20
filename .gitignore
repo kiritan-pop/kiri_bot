@@ -1,11 +1,9 @@
-.*
-!.gitignore
-hintPinto_words.txt
-*.log
+config.py
+log/
 __pycache__/
-db/
+.DS_Store
+data/
 work/
-dic/
 haarcascades/
 kiri_game/
 media_nico/
@@ -16,3 +14,4 @@ chino_images/
 media
 step01_get_toots.rb
 tenki_icon/
+venv_dev/

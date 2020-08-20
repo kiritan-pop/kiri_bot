@@ -2,7 +2,7 @@
 
 import re, os, json, random, unicodedata, signal, sys
 from time import sleep
-import kiri_util
+import dao
 
 jinkeis = [
 {'name':'フリーファイト',
@@ -98,7 +98,7 @@ bl = ':blank: '
 #######################################################
 # メイン
 def gen_jinkei():
-    DAO = kiri_util.DAO_statuses()
+    DAO = dao.Dao()
     accts = DAO.get_five()
     if len(accts) != 5:
         return

@@ -6,7 +6,7 @@ import MeCab
 import numpy as np
 import random,json
 import sys,io,re,gc,os
-import kiri_util
+import util
 from time import sleep
 from datetime import datetime,timedelta
 from pytz import timezone
@@ -15,9 +15,12 @@ from PIL import Image, ImageOps, ImageFile, ImageChops, ImageFilter, ImageEnhanc
 import cv2
 import tensorflow as tf
 
+# きりぼコンフィグ
+from config import NICODIC_PATH, IPADIC_PATH
+
 # 画像判定用ラベル
 labels = {}
-with open('dic/.cnn_labels','r') as f:
+with open('data/.cnn_labels','r') as f:
     labels_index = json.load(f)
 for label,i in labels_index.items():
     labels[i] = label
@@ -35,13 +38,13 @@ TXT_MAXLEN = 5      #
 MU = "🧪"       # 無
 END = "🦷"      # 終わりマーク
 
-tagger = MeCab.Tagger('-Owakati -u dic/nicodic.dic -d /usr/lib/x86_64-linux-gnu/mecab/dic/mecab-ipadic-neologd/')
+tagger = MeCab.Tagger(f"-Owakati -u {NICODIC_PATH} -d {IPADIC_PATH}")
 
 pat3 = re.compile(r'^\n')
 pat4 = re.compile(r'\n')
 
 #辞書読み込み
-wl_chars = list(open('dic/wl.txt').read())
+wl_chars = list(open('data/wl.txt').read())
 idx_char = {i:c for i,c in enumerate(wl_chars)}
 num_chars = len(idx_char)
 idx_char[num_chars] = MU
@@ -50,11 +53,11 @@ char_idx = {c:i for i,c in enumerate(wl_chars)}
 char_idx[MU] = num_chars
 char_idx[END] = num_chars + 1
 
-d2vmodel = Doc2Vec.load('db/d2v.model')
-lstm_vec_model = load_model('db/lstm_vec.h5')
-lstm_set_model = load_model('db/lstm_set.h5')
+d2vmodel = Doc2Vec.load('data/d2v.model')
+lstm_vec_model = load_model('data/lstm_vec.h5')
+lstm_set_model = load_model('data/lstm_set.h5')
 
-takomodel = load_model('db/cnn.h5')
+takomodel = load_model('data/cnn.h5')
 
 
 def sample(preds, temperature=1.2):
@@ -129,7 +132,7 @@ def takoramen(filepath):
     print(filepath,extention)
     if extention in ['png','jpg','jpeg','gif']:
         image = Image.open(filepath)
-        image = kiri_util.new_convert(image, "RGB")
+        image = util.new_convert(image, "RGB")
         image = image.resize(STANDARD_SIZE) 
         image = np.asarray(image)
     elif extention in ['mp4','webm']:

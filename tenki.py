@@ -16,6 +16,9 @@ from PIL import Image
 import locale
 locale.setlocale(locale.LC_TIME, 'ja_JP.UTF-8')
 
+# きりぼコンフィグ
+from config import CITY_LATLOC_PATH
+
 ICON_DIR = "tenki_icon"
 IMAGE_H = 1260
 IMAGE_W = 800
@@ -26,7 +29,7 @@ WEATHER_IMAGE_PATH = "./media"
 
 # 天気メイン
 def get_tenki(quary, appid):
-    with open('dic/city_latloc.json', 'r') as fr:
+    with open(CITY_LATLOC_PATH, 'r') as fr:
         city_latloc_dict = json.load(fr)
     os.makedirs(ICON_DIR, exist_ok=True)
 
