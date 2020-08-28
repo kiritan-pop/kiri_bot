@@ -46,8 +46,12 @@ def face_search(image_path):
             #認識結果の保存
             # save_path = ('media/detected.jpg')
             save_path = 'media/' + image_path.rsplit('/',1)[-1].split('.')[0] + '_face.jpg'
+            logger.debug(f"save_path = {save_path}")
+
             cv2.imwrite(save_path, image)
             return save_path
+        else:
+            return None
     except Exception as e:
         logger.error(e)
         return None

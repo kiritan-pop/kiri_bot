@@ -394,7 +394,7 @@ def ana_image(media_file, acct):
                 toot_now += ':@%s: 🚓🚓🚓＜う〜う〜！飯テロ警察 %s係でーす！'%(acct,result)
             break
 
-    return toot_now, attach_files
+    return toot_now.strip(), attach_files
 
 
 #######################################################
@@ -1116,11 +1116,12 @@ def worker(status):
 
     elif sensitive == False and len(media_file) > 0:
         toot_now, attach_files = ana_image(media_file, acct)
-        if len(attach_files) > 0:
-            toot_now = "#exp15m"
-            toot(toot_now, g_vis=g_vis, rep=None, spo='おわかりいただけるだろうか……', media_ids=media_files, interval=5)
-        else:
-            toot(toot_now, g_vis=g_vis)
+        if len(toot_now) > 0:
+            if len(attach_files) > 0:
+                toot_now = "#exp15m"
+                toot(toot_now, g_vis=g_vis, rep=None, spo='おわかりいただけるだろうか……', media_ids=media_files, interval=5)
+            else:
+                toot(toot_now, g_vis=g_vis)
 
 
 def lstm_gen_rapper(seeds, rndvec=0):
