@@ -8,9 +8,9 @@ from dateutil import parser
 from datetime import datetime,timedelta
 
 # きりぼコンフィグ
-from config import STATUSES_DB_PATH, DB_SCHEMA_PATH
+from kiribo.config import STATUSES_DB_PATH, DB_SCHEMA_PATH
 
-import util
+from kiribo import util
 
 #######################################################
 # きりたんだお〜！
@@ -96,7 +96,6 @@ class Dao():
             return seeds
 
 
-
     #######################################################
     # ｉｄ指定でトゥート内容を返す
     def pickup_1toot(self,status_id):
@@ -107,6 +106,7 @@ class Dao():
         row = c.fetchone()
         con.close()
         return row
+
 
     #######################################################
     # 数取りゲーム用 人数カウント
@@ -133,6 +133,7 @@ class Dao():
         con.close()
         return len(acct_list)
 
+
     #######################################################
     # 陣形用５人ピックアップ
     def get_five(self, num=5,minutes=30):
@@ -146,6 +147,7 @@ class Dao():
         con.close()
         return random.sample(acct_list,min([num, len(acct_list)]))
 
+
     #######################################################
     # モノマネ用
     def get_user_toots(self, acct, limit=10):
@@ -155,6 +157,7 @@ class Dao():
         rows = c.fetchall()
         con.close()
         return rows
+
 
     #######################################################
     # 時間指定トゥート取得
@@ -176,6 +179,7 @@ class Dao():
         rows = c.fetchall()
         con.close()
         return rows
+
 
     #######################################################
     # トゥートの保存
@@ -213,12 +217,10 @@ class Dao():
         finally:
             con.close()
 
+
     #######################################################
     # 対象の人のh時間以内のトゥート日付を取得
     def get_least_created_at(self,acct,h=3):
-        # con = sqlite3.connect(STATUSES_DB_PATH, timeout=self.timeout, isolation_level='DEFERRED')
-        # c = con.cursor()
-        # c.execute( r"select date, time from statuses where acct = ? order by id desc limit 1", (acct,))
         jst_now = datetime.now(timezone('Asia/Tokyo'))
         ymd = int((jst_now - timedelta(hours=h)).strftime("%Y%m%d"))
         hms = int((jst_now - timedelta(hours=h)).strftime("%H%M%S"))

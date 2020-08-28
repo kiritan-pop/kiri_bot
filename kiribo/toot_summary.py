@@ -8,7 +8,7 @@ import os
 from argparse import ArgumentParser
 
 # きりぼコンフィグ
-from config import EMOJI_PATH, NAME_DIC_PATH, ID_DIC_PATH, NICODIC_PATH, IPADIC_PATH
+from kiribo.config import EMOJI_PATH, NAME_DIC_PATH, ID_DIC_PATH, NICODIC_PATH, IPADIC_PATH
 
 eos_list = []
 if os.path.exists(EMOJI_PATH):

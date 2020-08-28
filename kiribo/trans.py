@@ -3,6 +3,9 @@
 import json
 import requests
 
+import kiribo.util
+logger = kiribo.util.setup_logger(__name__)
+
 class Trans:
     def __init__(self, key):
         self.key = key
@@ -33,7 +36,8 @@ class Trans:
         try:
             result = unit_aa["data"]["detections"][0][0]["language"]
             return result
-        except Exception:
+        except Exception as e:
+            logger.error(e)
             return None
 
     def __req_dec(self,url):
@@ -42,5 +46,6 @@ class Trans:
         try:
             result = unit_aa["data"]["translations"][0]["translatedText"]
             return result
-        except Exception:
+        except Exception as e:
+            logger.error(e)
             return None

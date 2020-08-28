@@ -11,7 +11,9 @@ from dateutil import parser
 from datetime import datetime,timedelta
 
 # きりぼコンフィグ
-from config import SIRITORI_DIC_PATH
+from kiribo.config import SIRITORI_DIC_PATH
+from kiribo import util
+logger = util.setup_logger(__name__)
 
 class GettingNum():
     def __init__(self,maxval=10):
@@ -63,7 +65,7 @@ class Siritori_game():
         self.rcnt = 0
 
     def judge(self,word):
-        print('しりとり＝',word)
+        logger.info(f"しりとり＝{word}")
         if word[-1] in  ['ン','ん']:
             return False,'あ、「ん」で終わったー！'
 
@@ -179,7 +181,7 @@ class Friends_nico_slot():
         for a in temp:
             temp2.extend([a for _ in range(reelsize)])
         temp2.extend([ ':@'+acct+':' for _ in range(3)])
-        for i in range(5):
+        for _ in range(5):
             random.shuffle(temp2)
             self.reels.append(temp2)
 
@@ -233,11 +235,6 @@ class Friends_nico_slot():
             else:
                 score += self.ot_base_rate[c]*self.rate
 
-        # if len(cnt_list) > 0:
-        #     if max(cnt_list) == 4:
-        #         print(cnt_list,hit_acct_list,score)
-        #         for l in rows:
-        #             print(l)
         return rows,int(score)
 
 """
@@ -250,21 +247,11 @@ class Hunting():
 """
 if __name__ == '__main__':
     g = Friends_nico_slot('kiritan',['yesdotsam', 'JC','rept', 'Thiele'],1,5) #,'aaa','bbb','ccc','ddd'
-    # print(g.reels)
-    # print(len(g.reels[0]))
-    # print(len(g.reels[1]))
-    # print(len(g.reels[2]))
 
     game_cnt = 10000
     score_sum = 0
     for i in range(game_cnt):
         rows,score = g.start()
-        # if score > 0:
-        #     print(score)
         score_sum += score
     print(score_sum,(score_sum)/game_cnt/3)
 
-    # rows,score = g.start()
-    # for l in rows:
-    #     print(l)
-    # print(score)

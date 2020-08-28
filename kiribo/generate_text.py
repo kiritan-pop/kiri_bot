@@ -32,7 +32,7 @@ class GenerateText(object):
         # 最終的にできる文章
         generated_text = ""
         # 指定の数だけ作成する
-        for i in range(self.n):
+        for _ in range(self.n):
             text = self._generate_sentence(cur,switch)
             generated_text += text  + "\n"
         # DBクローズ
@@ -59,9 +59,7 @@ class GenerateText(object):
         # 連結
         if switch == "poke":
             result = ""
-            #print(morphemes)
             for morpheme in morphemes[:-1]:
-                #print(morpheme)
                 if len(morpheme) < 4:
                     result += morpheme
                 else:
@@ -78,7 +76,6 @@ class GenerateText(object):
         end_time = datetime.now(timezone('Asia/Tokyo'))
         dif_time = end_time - str_time
         self._print_log('@@@_generate_sentence : %s'%dif_time)
-        #print(result)
         return result
 
     def _get_chain_from_DB(self, cur, prefixes):
@@ -95,7 +92,6 @@ class GenerateText(object):
         cur.execute(sql, prefixes)
         rows = cur.fetchall()
         for row in rows:
-            #print(dict(row))
             result.append(dict(row))
 
         end_time = datetime.now(timezone('Asia/Tokyo'))
@@ -138,7 +134,7 @@ class GenerateText(object):
         probability = []
         # 確率に合うように、インデックスを入れる
         for (index, chain) in enumerate(chains):
-            for j in range(chain["freq"]):
+            for _ in range(chain["freq"]):
                 probability.append(index)
         # ランダムに1つを選ぶ
         chain_index = random.choice(probability)

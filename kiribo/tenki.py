@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import os
-from pprint import pprint as pp
 import requests
 import json
 from bs4 import BeautifulSoup
@@ -17,7 +16,8 @@ import locale
 locale.setlocale(locale.LC_TIME, 'ja_JP.UTF-8')
 
 # きりぼコンフィグ
-from config import CITY_LATLOC_PATH
+import kiribo.util
+from kiribo.config import CITY_LATLOC_PATH
 
 ICON_DIR = "tenki_icon"
 IMAGE_H = 1260
@@ -54,9 +54,9 @@ def get_tenki(quary, appid):
                     hit_loc = latloc[1]
 
     if len(hit_skcs) == 0:
-        return 900, None, None  # 見つからなかった場合
+        return 900, None, None, None  # 見つからなかった場合
     elif len(hit_skcs) > 1:
-        return 901, "、".join(hit_skcs), None  # 複数見つかった場合
+        return 901, None, "、".join(hit_skcs), None  # 複数見つかった場合
 
     # 天気情報取得
     url = "http://api.openweathermap.org/data/2.5/onecall"
@@ -92,7 +92,6 @@ def get_uvi_info(uvi):
 
 # 現在の天気
 def make_weather_image_current(wd, skcs_name, tz):
-    # pp(wd)
     tmp_dict = {}
     tmp_dict['曇り％'] = wd['clouds']
     tmp_dict['日時'] = datetime.fromtimestamp(
@@ -121,7 +120,6 @@ def make_weather_image_current(wd, skcs_name, tz):
 
 # １週間天気
 def make_weather_image_daily(wd, skcs_name, tz):
-    # pp(wd)
     tenki_data_list = []
 
     for l1 in wd:
@@ -172,7 +170,6 @@ def make_weather_image_daily(wd, skcs_name, tz):
 
 # ４８時間天気
 def make_weather_image_hourly(wd, skcs_name, tz):
-    # pp(wd)
     tenki_data_list = []
 
     for l1 in wd:
@@ -223,8 +220,6 @@ def make_weather_image_hourly(wd, skcs_name, tz):
 
 # １時間降水量
 def make_weather_image_minutely(wd, skcs_name, tz):
-    # pp(wd)
-    # pp(len(wd))
     tenki_data_list = []
 
     for l1 in wd:
@@ -288,5 +283,6 @@ def test():
 
 
 if __name__ == '__main__':
+    from pprint import pprint as pp
     pp(get_tenki("利尻", "xxxxx"))
 

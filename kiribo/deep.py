@@ -6,7 +6,6 @@ import MeCab
 import numpy as np
 import random,json
 import sys,io,re,gc,os
-import util
 from time import sleep
 from datetime import datetime,timedelta
 from pytz import timezone
@@ -16,7 +15,9 @@ import cv2
 import tensorflow as tf
 
 # きりぼコンフィグ
-from config import NICODIC_PATH, IPADIC_PATH
+from kiribo.config import NICODIC_PATH, IPADIC_PATH
+from kiribo import imaging, util
+logger = util.setup_logger(__name__)
 
 # 画像判定用ラベル
 labels = {}
@@ -79,10 +80,10 @@ def lstm_gentxt(toots, rndvec=0):
     else:
         toots_nrm = temp_toots + [temp_toots[-1]]*(VEC_MAXLEN + AVE_LEN -len(temp_toots))
 
-    print("lstm_gen --------------------")
-    print("  inputトゥート")
+    logger.info("lstm_gen --------------------")
+    logger.info("  inputトゥート")
     for i,toot in enumerate(toots_nrm):
-        print(toot)
+        logger.info(toot)
         wakati = tagger.parse(toot).split(" ")
         input_vec[i] = d2vmodel.infer_vector(wakati)
 
@@ -93,8 +94,6 @@ def lstm_gentxt(toots, rndvec=0):
     input_mean_vec = input_mean_vec.reshape((1,VEC_MAXLEN, DOC_VEC_SIZE))
     output_vec = lstm_vec_model.predict_on_batch(input_mean_vec)[0]
 
-    # print(type(output_vec))
-    # print(output_vec)
     output_vec2 = np.zeros((DOC_VEC_SIZE,))
     # ベクトルをランダム改変
     for i in range(DOC_VEC_SIZE):
@@ -124,15 +123,14 @@ def lstm_gentxt(toots, rndvec=0):
     rtn_text = re.sub(r'(.)(.)(.)(\1\2\3){4,}',r'\4\4',rtn_text, flags=(re.MULTILINE | re.DOTALL))
     rtn_text = re.sub(r'(.)(.)(\1\2){4,}',r'\3\3',rtn_text, flags=(re.MULTILINE | re.DOTALL))
     rtn_text = re.sub(r'(.)\1{4,}',r'\1\1',rtn_text, flags=(re.MULTILINE | re.DOTALL))
-    print(f'gen text,rnd={rtn_text},{rnd:2f}')
+    logger.info(f'gen text,rnd={rtn_text},{rnd:2f}')
     return rtn_text
 
 def takoramen(filepath):
     extention = filepath.rsplit('.',1)[-1]
-    print(filepath,extention)
     if extention in ['png','jpg','jpeg','gif']:
         image = Image.open(filepath)
-        image = util.new_convert(image, "RGB")
+        image = imaging.new_convert(image, "RGB")
         image = image.resize(STANDARD_SIZE) 
         image = np.asarray(image)
     elif extention in ['mp4','webm']:
@@ -148,9 +146,9 @@ def takoramen(filepath):
     rslt_dict = {}
     for i,rslt in enumerate(result[0]):
         rslt_dict[labels[i]] = rslt
-    print("*** image:", filepath.split('/')[-1])  #, "\n*** result:", rslt_dict)
+    logger.info(f"*** image:{filepath.split('/')[-1]}")
     for k, v in sorted(rslt_dict.items(), key=lambda x: -x[1])[:4]:
-        print('{0}:{1:.2%}'.format(k,v))
+        logger.info(f"{k}:{v:.2%}")
 
     with open('image.log','a') as f:
         f.write("*** image:" + filepath.split('/')[-1] +  "  *** result:%s\n"%str(rslt_dict))

@@ -4,6 +4,10 @@ import threading
 from pytz import timezone
 from time import sleep
 
+from kiribo import util
+logger = util.setup_logger(__name__)
+
+
 #######################################################
 # クーリングタイム管理
 class CoolingManager():
@@ -13,7 +17,6 @@ class CoolingManager():
         threading.Thread(target=self.timer_showflowrate).start()
 
     def count(self,created_at):
-        #print(type(created_at),created_at.astimezone(timezone('Asia/Tokyo')))
         self.created_ats.append(created_at.astimezone(timezone('Asia/Tokyo')))
         if len(self.created_ats) > 100:
             self.created_ats = self.created_ats[1:]
@@ -28,7 +31,7 @@ class CoolingManager():
     def timer_showflowrate(self):
         while True:
             sleep(60)
-            print('***流速:{0:.1f}toots/分'.format( self._flowrate() ))
+            logger.info(f"***流速:{self._flowrate():.1f}toots/分")
 
     def get_coolingtime(self):
         return self._flowrate() * self.base_time / 60

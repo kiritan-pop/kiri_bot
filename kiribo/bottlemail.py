@@ -7,7 +7,7 @@ import unicodedata
 import sqlite3
 
 # きりぼコンフィグ
-from config import BOTTLEMAIL_DB_PATH, BOTTLEMAIL_SCHEMA_PATH
+from kiribo.config import BOTTLEMAIL_DB_PATH, BOTTLEMAIL_SCHEMA_PATH
 
 class Bottlemail():
     DB_PATH = BOTTLEMAIL_DB_PATH
@@ -74,8 +74,6 @@ class Bottlemail():
     def flow_count(self):
         con = sqlite3.connect(self.DB_PATH)
         c = con.cursor()
-#        for row in con.execute('select count(*) from bottlemail where send_fg=0'):
-#            print(row[0])
         c.execute('select count(*) from bottlemail where send_fg=0')
         result = c.fetchone()
         con.close()
@@ -83,15 +81,6 @@ class Bottlemail():
 
 if __name__ == '__main__':
     bm = Bottlemail()
-    #bm.bottling('kiritan5','テストメッセージ3')
-    #list = bm.drifting()
-    #print(list)
-    #for id,acct,msg in list:
-    #    print(id)
-    #    print(acct)
-    #    print(msg)
-    #    bm.sended(id,'kiri_bot01')
-
     for ret in bm.show():
         print(ret)
     print(bm.flow_count())

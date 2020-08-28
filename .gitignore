@@ -6,12 +6,8 @@ data/
 work/
 haarcascades/
 kiri_game/
-media_nico/
 media/
 recipe/
-colorize_images/
-chino_images/
 media
-step01_get_toots.rb
 tenki_icon/
 venv_dev/

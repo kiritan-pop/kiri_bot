@@ -1,13 +1,12 @@
 # coding: utf-8
 import os,sys,io,re,json
-from pprint import pprint as pp
 from socketIO_client_nexus import SocketIO, LoggingNamespace
 import xmltodict
 from collections import OrderedDict
 import requests
-import logging
-logging.getLogger('socketIO-client-nexus').setLevel(logging.DEBUG)
-logging.basicConfig()
+
+from kiribo import util
+logger = util.setup_logger(__name__)
 
 class Kirikishou():
     def __init__(self, ws_url, ws_port=80, kishou_target={}, on_msg_func=None):
@@ -25,19 +24,18 @@ class Kirikishou():
         socketIO.wait()
 
     def _on_connect(self):
-        print('connect')
+        logger.info('connect')
 
     def _on_disconnect(self):
-        print('disconnect')
+        logger.info('disconnect')
 
     def _on_reconnect(self):
-        print('reconnect')
+        logger.info('reconnect')
 
     def _on_msg(self, xml_data):
-        print('on_msg')
+        logger.info('on_msg')
         try:
             doc = xmltodict.parse(xml_data)
-            # pp(doc)
             feeds = []
             # entryが１件の場合と複数の場合に分ける
             if isinstance(doc['feed']['entry'], list):
@@ -55,16 +53,16 @@ class Kirikishou():
                 feeds.append(tmp_dict)
 
             for feed in feeds:
-                print(f"title  :{feed['title']}" )
-                print(f"link   :{feed['link']}" )
-                print(f"content:{feed['content']}" )
+                logger.info(f"title  :{feed['title']}" )
+                logger.info(f"link   :{feed['link']}" )
+                logger.info(f"content:{feed['content']}" )
                 if feed['title'] in self.kishou_target:
                     res = requests.get(feed['link'])
                     main_doc = xmltodict.parse(res.content.decode("utf-8"))
                     if self.on_msg_func:
                         self.on_msg_func(main_doc)
                     else:
-                        pp(main_doc)
+                        logger.error(main_doc)
 
         except Exception as e:
-            print(e)
+            logger.error(e)

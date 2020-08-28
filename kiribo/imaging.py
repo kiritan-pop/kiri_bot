@@ -1,153 +1,14 @@
 # coding: utf-8
 
-import random,json
-import os,sys,io,re
-import requests
-import http.client
-import urllib.parse
+import os
 import numpy as np
-from urllib.parse import quote
-from time import time, sleep
-import unicodedata
-import threading
-from pytz import timezone
-from datetime import datetime
-from bs4 import BeautifulSoup
 import cv2
-import traceback
+import requests
 from PIL import Image, ImageOps, ImageFile, ImageChops, ImageFilter, ImageEnhance
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
-# きりぼコンフィグ
-from config import TWOTWO_DIC_PATH, NG_WORDS_PATH
-
-BOT_ID = 'kiri_bot01'
-TIMEOUT = 3.0
-
-#######################################################
-# ネイティオ語翻訳
-def two2jp(twotwo_text):
-    twotwodic = {}
-    twotwo_text = unicodedata.normalize("NFKC", twotwo_text)
-    for line in open(TWOTWO_DIC_PATH):
-        tmp = line.strip().split(',')
-        twotwodic[tmp[1]] = tmp[0]
-    text = ""
-    for two in twotwo_text.split(' '):
-        if two in twotwodic:
-            text += twotwodic[two]
-        else:
-            text += two
-    return text
-    # return unicodedata.normalize("NFKC", text)
-
-#######################################################
-# エラー時のログ書き込み
-def error_log():
-    jst_now = datetime.now(timezone('Asia/Tokyo'))
-    ymdhms = jst_now.strftime("%Y/%m/%d %H:%M:%S")
-    with open('error.log', 'a') as f:
-        f.write('\n####%s####\n'%ymdhms)
-        traceback.print_exc(file=f)
-    print("###%s 例外情報\n"%ymdhms + traceback.format_exc())
-
-#######################################################
-# ハッシュタグ抽出
-def hashtag(content):
-    tmp = BeautifulSoup(content.replace("<br />","___R___").strip(),'lxml')
-    hashtag = []
-    for x in tmp.find_all("a",rel="tag"):
-        hashtag.append(x.span.text)
-    return hashtag
-    # return ','.join(hashtag)
-
-#######################################################
-# トゥート内容の標準化・クレンジング
-def content_cleanser(content):
-    tmp = BeautifulSoup(content.replace("<br />","___R___").strip(),'lxml')
-    hashtag = ""
-    for x in tmp.find_all("a",rel="tag"):
-        hashtag = x.span.text
-    for x in tmp.find_all("a"):
-        x.extract()
-
-    if tmp.text == None:
-        return ""
-
-    rtext = ''
-    ps = []
-    for p in tmp.find_all("p"):
-        ps.append(p.text)
-    rtext += '。\n'.join(ps)
-    rtext = unicodedata.normalize("NFKC", rtext)
-    # rtext = re.sub(r'([^:])@', r'\1', rtext)
-    rtext = rtext.replace("#","")
-    rtext = re.sub(r'(___R___)\1{2,}', r'\1', rtext)
-    rtext = re.sub(r'___R___', r'\n', rtext)
-    #NGワード
-    ng_words = set(word.strip() for word in open(NG_WORDS_PATH).readlines())
-    for ng_word in ng_words:
-        # rtext = rtext.replace(ng_word,'■■■')
-        rtext = re.sub(ng_word, '■'*len(ng_word), rtext)
-    if hashtag != "":
-        return rtext + " #" + hashtag
-    else:
-        return rtext
-
-#######################################################
-# トゥート内容の標準化・クレンジング・ライト
-def content_cleanser_light(text):
-    rtext = re.sub(r'([^:])@', r'\1', text)
-    rtext = re.sub(r'(___R___)\1{2,}', r'\1', rtext)
-    rtext = re.sub(r'___R___', r'\n', rtext)
-    #NGワード
-    ng_words = set(word.strip() for word in open(NG_WORDS_PATH).readlines())
-    for ng_word in ng_words:
-        rtext = re.sub(ng_word, '■'*len(ng_word), rtext)
-    return rtext
-
-#######################################################
-# スケジューラー！
-def scheduler(func,hhmm_list):
-    #func:起動する処理
-    #hhmm_list:起動時刻
-    while True:
-        sleep(10)
-        try:
-            #時刻指定時の処理
-            jst_now = datetime.now(timezone('Asia/Tokyo'))
-            hh_now = jst_now.strftime("%H")
-            mm_now = jst_now.strftime("%M")
-            for hhmm in hhmm_list:
-                if len(hhmm.split(":")) == 2:
-                    hh,mm = hhmm.split(":")
-                    if (hh == hh_now or hh == '**') and mm == mm_now:
-                        func()
-                        sleep(60)
-        except Exception:
-            error_log()
-
-def scheduler_rnd(func,intvl=60,rndmin=0,rndmax=0,CM=None):
-    #func:起動する処理
-    #intmm:起動間隔（分）
-    while True:
-        sleep(10)
-        try:
-            #インターバル分＋流速考慮値
-            if rndmin == 0 and rndmax == 0 or rndmin >= rndmax:
-                rndmm = 0
-            else:
-                rndmm = random.randint(rndmin,rndmax)
-            if CM==None:
-                cmm = 0
-            else:
-                cmm = int(CM.get_coolingtime())
-            a = (intvl+cmm+rndmm)*60
-            print('###%s###  start at : %ds'%(func,a))
-            sleep(a)
-            func()
-        except Exception:
-            error_log()
-
+from kiribo import util
+logger = util.setup_logger(__name__)
 
 def face_search(image_path):
     try:
@@ -162,9 +23,6 @@ def face_search(image_path):
 
         #ファイル読み込み
         image = cv2.imread(image_path)
-        #グレースケール変換
-        # image_gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
-        # print( image_gray)
 
         #カスケード分類器の特徴量を取得する
         cascade = cv2.CascadeClassifier(cascade_path)
@@ -178,8 +36,7 @@ def face_search(image_path):
         #minSize – 物体が取り得る最小サイズ．これよりも小さい物体は無視されます
         facerect = cascade.detectMultiScale(image, scaleFactor=1.1, minNeighbors=1, minSize=(48, 48))
 
-        print( "face rectangle")
-        print( facerect)
+        logger.debug(f"face rectangle {facerect}")
 
         if len(facerect) > 0:
             #検出した顔を囲む矩形の作成
@@ -192,13 +49,12 @@ def face_search(image_path):
             cv2.imwrite(save_path, image)
             return save_path
     except Exception as e:
-        error_log()
-        print(e)
+        logger.error(e)
         return None
 
 
 def newyear_icon_maker(path, mode=0):
-    print("newyear_icon_maker")
+    logger.info("newyear_icon_maker")
     REP = 1
     if mode==0:
         STEP = 2
@@ -223,7 +79,7 @@ def newyear_icon_maker(path, mode=0):
         return None
 
     base_icon = Image.open(path)
-    print(f"mode={base_icon.mode}")
+    logger.info(f"mode={base_icon.mode}")
     if base_icon.mode in ["RGB", "L", "P"]:
         newpath = auto_alpha(path)
         base_icon = Image.open(newpath)
@@ -238,11 +94,6 @@ def newyear_icon_maker(path, mode=0):
 
     SIZE = (base_icon.width*400//max(base_icon.size),
             base_icon.height*400//max(base_icon.size))
-    # if max(base_icon.size) > 400:
-    #     SIZE = (base_icon.width*400//max(base_icon.size),
-    #             base_icon.height*400//max(base_icon.size))
-    # else:
-    #     SIZE = base_icon.size
     base_icon = base_icon.resize(SIZE, Image.LANCZOS)
 
     def dwondwon(x):
@@ -270,9 +121,7 @@ def newyear_icon_maker(path, mode=0):
                 base_images.append(img)
             cnt += 1
 
-    print(len(base_images))
     for i, base_image in enumerate(base_images):
-        # print(base_icon.mode)
         if base_icon.mode == "RGBA":
             tmp = base_icon.copy()
             # 横揺れ
@@ -281,7 +130,6 @@ def newyear_icon_maker(path, mode=0):
 
             # ドゥンドゥン
             rate = 1.0 + 0.15 * dwondwon(DWON*i/len(base_images))
-            # print(rate)
             tmp = tmp.resize((int(tmp.width*rate), int(tmp.height*rate)),
                              resample=Image.BICUBIC)
 
@@ -300,8 +148,9 @@ def newyear_icon_maker(path, mode=0):
 
     return genpath
 
+
 def auto_alpha(path, icon=True):
-    print("auto_alpha")
+    logger.info("auto_alpha")
     DVR = 40
     img = Image.open(path).convert("RGB")
     if icon:
@@ -309,16 +158,9 @@ def auto_alpha(path, icon=True):
                 img.height*400//max(img.size))
     else:
         SIZE = (img.width,img.height)
-    # if max(img.size) > 400:
-    #     SIZE = (img.width*400//max(img.size),
-    #             img.height*400//max(img.size))
-    # else:
-    #     SIZE = img.size
 
     img = img.resize(SIZE, Image.LANCZOS)
 
-    # img = img.filter(ImageFilter.CONTOUR)
-    # img = img.convert("L")
     gray = new_convert(img, "L")  # グレイスケール
     enhancer = ImageEnhance.Contrast(gray)
     gray = enhancer.enhance(2.0)
@@ -328,10 +170,8 @@ def auto_alpha(path, icon=True):
     gray2 = gray.filter(ImageFilter.MaxFilter(3))
     senga_inv = ImageChops.difference(gray, gray2)
     senga_inv = ImageOps.invert(senga_inv)
-    # senga_inv.filter(ImageFilter.MedianFilter(5))
     enhancer = ImageEnhance.Contrast(senga_inv)
     senga_inv = enhancer.enhance(5.0)
-    # senga_inv = senga_inv.filter(ImageFilter.GaussianBlur(0.5))
     senga_inv.save("media/edge.png")
     edge = np.asarray(senga_inv)
     # 四隅から領域調査
@@ -348,7 +188,6 @@ def auto_alpha(path, icon=True):
             if mask[sh, sw] == 1 and c_min <= img_mat[sh, sw] <= c_max:
                 que.append((sh,sw))
             while len(que) > 0:
-                # print(len(que))
                 h, w = que.pop(0)
                 if mask[h, w] == 1:
                     if  edge[h, w] >= EDGE_VAL:
@@ -402,6 +241,7 @@ def auto_alpha(path, icon=True):
     img.save(retpath)
     return retpath
 
+
 #######################################################
 # 線画化
 def image_to_line(path): # img:RGBモード
@@ -417,6 +257,7 @@ def image_to_line(path): # img:RGBモード
     senga_inv.save(save_path)
     return save_path
 
+
 def expand2square(pil_img, background_color):
     width, height = pil_img.size
     if width == height:
@@ -430,6 +271,7 @@ def expand2square(pil_img, background_color):
         result.paste(pil_img, ((height - width) // 2, 0))
         return result
 
+
 def image_resize(img, resize):
     # アスペクト比維持
     tmp = img.copy()
@@ -440,12 +282,14 @@ def image_resize(img, resize):
         tmp = expand2square(tmp,(255,255,255))
     return tmp.resize(resize,Image.BICUBIC)
 
+
 def crop_center(pil_img, crop_width, crop_height):
     img_width, img_height = pil_img.size
     return pil_img.crop(((img_width - crop_width) // 2,
                          (img_height - crop_height) // 2,
                          (img_width + crop_width) // 2,
                          (img_height + crop_height) // 2))
+
 
 def new_convert(img, mode):
     if img.mode == "RGBA":

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
+print("in kiribo.py")
 
 from mastodon import Mastodon, StreamListener
-from pprint import pprint as pp
 import requests
 import re, os, json, random, unicodedata, signal, sys
 import threading, queue, urllib
@@ -12,37 +12,50 @@ from datetime import datetime,timedelta
 from os.path import join
 from collections import defaultdict, Counter
 import wikipedia
-from PIL import Image, ImageOps, ImageFile, ImageChops, ImageFilter, ImageEnhance
+from PIL import Image
 import argparse
 
 # きりぼコンフィグ
-from config import *
+from kiribo.config import MEDIA_PATH, GOOGLE_ENGINE_KEY, GOOGLE_KEY, MASTODON_URL, MASTODON_ACCESS_TOKEN,\
+    MASTER_ID, BOT_ID, BOT_LIST_PATH, KAOMOJI_PATH, KORA_PATH, HINPINED_WORDS_PATH,\
+    OPENWEATHER_APPID, WATCH_LIST_PATH, NADE_PATH, RECIPE_Z_PATH, RECIPE_A_PATH, NO_BOTTLE_PATH,\
+    KISHOU_WS, KISHOU_WS_PORT
 
 # きりぼサブモジュール
-import bottlemail
-import cooling_manager
-import dao
-import deep
-import game
-import generate_text
-import get_images_ggl
-import kishou
-import romasaga
-import score_manager
-import stat
-import tenki
-import timer
-import toot_summary
-import trans
-import util
+from kiribo import bottlemail, cooling_manager, dao, deep, game, generate_text,\
+    get_images_ggl, imaging, kishou, romasaga, scheduler, score_manager, stat, tenki,\
+    timer, toot_summary, trans, util
 
-ImageFile.LOAD_TRUNCATED_IMAGES = True
+# import kiribo.bottlemail as bottlemail
+# import kiribo.cooling_manager as 
+# import kiribo.dao as 
+# import kiribo.deep as 
+# import kiribo.game as game
+# import kiribo.generate_text as 
+# import kiribo.get_images_ggl as 
+# import kiribo.imaging as 
+# import kiribo.kishou as 
+# import kiribo.romasaga as 
+# import kiribo.scheduler as 
+# import kiribo.score_manager as 
+# import kiribo.stat as stat
+# import kiribo.tenki as tenki
+# import kiribo.timer as timer
+# import kiribo.toot_summary as toot_summary
+# import kiribo.trans as trans
+# import kiribo.util as util
+logger = util.setup_logger(__name__)
+
+os.makedirs(MEDIA_PATH, exist_ok=True)
 
 abc = list("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?.()+-=,")
 keisho = r"(くん|君|さん|様|さま|ちゃん|氏)"
 
 wikipedia.set_lang("ja")
 wikipedia.set_user_agent("kiri_bot (https://github.com/kiritan-pop/kiri_bot/)")
+
+# Google画像検索設定
+gi = get_images_ggl.GetImagesGGL(GOOGLE_KEY,GOOGLE_ENGINE_KEY)
 
 #得点管理、流速監視
 SM = score_manager.ScoreManager()
@@ -52,13 +65,11 @@ TRANS = trans.Trans(GOOGLE_KEY)
 #しりとり用
 StMG = game.Siritori_manager()
 
-publicdon = Mastodon(api_base_url=MASTODON_URL,
-                    ratelimit_method="throw")  # インスタンス
+publicdon = Mastodon(api_base_url=MASTODON_URL)  # インスタンス
 
 mastodon = Mastodon(
     access_token=MASTODON_ACCESS_TOKEN,
-    api_base_url=MASTODON_URL,
-    ratelimit_method="throw")  # インスタンス
+    api_base_url=MASTODON_URL)  # インスタンス
 
 PostQ = queue.Queue()
 WorkerQ = queue.Queue()
@@ -189,7 +200,7 @@ class public_listener(StreamListener):
     def on_delete(self, status_id):
         jst_now = datetime.now(timezone('Asia/Tokyo'))
         ymdhms = jst_now.strftime("%Y%m%d %H%M%S")
-        print("{0}===public_listener on_delete【{1}】===".format(ymdhms,str(status_id)))
+        logger.info("{0}===public_listener on_delete【{1}】===".format(ymdhms,str(status_id)))
         DelQ.put(status_id)
 
 #######################################################
@@ -218,7 +229,7 @@ def exe_toot(toot_now, g_vis='direct', rep=None, spo=None, media_ids=None, inter
 
     jst_now = datetime.now(timezone('Asia/Tokyo'))
     ymdhms = jst_now.strftime("%Y%m%d %H%M%S")
-    print("%s🆕toot:"%ymdhms + toot_now[0:300] + ":" + g_vis )
+    logger.info("%s🆕toot:"%ymdhms + toot_now[0:300] + ":" + g_vis )
 
 #######################################################
 # ファボ処理
@@ -229,14 +240,14 @@ def exe_fav_now(id):  # ニコります
     try:
         status = mastodon.status(id)
     except Exception as e:
-        print(e)
+        logger.error(e)
     else:
         if status['favourited'] == False:
             th = threading.Timer(interval=2,function=mastodon.status_favourite,args=(id,))
             th.start()
             jst_now = datetime.now(timezone('Asia/Tokyo'))
             ymdhms = jst_now.strftime("%Y%m%d %H%M%S")
-            print("%s🙆Fav"%ymdhms)
+            logger.info("%s🙆Fav"%ymdhms)
 
 #######################################################
 # ブースト
@@ -247,7 +258,7 @@ def exe_boost_now(id):  # ぶーすと！
     try:
         status = mastodon.status(id)
     except Exception as e:
-        print(e)
+        logger.error(e)
     else:
         if status['reblogged'] == False:
             mastodon.status_reblog(id)
@@ -255,7 +266,7 @@ def exe_boost_now(id):  # ぶーすと！
             mastodon.status_unreblog(id)
             sleep(3)
             mastodon.status_reblog(id)
-        print("🙆boost")
+        logger.info("🙆boost")
 
 #######################################################
 # ブーキャン
@@ -266,7 +277,7 @@ def exe_boocan_now(id):  # ぶーすと！
     status = mastodon.status(id)
     if status['reblogged'] == True:
         mastodon.status_unreblog(id)
-        print("🙆unboost")
+        logger.info("🙆unboost")
 
 #######################################################
 # フォロー
@@ -275,7 +286,7 @@ def follow(id):
 
 def exe_follow(id):
     mastodon.account_follow(id)
-    print("💖follow")
+    logger.info("💖follow")
 
 #######################################################
 # アンフォロー
@@ -284,7 +295,7 @@ def unfollow(id):
 
 def exe_unfollow(id):
     mastodon.account_unfollow(id)
-    print("💔unfollow")
+    logger.info("💔unfollow")
 
 #######################################################
 # トゥー消し
@@ -297,7 +308,7 @@ def toot_delete(id,interval=5):
 
 def exe_toot_delete(id):
     mastodon.status_delete(id)
-    print("♥toot delete")
+    logger.info("♥toot delete")
 
 #######################################################
 # 数取りゲーム 投票前処理
@@ -337,27 +348,20 @@ def HintPinto_ans_check(status):
 
 #######################################################
 # 画像判定
-def ana_image(media_attachments,sensitive,acct,g_vis,id,content):
+def ana_image(media_file, acct):
     toot_now = ''
-    #隠してある画像には反応しないことにしたー
-    if sensitive:
-        return toot_now
+    attach_files = []
 
-    for media in media_attachments[:1]:
-        filename = download(media["url"] , "media")
-        result = deep.takoramen(filename)
-        print('   ',result)
-        if result == 'other':
-            if random.randint(0,50)  == 0:
-                if face_search(filename,acct,g_vis,id):
-                    return ''
-                else:
-                    pass
-        elif result == '風景' or result == '夜景':
-            if face_search(filename,acct,g_vis,id):
-                return ''
-            else:
-                pass
+    for f in media_file:
+        result = deep.takoramen(f)
+        logger.info(result)
+        if result in ['風景', '夜景', 'other']:
+            tmp = imaging.face_search(f)
+            if tmp:
+                ex = tmp.rsplit('.')[-1]
+                if ex == 'jpg':
+                    ex = 'jpeg'
+                attach_files.append(mastodon.media_post(tmp, 'image/' + ex))
         elif result == 'ねこ':
             toot_now += 'にゃーん'
         elif result == 'ダーツ':
@@ -405,31 +409,13 @@ def ana_image(media_attachments,sensitive,acct,g_vis,id,content):
                 toot_now += '📷スクショパシャパシャ！'
         else:
             if 'チョコ' in result or 'ショコラ' in result:
-                toot_now += ':@%s: 🚓🚓🚓＜う〜う〜！飯テロ警察 チョコレート係でーす！\n'%(acct)
+                toot_now += ':@%s: 🚓🚓🚓＜う〜う〜！飯テロ警察 チョコレート係でーす！'%(acct)
             else:
-                toot_now += ':@%s: 🚓🚓🚓＜う〜う〜！飯テロ警察 %s係でーす！\n'%(acct,result)
+                toot_now += ':@%s: 🚓🚓🚓＜う〜う〜！飯テロ警察 %s係でーす！'%(acct,result)
             break
 
-    return toot_now
+    return toot_now, attach_files
 
-#######################################################
-# 顔マーク
-def face_search(filename, acct, g_vis, id):
-    media_files = []
-    try:
-        tmp = util.face_search(filename)
-        if tmp:
-            if tmp.rsplit('.')[-1] == 'jpg':
-                ex = 'jpeg'
-            else:
-                ex = tmp.rsplit('.')[-1]
-            media_files.append(mastodon.media_post(tmp, 'image/' + ex))
-            toot_now = "@%s \n#exp15m"%acct
-            toot(toot_now, g_vis=g_vis, rep=None, spo='おわかりいただけるだろうか……', media_ids=media_files, interval=5)
-            return True
-    except Exception as e:
-        print(e)
-        util.error_log()
 
 #######################################################
 # ワーカー処理の実装
@@ -440,11 +426,6 @@ def worker(status):
     username = "@" +  acct
     g_vis = status["visibility"]
     content = util.content_cleanser(status['content'])
-    # hashtags = util.hashtag(status['content'])
-    # if 'application' not in status or status['application'] == None:
-    #     application = ''
-    # else:
-    #     application = status['application']['name']
     statuses_count = status["account"]["statuses_count"]
     spoiler_text = status["spoiler_text"]
     ac_created_at = status["account"]["created_at"]
@@ -481,10 +462,15 @@ def worker(status):
     Toot1bQ.put((content, acct))
 
     if re.search(r"^(緊急|強制)(停止|終了)$", content) and acct == MASTER_ID:
-        print("＊＊＊＊＊＊＊＊＊＊＊緊急停止したよー！＊＊＊＊＊＊＊＊＊＊＊")
+        logger.info("＊＊＊＊＊＊＊＊＊＊＊緊急停止したよー！＊＊＊＊＊＊＊＊＊＊＊")
         toot("@%s 緊急停止しまーす！"%MASTER_ID, 'direct', id ,None)
         sleep(10)
         os.kill(os.getpid(), signal.SIGKILL)
+
+    # 画像があればダウンロード
+    media_file = []
+    for media in media_attachments:
+        media_file.append(util.download_media(media["url"]))
 
 #   定期トゥート
     toot_cnt += 1
@@ -714,10 +700,6 @@ def worker(status):
             tmp.append('٩(٩`^´๑ )三( ๑`^´۶)۶')
             toot_now = random.choice(tmp)
             id_now = None
-    elif len(media_attachments) > 0 and re.search(r"色[ぬ塗]って", content) == None and re.search(r"きりぼ.*アイコン作", content) == None and re.search(r"きりぼ.*透過して", content) == None:
-        toot_now = ana_image(media_attachments, sensitive, acct, g_vis, id_now, content)
-        id_now = None
-        interval = 0
     elif re.search(r"^う$", content):
         SM.update(acct, 'func')
         if rnd <= 6:
@@ -795,7 +777,7 @@ def worker(status):
 
     ############################################################
     #各種機能
-    # pp(f"debug:g_vis={g_vis},is_game({acct})={StMG.is_game(acct)}")
+    logger.debug(f"g_vis={g_vis},is_game({acct})={StMG.is_game(acct)}")
     if re.search(r"きりぼ.*(しりとり).*(しよ|やろ|おねがい|お願い)", content):
         fav_now(id)
         if StMG.is_game(acct):
@@ -872,7 +854,7 @@ def worker(status):
         slot_accts = DAO.get_five(num=reel_num,minutes=120)
         slotgame = game.Friends_nico_slot(acct,slot_accts,slot_rate,reelsize)
         slot_rows,slot_score = slotgame.start()
-        print(' '*20 + 'acct=%s reel_num=%d reelsize=%d'%(acct,reel_num,reelsize))
+        logger.info(' '*20 + 'acct=%s reel_num=%d reelsize=%d'%(acct,reel_num,reelsize))
         sl_txt = ''
         for row in slot_rows:
             for c in row:
@@ -913,7 +895,7 @@ def worker(status):
             toot('@%s ＤＭで依頼してねー！周りの人に答え見えちゃうよー！'%acct, 'direct', rep=id, interval=a)
 
     elif re.search(r"([ぼボ][とト][るル][メめ]ー[るル])([サさ]ー[ビび][スす])[：:]", content):
-        print("★ボトルメールサービス")
+        logger.info("★ボトルメールサービス")
         bottlemail_service(content=content, acct=acct, id=id, g_vis=g_vis)
         SM.update(acct, 'func')
 
@@ -932,7 +914,7 @@ def worker(status):
             nl = "\n"
             toot(f'@{acct} 「{word}」にはいくつか意味があるみたいだよ〜{nl}次のいずれかのキーワードでもう一度調べてね〜{nl}{",".join(e.options)}', g_vis, id, None, interval=a)
         except Exception as e:
-            print(e)
+            logger.error(e)
             toot('@%s え？「%s」しらなーい！'%(acct,word), g_vis, id, None, interval=a)
         else:
             summary_text = page.summary
@@ -946,7 +928,6 @@ def worker(status):
 
     elif len(media_attachments) > 0 and re.search(r"きりぼ.*アイコン作", content):
         SM.update(acct, 'func', score=1)
-        filename = download(media_attachments[0]["url"], "media")
         if re.search(r"正月", content):
             mode = 0
         elif re.search(r"2|２", content):
@@ -954,7 +935,7 @@ def worker(status):
         else:
             mode = 1
 
-        ret = util.newyear_icon_maker(filename,mode=mode)
+        ret = imaging.newyear_icon_maker(media_file[0] ,mode=mode)
         if ret:
             media = mastodon.media_post(ret, 'image/gif')
             toot_now = f"@{acct} できたよ〜 \n ここでgifに変換するといいよ〜 https://www.aconvert.com/jp/video/mp4-to-gif/ \n#exp15m"
@@ -965,8 +946,7 @@ def worker(status):
 
     elif len(media_attachments) > 0 and re.search(r"きりぼ.*透過して", content):
         SM.update(acct, 'func', score=1)
-        filename = download(media_attachments[0]["url"], "media")
-        alpha_image_path = util.auto_alpha(filename, icon=False)
+        alpha_image_path = imaging.auto_alpha(media_file[0], icon=False)
         media = mastodon.media_post(alpha_image_path, 'image/png')
         toot_now = f"@{acct} できたよ〜 \n#exp15m"
         toot(toot_now, g_vis=g_vis, rep=id, media_ids=[media])
@@ -980,7 +960,7 @@ def worker(status):
         show_rank(acct=acct, target=word, id=id, g_vis=g_vis)
         SM.update(acct, 'func')
     elif re.search(r"(数取りゲーム|かずとりげぇむ).*(おねがい|お願い)", content):
-        print('数取りゲーム受信')
+        logger.info('数取りゲーム受信')
         if len(GetNum_flg) > 0:
             toot("@%s 数取りゲーム開催中だよー！急いで投票してー！"%acct, 'public', id)
         else:
@@ -1023,7 +1003,7 @@ def worker(status):
         gen_txt = toot_summary.summarize(content,limit=10,lmtpcs=1, m=1, f=4)
         if gen_txt[-1] == '#':
             gen_txt = gen_txt[:-1]
-        print('★要約結果：',gen_txt)
+        logger.info(f'★要約結果：{gen_txt}')
         if is_japanese(gen_txt):
             if len(gen_txt) > 5:
                 gen_txt +=  "\n#きり要約 #きりぼっと"
@@ -1166,6 +1146,14 @@ def worker(status):
         else:
             toot(f":@{acct}: 只今の記録、０{word}魔王でした〜\n#{word}魔王チャレンジ",g_vis='public')
 
+    elif sensitive == False and len(media_file) > 0:
+        toot_now, attach_files = ana_image(media_file, acct)
+        if len(attach_files) > 0:
+            toot_now = "#exp15m"
+            toot(toot_now, g_vis=g_vis, rep=None, spo='おわかりいただけるだろうか……', media_ids=media_files, interval=5)
+        else:
+            toot(toot_now, g_vis=g_vis)
+
 
 def lstm_gen_rapper(seeds, rndvec=0):
     new_seeds = [s for s in seeds if random.randint(1,3) != 1]
@@ -1173,19 +1161,16 @@ def lstm_gen_rapper(seeds, rndvec=0):
     return ret_txt
 
 #######################################################
-# 即時応答処理ー！
+# 認証なしタイムライン用（きりぼがブロックされてても反応する用）
 def business_contact(status):
     id = status["id"]
     acct = status["account"]["acct"]
-    # g_vis = status["visibility"]
     content = util.content_cleanser(status['content'])
     statuses_count = status["account"]["statuses_count"]
-    # spoiler_text = status["spoiler_text"]
     created_at = status['created_at']
     display_name = status["account"]['display_name']
     ac_created_at = status["account"]["created_at"]
     ac_created_at = ac_created_at.astimezone(timezone('Asia/Tokyo'))
-    # ac_ymd = ac_created_at.strftime("%Y.%m.%d %H:%M:%S")
     if '@' in acct: #連合スルー
         return        
     #最後にトゥートしてから3時間以上？ 
@@ -1200,7 +1185,7 @@ def business_contact(status):
     jst_now = datetime.now(timezone('Asia/Tokyo'))
     jst_now_str = jst_now.strftime("%Y%m%d %H%M%S")
     jst_now_hh = int(jst_now.strftime("%H"))
-    print('%s===「%s」by %s'%(jst_now_str,('\n'+' '*20).join(content.split('\n')), acct))
+    logger.info('%s===「%s」by %s'%(jst_now_str,('\n'+' '*20).join(content.split('\n')), acct))
 
     kaomoji = random.choice([tmp.strip() for tmp in open(KAOMOJI_PATH,'r').readlines() if os.path.exists(KAOMOJI_PATH) and len(tmp.strip())>0])
     if statuses_count == 1:
@@ -1231,21 +1216,6 @@ def business_contact(status):
         toot_now = '@%s\n:@%s: %s\n「%s」\n#exp10m'%(MASTER_ID, acct, display_name, content)
         toot(toot_now)
 
-#######################################################
-# 画像検索サービス
-def get_file_name(url):
-    return url.split("/")[-1].split("?")[0]
-
-def download(url, save_path):
-    ret_path = save_path + "/" + get_file_name(url)
-    if os.path.exists(ret_path):
-        return ret_path
-    req = urllib.request.Request(url)
-    req.add_header("User-agent", "kiritan downloader made by @kiritan")
-    source = urllib.request.urlopen(req).read()
-    with open(ret_path, 'wb') as file:
-        file.write(source)
-    return ret_path
 
 #######################################################
 # 日本語っぽいかどうか判定
@@ -1303,7 +1273,7 @@ def recipe_service(content=None, acct=MASTER_ID, id=None, g_vis='unlisted'):
 def show_rank(acct=None, target=None, id=None, g_vis=None):
     ############################################################
     # 数取りゲームスコアなど
-    print(f"show_rank target={target}")
+    logger.info(f"show_rank target={target}")
     if id:
         fav_now(id)
     sm = score_manager.ScoreManager()
@@ -1386,23 +1356,20 @@ def bottlemail_service(content, acct, id, g_vis):
 #######################################################
 # ワーカー処理のスレッド
 def th_worker():
-    try:
-        while True:
+    while True:
+        try:
             status = WorkerQ.get() #キューからトゥートを取り出すよー！なかったら待機してくれるはずー！
-            sleep(1.8)
             if WorkerQ.qsize() <= 1: #キューが詰まってたらスルー
                 worker(status)
-    except Exception as e:
-        print(e)
-        util.error_log()
-        sleep(30)
-        th_worker()
+        except Exception as e:
+            logger.error(e)
+            sleep(30)
 
 #######################################################
 # ワーカー処理のスレッド
 def th_timerDel():
-    try:
-        while True:
+    while True:
+        try:
             status = TimerDelQ.get() #キューからトゥートを取り出すよー！なかったら待機してくれるはずー！
             id = status["id"]
             acct = status["account"]["acct"]
@@ -1427,11 +1394,9 @@ def th_timerDel():
                 if sec > 0:
                     toot_delete(id=id, interval=sec)
 
-    except Exception as e:
-        print(e)
-        util.error_log()
-        sleep(30)
-        th_timerDel()
+        except Exception as e:
+            logger.error(e)
+            sleep(30)
 
 #######################################################
 # 陣形
@@ -1495,7 +1460,7 @@ def th_delete():
             # 垢消し時は大量のトゥー消しが来るので、キューが溜まってる場合はスキップするよ〜
             if DelQ.qsize() >= 3:
                 continue
-            print('th_delete:',row)
+            logger.info(f'th_delete:{row}')
             if row:
                 acct = row[0]
                 if acct not in del_accts and acct != BOT_ID:
@@ -1514,10 +1479,7 @@ def th_delete():
                     del_accts.pop(0)
 
         except Exception as e:
-            print(e)
-            util.error_log()
-            # sleep(30)
-            # th_delete()
+            logger.error(e)
 
 #######################################################
 # ヒントでピントゲーム
@@ -1577,7 +1539,6 @@ def th_hint_de_pinto(gtime=20):
         toot_now = "正解は{0}でした〜！\n（出題 :@{1}: ） #exp15m".format(term,acct)
         toot(toot_now, g_vis='public', rep=None, spo=None, media_ids=media_files,interval=4)
 
-    gi = get_images_ggl.GetImagesGGL(GOOGLE_KEY,GOOGLE_ENGINE_KEY)
     junbiTM = timer.Timer(30*60)
     junbiTM.reset(gtime*60)
     junbiTM.start()
@@ -1718,32 +1679,24 @@ def th_gettingnum(gtime=30):
                     toot(f'{toot_now}\n勝者はいなかったよ〜😢\n#数取りゲーム #きりぼっと', 'public', None, '数取りゲーム、結果発表ーー！！')
 
         except Exception as e:
-            print(e)
-            util.error_log()
+            logger.error(e)
 
 #######################################################
 # トゥートをいろいろ
 def th_saver():
-    try:
-        while True:
-            status = StatusQ.get()
-            # 業務連絡
-            business_contact(status)
-            # トゥートを保存
-            try:
-                # threading.Thread(target=DAO.save_toot, args=(status,))
-                DAO.save_toot(status)
-            except Exception as e:
-                #保存失敗したら、キューに詰めてリトライ！
-                print(e)
-                util.error_log()
-                sleep(10)
-                StatusQ.put(status)
-    except Exception as e:
-        print(e)
-        util.error_log()
-        sleep(20)
-        th_saver()
+    while True:
+        status = StatusQ.get()
+        # 業務連絡
+        business_contact(status)
+        # トゥートを保存
+        try:
+            # threading.Thread(target=DAO.save_toot, args=(status,))
+            DAO.save_toot(status)
+        except Exception as e:
+            #保存失敗したら、キューに詰めてリトライ！
+            logger.error(e)
+            sleep(10)
+            StatusQ.put(status)
 
 
 #######################################################
@@ -1762,7 +1715,7 @@ def jihou():
 #######################################################
 # フォロ外し
 def th_follow_mente():
-    print('🌠フォローフォロワー整理処理ーー！！')
+    logger.info('🌠フォローフォロワー整理処理ーー！！')
     ret = mastodon.account_verify_credentials()
     uid = ret['id']
     sleep(2)
@@ -1777,7 +1730,7 @@ def th_follow_mente():
         sleep(2)
         for account in ret:
             fids.append(account['id'])
-    print('　　フォロー：',len(fids))
+    logger.info(f'　　フォロー：{len(fids)}')
     sleep(2)
     ret = mastodon.account_followers(uid, max_id=None, since_id=None, limit=80)
     fers = []
@@ -1791,22 +1744,22 @@ def th_follow_mente():
         for account in ret:
             fers.append(account['id'])
 
-    print('　　フォロワー：',len(fers))
+    logger.debug(f'　　フォロワー：{len(fers)}')
     sleep(1)
     for u in set(fers) - set(fids):
-        print('id=',u)
+        logger.debug(f'id={u}')
         try:
             follow(u)
         except Exception as e:
-            print('id=',u,e)
-            util.error_log()
+            logger.error(f'id={u}')
+            logger.error(e)
         sleep(8)
 #    for u in set(fids) - set(fers):
-#        print('id=',u)
+#        logger.debug('id=',u)
 #        try:
 #            unfollow(u)
 #        except Exception as e:
-#            print('id=',u,e)
+#            logger.error(f'id={u}')
 #            util.error_log()
 #        sleep(8)
 
@@ -1819,9 +1772,8 @@ def th_post():
             func(*args)
             sleep(1.1)
         except Exception as e:
-            print(e)
-            util.error_log()
-            sleep(3.2)
+            logger.error(e)
+            sleep(3)
 
 #######################################################
 # 気象情報取得スレッド
@@ -1884,13 +1836,12 @@ def th_kishou():
             # 待機中は帰ってこないやつ
             kishou_sv.connect_run_forever()
         except Exception as e:
-            print(e)
-            util.error_log()
+            logger.error(e)
             sleep(300)
 
 #######################################################
 # メイン
-def main():
+def run():
     args = get_args()
     threads = []
     #タイムライン受信系
@@ -1903,22 +1854,20 @@ def main():
     threads.append( threading.Thread(target=th_gettingnum, args=(args.gtime,)) )
     threads.append( threading.Thread(target=th_hint_de_pinto, args=(args.htime,)) )
     threads.append( threading.Thread(target=th_worker) )
-    # threads.append( threading.Thread(target=th_timerDel) )
+    threads.append( threading.Thread(target=th_timerDel) )
     threads.append( threading.Thread(target=th_post) )
     #スケジュール起動系(時刻)
-    threads.append( threading.Thread(target=util.scheduler, args=(bottlemail_sending,['23:05'])) )
-    threads.append( threading.Thread(target=util.scheduler, args=(th_follow_mente,['21:27'])) )
-    threads.append( threading.Thread(target=util.scheduler, args=(nyan_time,['22:22'])) )
-    threads.append( threading.Thread(target=util.scheduler, args=(show_rank,['07:00'])) )
-    threads.append( threading.Thread(target=util.scheduler, args=(jihou,['**:00'])) )
+    threads.append( scheduler.Scheduler(bottlemail_sending, hhmm_list=['23:05']))
+    threads.append( scheduler.Scheduler(th_follow_mente, hhmm_list=['21:27']))
+    threads.append( scheduler.Scheduler(nyan_time, hhmm_list=['22:22']))
+    threads.append( scheduler.Scheduler(show_rank, hhmm_list=['07:00']))
+    threads.append( scheduler.Scheduler(jihou, hhmm_list=['**:00']))
+
     #スケジュール起動系(間隔)
-    threads.append( threading.Thread(target=util.scheduler_rnd, args=(lstm_tooter,60,-10,4,CM)) )
-    threads.append( threading.Thread(target=util.scheduler_rnd, args=(jinkei_tooter,120,-10,10,CM)) )
+    threads.append( scheduler.Scheduler(lstm_tooter, hhmm_list=None, intvl=60, rndmin=-10, rndmax=4, cm=CM))
+    threads.append( scheduler.Scheduler(jinkei_tooter, hhmm_list=None, intvl=120, rndmin=-10, rndmax=10, cm=CM))
     #外部ストリーム受信
     threads.append( threading.Thread(target=th_kishou ) ) #LTL
 
     for th in threads:
         th.start()
-
-if __name__ == '__main__':
-    main()
