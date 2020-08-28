@@ -26,24 +26,6 @@ from kiribo import bottlemail, cooling_manager, dao, deep, game, generate_text,\
     get_images_ggl, imaging, kishou, romasaga, scheduler, score_manager, stat, tenki,\
     timer, toot_summary, trans, util
 
-# import kiribo.bottlemail as bottlemail
-# import kiribo.cooling_manager as 
-# import kiribo.dao as 
-# import kiribo.deep as 
-# import kiribo.game as game
-# import kiribo.generate_text as 
-# import kiribo.get_images_ggl as 
-# import kiribo.imaging as 
-# import kiribo.kishou as 
-# import kiribo.romasaga as 
-# import kiribo.scheduler as 
-# import kiribo.score_manager as 
-# import kiribo.stat as stat
-# import kiribo.tenki as tenki
-# import kiribo.timer as timer
-# import kiribo.toot_summary as toot_summary
-# import kiribo.trans as trans
-# import kiribo.util as util
 logger = util.setup_logger(__name__)
 
 os.makedirs(MEDIA_PATH, exist_ok=True)
