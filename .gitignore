@@ -5,9 +5,8 @@ __pycache__/
 data/
 work/
 haarcascades/
-kiri_game/
 media/
 recipe/
-media
-tenki_icon/
+media/
 venv_dev/
+.vscode/*

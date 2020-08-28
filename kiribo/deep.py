@@ -150,7 +150,7 @@ def takoramen(filepath):
     for k, v in sorted(rslt_dict.items(), key=lambda x: -x[1])[:4]:
         logger.info(f"{k}:{v:.2%}")
 
-    with open('image.log','a') as f:
+    with open(os.path.join('log', 'image.log'), 'a') as f:
         f.write("*** image:" + filepath.split('/')[-1] +  "  *** result:%s\n"%str(rslt_dict))
     if max(result[0]) > 0.8:
         return labels[np.argmax(result[0])]

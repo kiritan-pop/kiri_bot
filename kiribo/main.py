@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-print("in kiribo.py")
-
 from mastodon import Mastodon, StreamListener
 import requests
 import re, os, json, random, unicodedata, signal, sys
@@ -853,24 +851,12 @@ def worker(status):
     elif re.search(r"(ヒントでピント)[：:](.+)", content):
         if g_vis == 'direct':
             word = re.search(r"(ヒントでピント)[：:](.+)", str(content)).group(2).strip()
-            hintPinto_words = []
-            if os.path.exists(HINPINED_WORDS_PATH):
-                for line in open(HINPINED_WORDS_PATH,'r'):
-                    hintPinto_words.append(line.strip())
-            if word in hintPinto_words:
-                toot(f'@{acct} この前やったお題なので別のにして〜！', 'direct', rep=id, interval=a)
-                return
             if len(word) < 3:
                 toot(f'@{acct} お題は３文字以上にしてね〜', 'direct', rep=id, interval=a)
                 return
             if len(word) > 30:
                 toot(f'@{acct} お題は３０文字以下にしてね〜', 'direct', rep=id, interval=a)
                 return
-            hintPinto_words.append(word)
-            if len(hintPinto_words) > 10:
-                hintPinto_words.pop(0)
-            with open(HINPINED_WORDS_PATH,'w') as f:
-                f.write("\n".join(hintPinto_words))
             HintPintoQ.put([acct,id,word])
             SM.update(acct, 'func')
         else:
@@ -1528,12 +1514,26 @@ def th_hint_de_pinto(gtime=20):
         tmp_list = HintPintoQ.get()
         g_acct,g_id,term = tmp_list[0], tmp_list[1], tmp_list[2]
 
+        # 準備中確認
         if junbiTM.check() > 0:
             sleep(3)
             remaintm = junbiTM.check()
             toot('@%s\n開催準備中だよー！あと%d分%d秒待ってねー！'%(g_acct,remaintm//60,remaintm%60), 'direct', g_id, None)
             sleep(27)
             continue
+
+        # 使用済みワード確認
+        hintPinto_words = [tmp.strip() for tmp in open(HINPINED_WORDS_PATH,'r').readlines() if os.path.exists(HINPINED_WORDS_PATH) and len(tmp.strip())>0]
+        if term in hintPinto_words:
+            toot(f'@{acct} この前やったお題なので別のにして〜！', 'direct', rep=g_id)
+            continue
+
+        # 使用済みワードを追記
+        hintPinto_words.append(term)
+        if len(hintPinto_words) > 10:
+            hintPinto_words.pop(0)
+        with open(HINPINED_WORDS_PATH,'w') as f:
+            f.write("\n".join(hintPinto_words))
 
         HintPinto_flg.append('ON')
         break_flg = []
@@ -1561,16 +1561,18 @@ def th_hint_de_pinto(gtime=20):
                 break
 
         th.join()
-        if len(break_flg) == 0:  # 正解者なし
-            loop = len(loop_cnt)
-            score = min([10,len(term)])*8//2
-            SM.update(g_acct, 'getnum', score=-1*score)
-            toot(f'正解者なしのため出題者[[[ :@{g_acct}:]]] にペナルティ〜！\n減点{score}点だよ〜', g_vis='public', rep=None, spo=None, interval=2)
 
         #ゲーム終了後、次回開始までの準備期間
-        HintPinto_flg.remove('ON')
-        junbiTM.reset()
-        junbiTM.start()
+        if 'ON' in HintPinto_flg:
+            if len(break_flg) == 0:  # 正解者なし
+                loop = len(loop_cnt)
+                score = min([10,len(term)])*8//2
+                SM.update(g_acct, 'getnum', score=-1*score)
+                toot(f'正解者なしのため出題者[[[ :@{g_acct}:]]] にペナルティ〜！\n減点{score}点だよ〜', g_vis='public', rep=None, spo=None, interval=2)
+
+            HintPinto_flg.remove('ON')
+            junbiTM.reset()
+            junbiTM.start()
 
 #######################################################
 # 数取りゲーム

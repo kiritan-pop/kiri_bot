@@ -108,3 +108,10 @@ class ScoreManager():
         ret = list(rows.fetchall())
         con.close()
         return ret
+
+if __name__ == '__main__':
+    from pprint import pprint as pp
+    cm = ScoreManager()
+    pp(cm.show(acct='Penitus'))
+    cm.update(acct='Penitus', key='getnum', score=20)
+    pp(cm.show(acct='Penitus'))
