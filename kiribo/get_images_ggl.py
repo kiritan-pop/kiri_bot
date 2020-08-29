@@ -18,8 +18,8 @@ class GetImagesGGL:
         self.save_dir_path = "media/"
 
     def ImageSearch(self, search):
-        url = f"{self.url}?key={self.key}&cx={self.engine_key}&searchType=image&cr=ja&num=10&safe=active&q={search}"
-        rr=requests.get(url)
+        url = f"{self.url}?key={self.key}&cx={self.engine_key}&searchType=image&q={search}"
+        rr = requests.get(url)
         unit_aa=json.loads(rr.text)
         image_links = []
         for item in unit_aa['items']:
@@ -47,4 +47,4 @@ class GetImagesGGL:
             except Exception as err:
                 logger.error(err)
 
-        return img_paths
+        return [a for a in img_paths if a]

@@ -112,16 +112,31 @@ def content_cleanser_light(text):
         rtext = re.sub(ng_word, '■'*len(ng_word), rtext)
     return rtext
 
+
 #######################################################
 # メディアダウンロード
 def get_file_name(url):
-    filename, file_extension, *_ = url.split("/")[-1].split("?")[0].split(".")
+    print(f'url:{url}')
+    temp = url.split("/")[-1].split("?")[0]
+    filename = temp.split(".")[0]
+    file_extension = temp.split(".")[-1]
+    if len(temp.split(".")) <= 1:
+        return None
     return filename + "." + file_extension.lower()
 
 
 def download_media(url, save_path=MEDIA_PATH, subdir=""):
     os.makedirs(os.path.join(save_path, subdir), exist_ok=True)
-    ret_path = os.path.join(save_path, subdir, get_file_name(url))
-    with open(ret_path, 'wb') as file:
-        file.write(requests.get(url, allow_redirects=True).content)
-    return ret_path
+    filename = get_file_name(url)
+    if filename:
+        ret_path = os.path.join(save_path, subdir, filename)
+        response = requests.get(url)
+        print(response.status_code)
+        if response.status_code == 200:
+            with open(ret_path, 'wb') as file:
+                file.write(response.content)
+            return ret_path
+        else:
+            return None
+    else:
+        return None

@@ -19,13 +19,13 @@ locale.setlocale(locale.LC_TIME, 'ja_JP.UTF-8')
 import kiribo.util
 from kiribo.config import CITY_LATLOC_PATH
 
-ICON_DIR = "tenki_icon"
 IMAGE_H = 1260
 IMAGE_W = 800
 BG_COLOR = "#100500"
 LINE_COLOR = "#5f5050"
 FONT_COLOR = "#fff5f3"
 WEATHER_IMAGE_PATH = "./media"
+ICON_DIR = "tenki_icon"
 
 # 天気メイン
 def get_tenki(quary, appid):
@@ -247,7 +247,8 @@ def make_weather_image_minutely(wd, skcs_name, tz):
                     )
     )
 
-    imagepath = os.path.join(WEATHER_IMAGE_PATH, "tmp_weather_m.png")
+    imagepath = os.path.join(
+        WEATHER_IMAGE_PATH, WEATHER_IMAGE_PATH, "tmp_weather_m.png")
     fig.write_image(imagepath, height=400, width=1600, scale=1)
 
     return imagepath

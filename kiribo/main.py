@@ -1526,7 +1526,7 @@ def th_hint_de_pinto(gtime=20):
         # 使用済みワード確認
         hintPinto_words = [tmp.strip() for tmp in open(HINPINED_WORDS_PATH,'r').readlines() if os.path.exists(HINPINED_WORDS_PATH) and len(tmp.strip())>0]
         if term in hintPinto_words:
-            toot(f'@{acct} この前やったお題なので別のにして〜！', 'direct', rep=g_id)
+            toot(f'@{g_acct} この前やったお題なので別のにして〜！', 'direct', rep=g_id)
             continue
 
         # 使用済みワードを追記
