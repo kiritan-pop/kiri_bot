@@ -127,6 +127,7 @@ def lstm_gentxt(toots, rndvec=0):
     return rtn_text
 
 def takoramen(filepath):
+    logger.debug(f"{filepath}")
     extention = filepath.rsplit('.',1)[-1]
     if extention in ['png','jpg','jpeg','gif']:
         image = Image.open(filepath)
@@ -146,7 +147,7 @@ def takoramen(filepath):
     rslt_dict = {}
     for i,rslt in enumerate(result[0]):
         rslt_dict[labels[i]] = rslt
-    logger.info(f"*** image:{filepath.split('/')[-1]}")
+    logger.debug(f"*** image:{filepath.split('/')[-1]}")
     for k, v in sorted(rslt_dict.items(), key=lambda x: -x[1])[:4]:
         logger.info(f"{k}:{v:.2%}")
 

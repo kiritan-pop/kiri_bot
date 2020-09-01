@@ -10,7 +10,7 @@ from datetime import datetime,timedelta
 # スコア管理
 class ScoreManager():
     DB_PATH = "data/scoremanager.db"
-    DB_SCHEMA_PATH = "scoremanager.sql"
+    DB_SCHEMA_PATH = "sql/scoremanager.sql"
     def __init__(self, db=None, timeout=3):
         self.timeout = timeout
         if db is not None:
@@ -112,6 +112,7 @@ class ScoreManager():
 if __name__ == '__main__':
     from pprint import pprint as pp
     cm = ScoreManager()
-    pp(cm.show(acct='Penitus'))
-    cm.update(acct='Penitus', key='getnum', score=20)
-    pp(cm.show(acct='Penitus'))
+    acct = "neruru"
+    pp(cm.show(acct=acct))
+    cm.update(acct=acct, key='getnum', score=480)
+    pp(cm.show(acct=acct))

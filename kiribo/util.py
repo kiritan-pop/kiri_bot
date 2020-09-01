@@ -117,12 +117,12 @@ def content_cleanser_light(text):
 # メディアダウンロード
 def get_file_name(url):
     print(f'url:{url}')
-    temp = url.split("/")[-1].split("?")[0]
+    temp = url.split("/")[-1].split("?", 1)[0].split(",", 1)[0]
     filename = temp.split(".")[0]
     file_extension = temp.split(".")[-1]
-    if len(temp.split(".")) <= 1:
-        return None
-    return filename + "." + file_extension.lower()
+    if file_extension.lower() in ["jpg", "jpeg", "png", "gif", "mp4"]:
+        return filename + "." + file_extension.lower()
+    return None
 
 
 def download_media(url, save_path=MEDIA_PATH, subdir=""):

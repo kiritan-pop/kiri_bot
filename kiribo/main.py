@@ -324,14 +324,14 @@ def HintPinto_ans_check(status):
     if len(content) == 0 or acct == BOT_ID:
         return
     if len(HintPinto_flg) > 0:
-        HintPinto_ansQ.put([acct, id, content.strip()])
+        HintPinto_ansQ.put([acct, id, content.strip(), status["visibility"]])
 
 #######################################################
 # 画像判定
 def ana_image(media_file, acct):
     toot_now = ''
     attach_files = []
-
+    logger.debug(media_file)
     for f in media_file:
         result = deep.takoramen(f)
         logger.info(result)
@@ -384,6 +384,12 @@ def ana_image(media_file, acct):
             toot_now += 'こころぴょんぴょん！'
         elif result == 'る':
             toot_now += 'るの人だ！'
+        elif result == '東北ずん子':
+            toot_now += '{{{:zunda:}}}ずんだもち！'
+        elif result == '東北イタコ':
+            toot_now += 'タコ姉！'
+        elif result == '東北きりたん':
+            toot_now += '{{{:kiritampo:}}}きりたんぽ！'
         elif result == 'スクショ':
             if random.randint(0,4) == 0:
                 toot_now += '📷スクショパシャパシャ！'
@@ -1037,7 +1043,7 @@ def worker(status):
             media_files = []
             for p in weather_image_paths:
                 media_files.append(mastodon.media_post(p, 'image/png'))
-            toot(toot_now, g_vis=g_vis, rep=id, media_ids=media_files, spo=sptxt+"だよ〜")
+            toot(toot_now, g_vis=g_vis, rep=id, media_ids=media_files) #, spo=sptxt+"だよ〜")
 
     elif re.search(r'[^:]@%s'%BOT_ID, status['content']):
         SM.update(acct, 'reply')
@@ -1541,8 +1547,9 @@ def th_hint_de_pinto(gtime=20):
         loop_cnt = []
         th = threading.Thread(target=th_shududai, args=(g_acct,g_id,term))
         th.start()
+        sleep(1.5)
         while True:
-            acct, _, ans, *_ = HintPinto_ansQ.get()
+            acct, _, ans, vis, *_ = HintPinto_ansQ.get()
             if not th.is_alive():
                 break
             if g_acct != acct and term in ans:
@@ -1554,7 +1561,7 @@ def th_hint_de_pinto(gtime=20):
                 break_flg.append('ON')
                 toot('正解者には{0}点、出題者には{1}点入るよー！'.format(score//1, score//2), g_vis='public', rep=None, spo=None, interval=8)
                 break
-            if g_acct == acct and term in ans:
+            if g_acct == acct and vis != 'direct' and term in ans:
                 score = min([10,len(term)])*8*3
                 toot(f'こら〜！ [[[ :@{acct}: ]]] 答えをばらしたのでペナルティ〜！\n減点{score}点だよ〜', g_vis='public', rep=None, spo=None)
                 SM.update(g_acct, 'getnum', score=score*-1)

@@ -40,7 +40,7 @@ def get_tenki(quary, appid):
     if len(hit_tdfk) == 1:
         # 都道府県指定あり
         for k_skcs, latloc in city_latloc_dict[hit_tdfk[0]].items():
-            if quary.split(hit_tdfk[0])[-1] in k_skcs:
+            if quary.split(hit_tdfk[0])[-1] in [k_skcs, k_skcs[:-1]]:
                 hit_skcs.append(hit_tdfk[0] + k_skcs)
                 hit_lat = latloc[0]
                 hit_loc = latloc[1]
@@ -48,7 +48,7 @@ def get_tenki(quary, appid):
         # 都道府県指定なし
         for k_tdfk, v in city_latloc_dict.items():
             for k_skcs, latloc in v.items():
-                if quary == k_skcs or quary == k_skcs[:-1]:
+                if quary in [k_skcs, k_skcs[:-1]]:
                     hit_skcs.append(k_tdfk + k_skcs)
                     hit_lat = latloc[0]
                     hit_loc = latloc[1]
@@ -104,8 +104,11 @@ def make_weather_image_current(wd, skcs_name, tz):
     tmp_dict['日の入'] = datetime.fromtimestamp(
         wd['sunset'], tz=tz).strftime("%H:%M:%S")
     tmp_dict['気温℃'] = f"{float(wd['temp']):.1f}"
-    uv_text, _ = get_uvi_info(wd['uvi'])
-    tmp_dict['UV指数'] = f"{uv_text}({float(wd['uvi']):.1f})"
+    if 'uvi' in wd:
+        uv_text, _ = get_uvi_info(wd['uvi'])
+        tmp_dict['UV指数'] = f"{uv_text}({float(wd['uvi']):.1f})"
+    else:
+        tmp_dict['UV指数'] = "−"
     tmp_dict['天気'] = wd['weather'][0]['description']
 
     ret_text = f"現在({tmp_dict['日時']}時点)の{skcs_name}の天気\n"
@@ -247,15 +250,15 @@ def make_weather_image_minutely(wd, skcs_name, tz):
                     )
     )
 
-    imagepath = os.path.join(
-        WEATHER_IMAGE_PATH, WEATHER_IMAGE_PATH, "tmp_weather_m.png")
+    imagepath = os.path.join(WEATHER_IMAGE_PATH, "tmp_weather_m.png")
     fig.write_image(imagepath, height=400, width=1600, scale=1)
 
     return imagepath
 
 # 天気アイコン取得
 def get_weather_icon(icon_name):
-    icon_image_path = os.path.join(ICON_DIR, icon_name + ".png")
+    icon_image_path = os.path.join(
+        WEATHER_IMAGE_PATH, ICON_DIR, icon_name + ".png")
     if os.path.exists(icon_image_path):
         pass
     else:
