@@ -144,7 +144,7 @@ class notification_listener(StreamListener):
             CM.count(status['created_at'])
             WorkerQ.put(status)
             vote_check(status)
-            HintPinto_ans_check(status)
+            # HintPinto_ans_check(status)
         elif notification["type"] == "favourite":
             SM.update(notification["account"]["acct"], 'fav', ymdhms)
         elif notification["type"] == "reblog":
@@ -168,7 +168,7 @@ class ltl_listener(StreamListener):
         acct = status["account"]["acct"]
         if acct != BOT_ID:
             WorkerQ.put(status)
-            HintPinto_ans_check(status)
+            # HintPinto_ans_check(status)
 
 #######################################################
 # タイムライン保存用（認証なし）
@@ -406,6 +406,7 @@ def ana_image(media_file, acct):
 #######################################################
 # ワーカー処理の実装
 def worker(status):
+    HintPinto_ans_check(status)
     global toot_cnt
     id = status["id"]
     acct = status["account"]["acct"]
@@ -1542,12 +1543,12 @@ def th_hint_de_pinto(gtime=20):
         with open(HINPINED_WORDS_PATH,'w') as f:
             f.write("\n".join(hintPinto_words))
 
-        HintPinto_flg.append('ON')
         break_flg = []
         loop_cnt = []
         th = threading.Thread(target=th_shududai, args=(g_acct,g_id,term))
         th.start()
-        sleep(1.5)
+        sleep(1.0)
+        HintPinto_flg.append('ON')
         while True:
             acct, _, ans, vis, *_ = HintPinto_ansQ.get()
             if not th.is_alive():
