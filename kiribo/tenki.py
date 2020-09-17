@@ -27,11 +27,13 @@ FONT_COLOR = "#fff5f3"
 WEATHER_IMAGE_PATH = "./media"
 ICON_DIR = "tenki_icon"
 
+
 # 天気メイン
 def get_tenki(quary, appid):
     with open(CITY_LATLOC_PATH, 'r') as fr:
         city_latloc_dict = json.load(fr)
-    os.makedirs(ICON_DIR, exist_ok=True)
+    os.makedirs(WEATHER_IMAGE_PATH, exist_ok=True)
+    os.makedirs(os.path.join(WEATHER_IMAGE_PATH, ICON_DIR), exist_ok=True)
 
     hit_tdfk = [tdfk for tdfk in city_latloc_dict.keys() if tdfk in quary]
     hit_skcs = []
@@ -72,8 +74,8 @@ def get_tenki(quary, appid):
     return 0, hit_skcs[0]+"の天気", \
         make_weather_image_current(tenki_data['current'], skcs_name, tz),\
         [make_weather_image_daily(tenki_data['daily'], skcs_name, tz),
-        make_weather_image_hourly(tenki_data['hourly'], skcs_name, tz),
-        make_weather_image_minutely(tenki_data['minutely'], skcs_name, tz)]
+         make_weather_image_hourly(tenki_data['hourly'], skcs_name, tz),
+         make_weather_image_minutely(tenki_data['minutely'], skcs_name, tz)]
 
 
 # UV指数
@@ -89,6 +91,13 @@ def get_uvi_info(uvi):
     else:
         return f"極端に強い", "rgb(255,101,255)"
 
+
+# 16方位名
+def get_wind_deg_name(deg):
+    import math
+    dname = ["北", "北北東", "北東", "東北東", "東", "東南東", "南東", "南南東",
+             "南", "南南西", "南西", "西南西", "西", "西北西", "北西", "北北西", "北"]
+    return dname[int((deg + 11.25)/22.5)]
 
 # 現在の天気
 def make_weather_image_current(wd, skcs_name, tz):
@@ -137,18 +146,22 @@ def make_weather_image_daily(wd, skcs_name, tz):
         tmp_dict['降水確率％'] = int(float(l1['pop'])*100)
         tmp_dict['UV指数'], tmp_dict['uv_color'] = get_uvi_info(l1['uvi'])
         tmp_dict['font_color'] = FONT_COLOR
+        tmp_dict['風速m/s'] = f"{float(l1['wind_speed']):.1f}"
+        tmp_dict['風向'] = get_wind_deg_name(l1['wind_deg'])
+        tmp_dict['気圧hPa'] = f"{int(l1['pressure']):,}"
 
         tenki_data_list.append(tmp_dict)
 
     df_temp = pd.json_normalize(tenki_data_list)
-    df = df_temp[['日付', '☀☁', '天気', '最高気温℃', '最低気温℃', '降水確率％', 'UV指数']]  # テーブルの作成
+    df = df_temp[['日付', '☀☁', '天気', '最高気温℃',
+                  '最低気温℃', '降水確率％', '風向', '風速m/s', '気圧hPa', 'UV指数']]  # テーブルの作成
     fig = go.Figure(data=[go.Table(
-        columnwidth=[25, 10, 25, 20, 20, 20, 20],  # カラム幅の変更
+        columnwidth=[25, 10, 25, 20, 20, 20, 20, 20, 20, 20],  # カラム幅の変更
         header=dict(values=df.columns, align='center', font=dict(color=FONT_COLOR, size=18), height=30,
                     line_color=LINE_COLOR, fill_color=BG_COLOR),
-        cells=dict(values=df.values.T, align='center', font=dict(color=[df_temp.font_color]*6 + [df_temp.uv_color], size=18), height=30,
-                    line_color=LINE_COLOR, fill_color=BG_COLOR),
-        )],
+        cells=dict(values=df.values.T, align='center', font=dict(color=[df_temp.font_color]*9 + [df_temp.uv_color], size=18), height=30,
+                   line_color=LINE_COLOR, fill_color=BG_COLOR),
+    )],
         layout=dict(margin=dict(l=0, r=0, t=30, b=0), paper_bgcolor=BG_COLOR,
                     title=dict(
                         text=skcs_name+"の１週間天気", x=0.5, y=1.0, font=dict(color=FONT_COLOR, size=24), xanchor='center', yanchor='top', pad=dict(l=0, r=0, t=5, b=0))
@@ -161,12 +174,12 @@ def make_weather_image_daily(wd, skcs_name, tz):
         icon_name = df_temp['icon'][i-1]
         icon_image = get_weather_icon(icon_name)
         fig.add_layout_image(
-            dict(source=icon_image, x=0.18, y=(1.0-1.0/(len(df)+1)*(i+0.5))))
+            dict(source=icon_image, x=0.125, y=(1.0-1.0/(len(df)+1)*(i+0.5))))
     fig.update_layout_images(dict(
         xref="paper", yref="paper", sizex=0.22, sizey=0.21, xanchor="left", yanchor="middle"))
 
     imagepath = os.path.join(WEATHER_IMAGE_PATH, "tmp_weather_d.png")
-    fig.write_image(imagepath, height=30*(len(df)+2), width=800, scale=1)
+    fig.write_image(imagepath, height=30*(len(df)+2), width=1100, scale=1)
 
     return imagepath
 
@@ -186,18 +199,22 @@ def make_weather_image_hourly(wd, skcs_name, tz):
         tmp_dict['湿度％'] = l1['humidity']
         tmp_dict['体感気温℃'] = f"{float(l1['feels_like']):.1f}"
         tmp_dict['降水確率％'] = int(float(l1['pop'])*100)
+        tmp_dict['風向'] = get_wind_deg_name(l1['wind_deg'])
+        tmp_dict['風速m/s'] = f"{float(l1['wind_speed']):.1f}"
+        tmp_dict['気圧hPa'] = f"{int(l1['pressure']):,}"
 
         tenki_data_list.append(tmp_dict)
 
     df_temp = pd.json_normalize(tenki_data_list)
-    df = df_temp[['日時', '☀☁', '天気', '気温℃', '湿度％', '体感気温℃', '降水確率％']]  # テーブルの作成
+    df = df_temp[['日時', '☀☁', '天気', '気温℃', '湿度％',
+                  '体感気温℃', '降水確率％', '風向', '風速m/s', '気圧hPa']]  # テーブルの作成
     fig = go.Figure(data=[go.Table(
         # columnorder=[10, 20, 30, 40, 50, 25, 70],
-        columnwidth=[25, 10, 25, 20, 20, 20, 20],  # カラム幅の変更
+        columnwidth=[25, 10, 25, 20, 20, 20, 20, 20, 20, 20],  # カラム幅の変更
         header=dict(values=df.columns, align='center', font=dict(color=FONT_COLOR, size=18), height=30,
                     line_color=LINE_COLOR, fill_color=BG_COLOR),
         cells=dict(values=df.values.T, align='center', font=dict(color=FONT_COLOR, size=18), height=30,
-                    line_color=LINE_COLOR, fill_color=BG_COLOR),
+                   line_color=LINE_COLOR, fill_color=BG_COLOR),
     )],
         layout=dict(margin=dict(l=0, r=0, t=30, b=0), paper_bgcolor=BG_COLOR,
                     title=dict(
@@ -211,12 +228,12 @@ def make_weather_image_hourly(wd, skcs_name, tz):
         icon_name = df_temp['icon'][i-1]
         icon_image = get_weather_icon(icon_name)
         fig.add_layout_image(
-            dict(source=icon_image, x=0.18, y=(1.0-1.0/49.0*(i+0.5))))
+            dict(source=icon_image, x=0.125, y=(1.0-1.0/49.0*(i+0.5))))
     fig.update_layout_images(dict(
-        xref="paper", yref="paper", sizex=0.07, sizey=0.06, xanchor="left", yanchor="middle"))
+        xref="paper", yref="paper", sizex=0.05, sizey=0.05, xanchor="left", yanchor="middle"))
 
     imagepath = os.path.join(WEATHER_IMAGE_PATH, "tmp_weather_h.png")
-    fig.write_image(imagepath, height=30*(48+2), width=800, scale=1)
+    fig.write_image(imagepath, height=30*(48+2), width=1100, scale=1)
 
     return imagepath
 
@@ -231,11 +248,10 @@ def make_weather_image_minutely(wd, skcs_name, tz):
             l1['dt'], tz=tz).strftime("%H:%M")
         tmp_dict['降水量mm'] = l1['precipitation']
 
-
         tenki_data_list.append(tmp_dict)
 
     df_temp = pd.json_normalize(tenki_data_list)
-    df = df_temp[['時刻', '降水量mm']].round({'降水量mm':2})  # テーブルの作成
+    df = df_temp[['時刻', '降水量mm']].round({'降水量mm': 2})  # テーブルの作成
     fig = go.Figure([go.Bar(x=df['時刻'], y=df['降水量mm'], text=df['降水量mm'], textposition='auto',
                             marker=dict(color='rgba(150,150,255,0.8)'),
                             y0=0
@@ -246,9 +262,9 @@ def make_weather_image_minutely(wd, skcs_name, tz):
                                 font=dict(color=FONT_COLOR, size=18),
                                 xaxis=dict(title='時刻', showgrid=False),
                                 yaxis=dict(title='降水量mm', showgrid=False,
-                                rangemode='nonnegative')
+                                           rangemode='nonnegative')
+                                )
                     )
-    )
 
     imagepath = os.path.join(WEATHER_IMAGE_PATH, "tmp_weather_m.png")
     fig.write_image(imagepath, height=400, width=1600, scale=1)
@@ -269,21 +285,6 @@ def get_weather_icon(icon_name):
                 local_file.write(data)
 
     return Image.open(icon_image_path)
-
-
-# テスト
-def test():
-    url = "http://api.openweathermap.org/data/2.5/forecast"
-    payload = {
-        "lat": "26.208581", "lon": "127.684452",
-        "lang": "ja",
-                "units": "metric",
-                "APPID": "xxxxxxxx"}
-    tenki_data = requests.get(url, params=payload).json()
-    pp(tenki_data)
-    testpd = pd.json_normalize(tenki_data["list"])
-    pp(testpd.columns)
-    testpd[["dt_txt", "main.temp_min", "main.temp_max", "rain.3h"]]
 
 
 if __name__ == '__main__':

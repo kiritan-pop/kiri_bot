@@ -114,6 +114,16 @@ def content_cleanser_light(text):
 
 
 #######################################################
+# 日本語っぽいかどうか判定
+def is_japanese(string):
+    for ch in string:
+        name = unicodedata.name(ch, "other")
+        if "CJK UNIFIED" in name or "HIRAGANA" in name or "KATAKANA" in name:
+            return True
+    return False
+
+
+#######################################################
 # メディアダウンロード
 def get_file_name(url):
     print(f'url:{url}')
