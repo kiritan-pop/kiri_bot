@@ -678,14 +678,14 @@ def worker(status):
             body = f"@{acct} 見つからなかったよ〜😢"
             toot(body, g_vis=g_vis, rep=id)
 
-    elif re.search(r"へいきりぼ(くん|君|さん|様|さま|ちゃん)?[!！]?きりたん丼の(天気|状態|状況|ステータス|status).*(教えて|おせーて)|^!server.*stat", content):
+    elif re.search(r"へいきりぼ(くん|君|さん|様|さま|ちゃん)?[!！、\s]?きりたん丼の(天気|状態|状況|ステータス|status).*(おしえて|教えて|おせーて)?|^!server.*stat", content):
         stats = stat.sys_stat()
         toot(
             f"@{acct} \nただいまの気温{stats['cpu_temp']}℃、忙しさ{stats['cpu']:.1f}％、気持ちの余裕{stats['mem_available']/(10**9):.1f}GB、クローゼットの空き{stats['disk_usage']/(10**9):.1f}GB", g_vis=g_vis, rep=id)
 
-    elif re.search(r"きりぼ(くん|君|さん|様|さま|ちゃん)?[!！、\s]?.+の天気.*(教え|おせーて)?", content):
+    elif re.search(r"きりぼ(くん|君|さん|様|さま|ちゃん)?[!！、\s]?.+の天気.*(おしえて|教え|おせーて)?", content):
         word1 = re.search(
-            r"きりぼ(くん|君|さん|様|さま|ちゃん)?[!！、\s]?(.+)の天気.*(教え|おせーて)?", str(content)).group(2).strip()
+            r"きりぼ(くん|君|さん|様|さま|ちゃん)?[!！、\s]?(.+)の天気.*(おしえて|教え|おせーて)?", str(content)).group(2).strip()
         if len(word1.split("の")) == 2:
             word1, word2 = word1.split("の")
             if word1 in ["今日", "明日", "明後日"]:
@@ -1507,50 +1507,21 @@ def th_delete():
 
 
 def th_hint_de_pinto(gtime=20):
+    MAX_SIZE = 512
 # ヒントでピントゲーム
-    def th_shududai(acct, id, term):
-        paths = gi.get_images_forQ(term)
-        # paths = util.fetch_and_save_img(term)
-        if len(paths) > 0:
-            path = random.choice(paths)
-        else:
-            toot(f'@{acct} 画像が見つからなかったー！', g_vis='direct', rep=id)
-            junbiTM.reset(0)
-            return
+    def th_shududai(path):
         img = Image.open(path).convert('RGB')
-        if path.rsplit('.')[-1] == 'jpg':
-            ex = 'jpeg'
-        else:
-            ex = path.rsplit('.')[-1]
-
-        y = int(img.height/10)
-        loop = 0
-        hint_text = "なし"
+        img = img.resize((img.width*MAX_SIZE//max(img.size),
+                          img.height*MAX_SIZE//max(img.size)), Image.LANCZOS)
+        
         mask_map = [i for i in range(len(term))]
-        for i in range(y, 1, - int(y*3/10)):
-            if len(break_flg) == 0:
-                tmp = img.resize((int(img.width/i), int(img.height/i)), Image.NEAREST)  # LANCZOS BICUBIC NEAREST
-                tmp = tmp.resize((img.width, img.height), Image.NEAREST)
-                filename = path.split('.')[0] + f'_{y}.png'
-                tmp.save(filename, "png")
-                media_files = []
-                media_files.append(
-                    mastodon.media_post(filename, 'image/' + ex))
-                toot_now = f"さて、これは何/誰でしょうか？\nヒント：{hint_text}\n#きりたんのヒントでピント #exp15m"
-                toot(toot_now, g_vis='public', rep=None,
-                        spo=None, media_ids=media_files)
-                for _ in range(60):
-                    sleep(1)
-                    if len(break_flg) > 0:
-                        break
-            else:
-                break
-
-            loop += 1
+        for loop, p in enumerate(range(3, 9, 1)):
             loop_cnt.append(loop)
-            if loop == 1:
+            if loop == 0:
+                hint_text = "なし"
+            elif loop == 1:
                 hint_text = "○"*len(term)
-            elif len(term) > loop - 1:
+            elif loop > 1 and len(mask_map) > 1:
                 random.shuffle(mask_map)
                 mask_map.pop()
                 hint_text = ""
@@ -1560,12 +1531,28 @@ def th_hint_de_pinto(gtime=20):
                     else:
                         hint_text += c
 
-        media_files = []
-        media_files.append(mastodon.media_post(path, 'image/' + ex))
-        toot_now = f"正解は{term}でした〜！\n（出題 :@{acct}: ） #exp15m"
-        toot(toot_now, g_vis='public', rep=None,
-                spo=None, media_ids=media_files, interval=4)
-        return
+            if len(break_flg) == 0:
+                # LANCZOS BICUBIC NEAREST
+                re_size = (img.width*(2**p)//max(img.size),
+                            img.height*(2**p)//max(img.size))
+                tmp = img.resize(re_size, Image.NEAREST)
+                tmp = tmp.resize(img.size, Image.NEAREST)
+                filename = path.split('.')[0] + f'_{loop}.png'
+                tmp.save(filename, "png")
+                media_files = []
+                media_files.append(
+                    mastodon.media_post(filename, 'image/png'))
+                toot_now = f"さて、これは何/誰でしょうか？\nヒント：{hint_text}\n#きりたんのヒントでピント #exp15m"
+                toot(toot_now, g_vis='public', rep=None,
+                        spo=None, media_ids=media_files)
+                # 待つ
+                for _ in range(45):
+                    sleep(1)
+                    if len(break_flg) > 0:
+                        break
+            else:
+                break
+
 
     junbiTM = timer.Timer(30*60)
     junbiTM.reset(gtime*60)
@@ -1589,53 +1576,76 @@ def th_hint_de_pinto(gtime=20):
             toot(f'@{g_acct} この前やったお題なので別のにして〜！', 'direct', rep=g_id)
             continue
 
+        # 画像検索
+        paths = gi.get_images_forQ(term)
+        if len(paths) > 0:
+            path = random.choice(paths)
+        else:
+            toot(f'@{g_acct} 画像が見つからなかったー！', g_vis='direct', rep=g_id)
+            continue
+
         # 使用済みワードを追記
         hintPinto_words.append(term)
-        if len(hintPinto_words) > 10:
+        if len(hintPinto_words) > 30:
             hintPinto_words.pop(0)
         with open(HINPINED_WORDS_PATH, 'w') as f:
             f.write("\n".join(hintPinto_words))
 
         break_flg = []
         loop_cnt = []
-        th = threading.Thread(target=th_shududai, args=(g_acct, g_id, term))
+        th = threading.Thread(target=th_shududai, args=(path,))
         th.start()
         sleep(1.0)
         HintPinto_flg.append('ON')
         while True:
-            acct, _, ans, vis, *_ = HintPinto_ansQ.get()
-            if not th.is_alive():
-                break
-            if g_acct != acct and term in ans:
-                loop = len(loop_cnt)
-                a_score = int(min([10, len(term)])*8//(2**loop))
-                q_score = a_score//2
-                toot(f'((( :@{acct}: ))) 正解〜！',
-                    g_vis='public', rep=None, spo=None)
-                SM.update(acct, 'getnum', score=a_score)
-                SM.update(g_acct, 'getnum', score=q_score)
-                break_flg.append('ON')
-                toot(f'正解者には{a_score}点、出題者には{q_score}点入るよー！',
-                    g_vis='public', rep=None, spo=None, interval=8)
-                break
-            if g_acct == acct and vis != 'direct' and term in ans:
-                score = min([10, len(term)])*8*3
-                toot(f'こら〜！ [[[ :@{acct}: ]]] 答えをばらしたのでペナルティ〜！\n減点{score}点だよ〜',
-                    g_vis='public', rep=None, spo=None)
-                SM.update(g_acct, 'getnum', score=score*-1)
-                break_flg.append('ON')
-                break
+            try:
+                acct, _, ans, vis, *_ = HintPinto_ansQ.get(timeout=2)
+                if not th.is_alive():
+                    break
+                if g_acct != acct and term in ans:
+                    loop = len(loop_cnt) - 1
+                    a_score = max(int(min([10, len(term)])*16//(2**loop)),1)
+                    q_score = max(a_score//2, 1)
+                    toot(f'((( :@{acct}: ))) 正解〜！',
+                        g_vis='public', rep=None, spo=None)
+
+                    SM.update(acct, 'getnum', score=a_score)
+                    SM.update(g_acct, 'getnum', score=q_score)
+                    break_flg.append('ON')
+                    toot(f'正解者には{a_score}点、出題者には{q_score}点入るよー！',
+                        g_vis='public', rep=None, spo=None, interval=8)
+                    break
+                if g_acct == acct and vis != 'direct' and term in ans:
+                    score = min([10, len(term)])*8*3
+                    toot(f'こら〜！ [[[ :@{acct}: ]]] 答えをばらしたのでペナルティ〜！\n減点{score}点だよ〜',
+                        g_vis='public', rep=None, spo=None)
+                    SM.update(g_acct, 'getnum', score=score*-1)
+                    break_flg.append('ON')
+                    break
+            except queue.Empty:
+                logger.debug(f"ひんぴんデバッグ:{th.is_alive()}")
 
         th.join()
+        logger.debug(f"ひんぴんデバッグ:終了")
 
         #ゲーム終了後、次回開始までの準備期間
         if 'ON' in HintPinto_flg:
+            if path.rsplit('.')[-1] == 'jpg':
+                ex = 'jpeg'
+            else:
+                ex = path.rsplit('.')[-1]
+            media_files = []
+            media_files.append(mastodon.media_post(path, 'image/' + ex))
+            toot_now = f"正解は{term}でした〜！\n（出題 :@{g_acct}: ） #exp15m"
+            toot(toot_now, g_vis='public', rep=None,
+                    spo=None, media_ids=media_files, interval=4)
+
             if len(break_flg) == 0:  # 正解者なし
                 loop = len(loop_cnt)
                 score = min([10, len(term)])*8//2
                 SM.update(g_acct, 'getnum', score=-1*score)
                 toot(f'正解者なしのため出題者[[[ :@{g_acct}:]]] にペナルティ〜！\n減点{score}点だよ〜',
-                    g_vis='public', rep=None, spo=None, interval=4)
+                    g_vis='public', rep=None, spo=None, interval=8)
 
             HintPinto_flg.remove('ON')
             junbiTM.reset()
@@ -1757,6 +1767,12 @@ def th_saver():
             StatusQ.put(status)
 
 
+def wan_time():
+# わんタイム
+    gen_txt = 'わんわんわんわん！\n（（（｛｛｛∪･ω･∪｝｝｝）））（（（｛｛｛∪￣ᴥ￣∪｝｝｝）））'
+    toot(gen_txt, "public")
+
+
 def nyan_time():
 # にゃんタイム
     gen_txt = 'にゃんにゃんにゃんにゃん！\n₍₍（（（｛｛｛(ฅ=˘꒳ ˘=)ฅ｝｝｝））） ⁾⁾ ₍₍ （（（｛｛｛ฅ(=╹꒳ ╹=ฅ)｝｝｝）））⁾⁾'
@@ -1803,6 +1819,7 @@ def run():
     #スケジュール起動系(時刻)
     threads.append(scheduler.Scheduler(
         bottlemail_sending, hhmm_list=['23:05']))
+    threads.append(scheduler.Scheduler(wan_time, hhmm_list=['11:11']))
     threads.append(scheduler.Scheduler(nyan_time, hhmm_list=['22:22']))
     threads.append(scheduler.Scheduler(show_rank, hhmm_list=['07:00']))
     threads.append(scheduler.Scheduler(jihou, hhmm_list=['**:00']))

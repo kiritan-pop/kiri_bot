@@ -102,7 +102,7 @@ def lstm_gentxt(toots, rndvec=0):
     # 推定したベクトルから文章生成
     generated = ''
     char_IDs = [char_idx[MU] for _ in range(TXT_MAXLEN)]    #初期値は無
-    rnd = random.uniform(0.2,0.7)
+    rnd = random.uniform(0.15,0.5)
 
     for i in range(500):
         preds = lstm_set_model.predict_on_batch([ np.asarray([output_vec2]),  np.asarray([char_IDs]) ])
