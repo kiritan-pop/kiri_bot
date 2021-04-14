@@ -48,7 +48,7 @@ gi = get_images_ggl.GetImagesGGL(GOOGLE_KEY, GOOGLE_ENGINE_KEY)
 
 #得点管理、流速監視
 SM = score_manager.ScoreManager()
-CM = cooling_manager.CoolingManager(3)
+CM = cooling_manager.CoolingManager(15)
 DAO = dao.Dao()
 TRANS = trans.Trans(GOOGLE_KEY)
 #しりとり用
@@ -145,7 +145,8 @@ class notification_listener(StreamListener):
             CM.count(status['created_at'])
             WorkerQ.put(status)
             vote_check(status)
-            logger.info(f"===notification mention {status['content'][:100]}")
+            logger.info(
+                f"===notification mention from {notification['account']['acct']}「{util.content_cleanser(status['content'])[:100]}」")
         elif notification["type"] == "favourite":
             SM.update(notification["account"]["acct"], 'fav', ymdhms)
             logger.info(
@@ -362,6 +363,7 @@ def worker(status):
     sensitive = status['sensitive']
     created_at = status['created_at']
     created_at = created_at.astimezone(timezone('Asia/Tokyo'))
+    reply_to = util.reply_to(status['content'])
 
     #botはスルー
     if status["account"]["bot"]:
@@ -375,7 +377,7 @@ def worker(status):
 
     Toot1bQ.put((content, acct))
 
-    if re.search(r"^(緊急|強制)(停止|終了)$", content) and acct == MASTER_ID:
+    if re.search(r"^(緊急|強制)(停止|終了|再起動)$", content) and acct == MASTER_ID:
         logger.info("＊＊＊＊＊＊＊＊＊＊＊緊急停止したよー！＊＊＊＊＊＊＊＊＊＊＊")
         toot(f"@{MASTER_ID} 緊急停止しまーす！", 'direct', id, None)
         sleep(10)
@@ -398,22 +400,20 @@ def worker(status):
         toot_cnt = 0
         lstm_tooter()
 
-    # 定型文応答処理
-    toot_now, id_now, vis_now, interval, *_ = res_fixed_phrase(id, acct, username, g_vis, content, statuses_count,
-                                                               spoiler_text, ac_ymd, now_ymd, media_attachments,
-                                                               sensitive, created_at, ct)
-    if toot_now:
-        toot(toot_now, vis_now, id_now, None, None, interval)
-        # 定型文応答したら、他機能の判定はせず終了
-        return
-
     # 高感度下げ
     if re.search(r"死ね", content+spoiler_text):
         SM.update(acct, 'func', score=-20)
     if re.search(r"^クソ|クソ$|[^ダ]クソ", content+spoiler_text):
         SM.update(acct, 'func', score=-3)
 
-    ############################################################
+    # 定型文応答処理
+    toot_now, id_now, vis_now, interval, reply = res_fixed_phrase(id, acct, username, g_vis, content, statuses_count,
+                                                               spoiler_text, ac_ymd, now_ymd, media_attachments,
+                                                               sensitive, created_at, reply_to, ct)
+    if toot_now:
+        toot(reply + toot_now, vis_now, id_now, None, None, interval)
+        return
+
     #各種機能
     logger.debug(f"g_vis={g_vis},is_game({acct})={StMG.is_game(acct)}")
     if re.search(r"きりぼ.*(しりとり).*(しよ|やろ|おねがい|お願い)", content):
@@ -539,13 +539,13 @@ def worker(status):
         recipe_service(content=content, acct=acct, id=id, g_vis=g_vis)
         SM.update(acct, 'func')
 
-    elif re.search(r"\s?(.+)って(何|なに|ナニ|誰|だれ|ダレ|いつ|どこ)\?$", content):
-        word = re.search(r"\s?(.+)って(何|なに|ナニ|誰|だれ|ダレ|いつ|どこ)\?$",
-                         str(content)).group(1)
+    elif re.search(r"(.+)って(何|なに|ナニ|誰|だれ|ダレ|いつ|どこ)\?$", content):
+        word = re.search(r"(.+)って(何|なに|ナニ|誰|だれ|ダレ|いつ|どこ)\?$",
+                         str(content)).group(1).strip()
         SM.update(acct, 'func')
         try:
             word = re.sub(
-                r".*へいきりぼ(っと)?(くん|君|さん|様|さま|ちゃん)?[!！,.、。]?", "", word)
+                r".*(へい)?きりぼ(っと)?(くん|君|さん|様|さま|ちゃん)?[!,.]?", "", word).strip()
             page = wikipedia.page(word)
         except wikipedia.exceptions.DisambiguationError as e:
             nl = "\n"
@@ -625,7 +625,7 @@ def worker(status):
                 if re.search(r"[^:]@|^@", toot_now):
                     pass
                 else:
-                    toot_now += "\n#きり翻訳 #きりぼっと"
+                    toot_now = f"@{acct}\n{toot_now}\n#きり翻訳 #きりぼっと"
                     toot(toot_now, 'public', id, f'翻訳したよ〜！なになに……？ :@{acct}: ＜')
                     SM.update(acct, 'func')
 
@@ -636,7 +636,7 @@ def worker(status):
             if re.search(r"[^:]@|^@", toot_now):
                 pass
             else:
-                toot_now += "\n#きり翻訳 #きりぼっと"
+                toot_now = f"@{acct}\n{toot_now}\n#きり翻訳 #きりぼっと"
                 toot(toot_now, 'public', id, f'翻訳したよ〜！ :@{acct}: ＜')
                 SM.update(acct, 'func')
 
@@ -678,8 +678,9 @@ def worker(status):
             body = f"@{acct} 見つからなかったよ〜😢"
             toot(body, g_vis=g_vis, rep=id)
 
-    elif re.search(r"へいきりぼ(くん|君|さん|様|さま|ちゃん)?[!！、\s]?きりたん丼の(天気|状態|状況|ステータス|status).*(おしえて|教えて|おせーて)?|^!server.*stat", content):
+    elif re.search(r"きりぼ(くん|君|さん|様|さま|ちゃん)?[!！、\s]?きりたん丼の(天気|状態|状況|ステータス|status).*(おしえて|教えて|おせーて)?|^!server.*stat", content):
         stats = stat.sys_stat()
+        logger.debug(f"stats={stats}")
         toot(
             f"@{acct} \nただいまの気温{stats['cpu_temp']}℃、忙しさ{stats['cpu']:.1f}％、気持ちの余裕{stats['mem_available']/(10**9):.1f}GB、クローゼットの空き{stats['disk_usage']/(10**9):.1f}GB", g_vis=g_vis, rep=id)
 
@@ -730,69 +731,27 @@ def worker(status):
         seeds.extend(toots_for_rep[acct])
         #時系列ソート
         seeds.sort(key=lambda x: (x[1]))
-        #文字だけ取り出し
-        tmp = lstm_gen_rapper([c[0] for c in seeds], rndvec=random.uniform(
-            0.05, min(len(toots_for_rep[acct])*0.05, 0.3)))
+        #
+        tmp = lstm_gen_rapper(seeds, rndvec=random.uniform(
+            0.025, min(len(toots_for_rep[acct])*0.025, 0.1)))
         tmp = util.content_cleanser_light(tmp)
         toot_now += tmp
         toots_for_rep[acct].append((tmp, jst_now))
         toot(toot_now, g_vis, id, None)
 
-    elif re.search(r"(きり|キリ).*(ぼっと|ボット|[bB][oO][tT])|[きキ][りリ][ぼボ]|[きキ][りリ][ぽポ][っッ][ぽポ]", content + spoiler_text):
+    elif re.search(r"(きり|キリ).*(ぼっと|ボット|[bB][oO][tT])|[きキ][りリ][ぼボ]|[きキ][りリ][ぽポ][っッ][ぽポ]", content + spoiler_text) != None \
+        and re.search(r"^[こコ][らラ][きキ][りリ][ぼボぽポ]", content + spoiler_text) == None:
         SM.update(acct, 'reply')
         if random.randint(0, 10+ct) > 9:
             return
         fav_now(id)
         toot_now = f"@{acct}\n"
-        seeds = DAO.get_least_10toots(limit=30)
-        tmp = lstm_gen_rapper(seeds, rndvec=random.uniform(0.05, 0.2))
+        seeds = DAO.get_least_10toots(limit=30, time=True)
+        tmp = lstm_gen_rapper(seeds, rndvec=random.uniform(0.05, 0.1))
         tmp = util.content_cleanser_light(tmp)
         toot_now += tmp
         toot(toot_now, g_vis, id, None)
         SM.update(acct, 'reply')
-
-    elif re.search(r"[へヘはハ][くク].*[しシ][ょョ][んン].*[出でデ][たタ]", content):
-        r = max([0, int(random.gauss(30, 30))])
-        maoudict = {"大魔王": 100, "中魔王": 10, "小魔王": 1}
-        result = {}
-        for k, v in maoudict.items():
-            if r >= v:
-                result[k] = int(r//v)
-                r = r % v
-        if len(result) > 0:
-            toot_now = f":@{acct}: 只今の記録"
-            for k, v in result.items():
-                toot_now += f"、{k}:{v}"
-            toot_now += "、でした〜\n#魔王チャレンジ"
-            if "大魔王" in result.keys():
-                toot_now += " #大魔王"
-            toot(toot_now, g_vis='public')
-        else:
-            toot(f":@{acct}: 只今の記録、０魔王でした〜\n#魔王チャレンジ", g_vis='public')
-
-    elif re.search(r"(.+)[出でデ][たタ]$", content):
-        r = max([0, int(random.gauss(30, 30))])
-        maoudict = {"大魔王": 100, "中魔王": 10, "小魔王": 1}
-        word = re.search(r"(.+)[出でデ][たタ]$", str(content)).group(1).strip()
-        word = sorted([(s, len(s)) for s in deep.tagger.parse(
-            word).strip().split()], key=lambda x: -x[1])[0][0]
-        if len(word) <= 1:
-            return
-        result = {}
-        for k, v in maoudict.items():
-            if r >= v:
-                result[k] = int(r//v)
-                r = r % v
-        if len(result) > 0:
-            toot_now = f":@{acct}: 只今の記録"
-            for k, v in result.items():
-                toot_now += f"、{word}{k}:{v}"
-            toot_now += f"、でした〜\n#{word}魔王チャレンジ"
-            if "大魔王" in result.keys():
-                toot_now += " #大魔王"
-            toot(toot_now, g_vis='public')
-        else:
-            toot(f":@{acct}: 只今の記録、０{word}魔王でした〜\n#{word}魔王チャレンジ", g_vis='public')
 
     elif sensitive == False and len(media_file) > 0:
         toot_now, attach_files = ana_image(media_file, acct)
@@ -807,41 +766,47 @@ def worker(status):
 
 def res_fixed_phrase(id, acct, username, g_vis, content, statuses_count,
                      spoiler_text, ac_ymd, now_ymd, media_attachments,
-                     sensitive, created_at, ct):
+                     sensitive, created_at, reply_to, ct):
 # 定型文応答処理
 
-    rnd = random.randint(0, 5+ct)
-    if acct == MASTER_ID:
-        rnd = 0
+    def re_search_rnd(re_txt, text, threshold=None, flags=0):
+        rnd = random.randint(0, 5+ct)
+        if acct == MASTER_ID:
+            rnd = 0
+        logger.debug(f"rnd={rnd} ct={ct}")
+        if re.search(re_txt, text, flags=flags) != None:
+            if threshold == None:
+                return True
+            elif rnd <= threshold:
+                return True
+        return False
 
     toot_now = ''
-    id_now = id
     vis_now = g_vis
     interval = 0
+    reply = f"@{acct} " if BOT_ID in reply_to else ""
+    id_now = id if reply_to != "" else None
+
     if Toot1bQ.empty():
         content_1b, acct_1b = None, None
     else:
         content_1b, acct_1b = Toot1bQ.get()  # キューから１回前を取得
 
-    if re.search(r"^貞$", content):
+    if re_search_rnd(r"^貞$", content, 8):
         if content_1b != None and acct == acct_1b:
             SM.update(acct, 'func', score=-1)
-            if re.search(r"^治$", content_1b):
+            if re_search_rnd(r"^治$", content_1b, 8):
                 SM.update(acct, 'func', score=2)
-                if rnd <= 8:
-                    toot_now = '　　三(  っ˃̵ᴗ˂̵) 通りまーす！'
-                    id_now = None
+                toot_now = '　　三(  っ˃̵ᴗ˂̵) 通りまーす！'
 
     #ネイティオが半角スペース区切りで５つ以上あれば翻訳
     if (acct == MASTER_ID or acct == 'twotwo') and len(content.split(' ')) > 4 and content.count('トゥ') > 4 and content.count('ー') > 0:
         toot_now = f':@{acct}: ＜「{util.two2jp(content)}」'
-        id_now = None
         SM.update(acct, 'func')
     if statuses_count != 0 and statuses_count % 10000 == 0:
         interval = 180
         toot_now = username + "\n"
         toot_now += f"あ！そういえばさっき{statuses_count:,}トゥートだったよー！"
-        id_now = None
         SM.update(acct, 'func')
     elif statuses_count == 1 and ac_ymd == now_ymd:
         interval = 5
@@ -849,260 +814,224 @@ def res_fixed_phrase(id, acct, username, g_vis, content, statuses_count,
         toot_now += "新規さんいらっしゃーい！🍵🍡どうぞー！"
         vis_now = 'unlisted'
         SM.update(acct, 'func')
-    elif re.search(r"草$", content+spoiler_text):
+    elif re_search_rnd(r"草$", content+spoiler_text, 1):
         SM.update(acct, 'func', score=-1)
-        if rnd <= 1:
-            # toot_now = ":" + username + ": "
-            toot_now = random.choice(hanalist)  # + ' 三💨 ﾋﾟｭﾝ!!'
-            id_now = None
-    elif re.search(r"花$", content+spoiler_text):
+        toot_now = random.choice(hanalist)  # + ' 三💨 ﾋﾟｭﾝ!!'
+    elif re_search_rnd(r"花$", content+spoiler_text, 1):
         SM.update(acct, 'func')
-        if rnd <= 1:
-            tmp = []
-            tmp.append('木')
-            tmp.append('森')
-            tmp.append('種')
-            toot_now = random.choice(tmp)
-            id_now = None
-    elif re.search(r"^:twitter:.+(((🔥)))$", content, flags=(re.MULTILINE | re.DOTALL)):
+        tmp = []
+        tmp.append('木')
+        tmp.append('森')
+        tmp.append('種')
+        toot_now = random.choice(tmp)
+    elif re_search_rnd(r"^:twitter:.+(((🔥)))$", content, 4, flags=(re.MULTILINE | re.DOTALL)):
         SM.update(acct, 'func')
-        if rnd <= 4:
-            tmp = []
-            tmp.append(':twitter: ＜ﾊﾟﾀﾊﾟﾀｰ\n川\n\n(((🔥)))')
-            tmp.append('(ﾉ・_・)ﾉ ﾆｹﾞﾃ!⌒:twitter: ＜ｱﾘｶﾞﾄｩ!\n(((🔥)))')
-            tmp.append('(ﾉ・_・)ﾉ ﾆｹﾞﾃ!⌒🍗 ＜ｱﾘｶﾞﾄｩ!\n(((🔥)))')
-            toot_now = random.choice(tmp)
-            id_now = None
-    elif re.search(r"ブリブリ|ぶりぶり|うん[ちこ]|💩", content+spoiler_text):
+        tmp = []
+        tmp.append(':twitter: ＜ﾊﾟﾀﾊﾟﾀｰ\n川\n\n(((🔥)))')
+        tmp.append('(ﾉ・_・)ﾉ ﾆｹﾞﾃ!⌒:twitter: ＜ｱﾘｶﾞﾄｩ!\n(((🔥)))')
+        tmp.append('(ﾉ・_・)ﾉ ﾆｹﾞﾃ!⌒🍗 ＜ｱﾘｶﾞﾄｩ!\n(((🔥)))')
+        toot_now = random.choice(tmp)
+    elif re_search_rnd(r"ブリブリ|ぶりぶり|うん[ちこ]|💩", content+spoiler_text, 4):
         SM.update(acct, 'func', score=-2)
-        if rnd <= 4:
-            tmp = []
-            tmp.append(f":@{acct}: " + r'{{{🌊🌊🌊🌊}}} ＜ざばーっ！')
-            tmp.append('( •́ฅ•̀ )ｸｯｻ')
-            tmp.append(f"　:@{acct}:\nっ🚽")
-            toot_now = random.choice(tmp)
-            id_now = None
-    elif re.search(r"^木$|^林$|^森$", content+spoiler_text):
+        tmp = []
+        tmp.append(f":@{acct}: " + r'{{{🌊🌊🌊🌊}}} ＜ざばーっ！')
+        tmp.append('( •́ฅ•̀ )ｸｯｻ')
+        tmp.append(f"　:@{acct}:\nっ🚽")
+        toot_now = random.choice(tmp)
+    elif re_search_rnd(r"^木$|^林$|^森$", content+spoiler_text, 6):
         SM.update(acct, 'func')
-        if rnd <= 6:
-            tmp = []
-            tmp.append(r'{{{🌴🌴🌴🌴}}} ＜すくすくーっ！')
-            tmp.append(r'{{{🌲🌲🌲🌲}}} ＜すくすくーっ！')
-            tmp.append(r'{{{🌳🌳🌳🌳}}} ＜すくすくーっ！')
-            toot_now = random.choice(tmp)
-            id_now = None
-    elif re.search(r"^流して$|^水$", content+spoiler_text):
+        tmp = []
+        tmp.append(r'{{{🌴🌴🌴🌴}}} ＜すくすくーっ！')
+        tmp.append(r'{{{🌲🌲🌲🌲}}} ＜すくすくーっ！')
+        tmp.append(r'{{{🌳🌳🌳🌳}}} ＜すくすくーっ！')
+        toot_now = random.choice(tmp)
+    elif re_search_rnd(r"^流して$|^水$", content+spoiler_text, 6):
         SM.update(acct, 'func')
-        if rnd <= 6:
-            toot_now = r'{{{🌊🌊🌊🌊}}} ＜ざばーっ！'
-            id_now = None
-    elif re.search(r"^ふきふき$|^竜巻$|^風$", content):
+        toot_now = r'{{{🌊🌊🌊🌊}}} ＜ざばーっ！'
+    elif re_search_rnd(r"^ふきふき$|^竜巻$|^風$", content, 4):
         SM.update(acct, 'func')
-        if rnd <= 4:
-            tmp = []
-            tmp.append('(((🌪🌪🌪🌪)))＜ごぉ〜〜っ！')
-            tmp.append('(((💨💨💨)))[[[🍃]]]＜ぴゅ〜〜っ！')
-            toot_now = random.choice(tmp)
-            id_now = None
-    elif re.search(r"^凍らせて$|^氷$", content):
+        tmp = []
+        tmp.append('(((🌪🌪🌪🌪)))＜ごぉ〜〜っ！')
+        tmp.append('(((💨💨💨)))[[[🍃]]]＜ぴゅ〜〜っ！')
+        toot_now = random.choice(tmp)
+    elif re_search_rnd(r"^凍らせて$|^氷$", content, 2):
         SM.update(acct, 'func')
-        if rnd <= 2:
-            toot_now = '[[[❄]]][[[❄]]][[[❄]]][[[❄]]][[[❄]]] ＜カチコチ〜ッ！'
-            id_now = None
-    elif re.search(r"^雷$", content):
+        toot_now = '[[[❄]]][[[❄]]][[[❄]]][[[❄]]][[[❄]]] ＜カチコチ〜ッ！'
+    elif re_search_rnd(r"^雷$", content, 2):
         SM.update(acct, 'func')
-        if rnd <= 2:
-            toot_now = r'{{{⚡⚡⚡⚡}}}＜ゴロゴロ〜ッ！'
-            id_now = None
-    elif re.search(r"^雲$", content):
+        toot_now = r'{{{⚡⚡⚡⚡}}}＜ゴロゴロ〜ッ！'
+    elif re_search_rnd(r"^雲$", content, 2):
         SM.update(acct, 'func')
-        if rnd <= 2:
-            toot_now = r'(((☁☁☁☁)))＜もくもく〜'
-            id_now = None
-    elif re.search(r"^雨$", content):
+        toot_now = r'(((☁☁☁☁)))＜もくもく〜'
+    elif re_search_rnd(r"^雨$", content, 2):
         SM.update(acct, 'func')
-        if rnd <= 2:
-            toot_now = r'(((☔☔☔☔)))＜ざーざー'
-            id_now = None
-    elif re.search(r"^雪$", content):
+        toot_now = r'(((☔☔☔☔)))＜ざーざー'
+    elif re_search_rnd(r"^雪$", content, 2):
         SM.update(acct, 'func')
-        if rnd <= 2:
-            toot_now = r'[[[❄]]][[[❄]]][[[❄]]][[[❄]]][[[❄]]]＜こんこん〜'
-            id_now = None
-    elif re.search(r"^ぬるぽ$|^[Nn]ull[Pp]ointer[Ee]xception$", content):
+        toot_now = r'[[[❄]]][[[❄]]][[[❄]]][[[❄]]][[[❄]]]＜こんこん〜'
+    elif re_search_rnd(r"^ぬるぽ$|^[Nn]ull[Pp]ointer[Ee]xception$", content, 4):
         SM.update(acct, 'func', score=-1)
-        if rnd <= 4:
-            toot_now = 'ｷﾘｯ'
-            id_now = None
-    elif re.search(r"^通過$", content):
+        toot_now = 'ｷﾘｯ'
+    elif re_search_rnd(r"^通過$", content, 6):
         SM.update(acct, 'func')
-        if rnd <= 6:
-            tmp = []
-            tmp.append('⊂(˃̵᎑˂̵๑⊃ )彡　阻止！')
-            tmp.append('　ミ(  っ˃̵ᴗ˂̵)っ　阻止！')
-            toot_now = random.choice(tmp)
-            id_now = None
-    elif re.search(r"3.{0,1}3.{0,1}4", content):
+        tmp = []
+        tmp.append('⊂(˃̵᎑˂̵๑⊃ )彡　阻止！')
+        tmp.append('　ミ(  っ˃̵ᴗ˂̵)っ　阻止！')
+        toot_now = random.choice(tmp)
+    elif re_search_rnd(r"3.{0,1}3.{0,1}4", content, 6):
         SM.update(acct, 'func', score=-1)
-        if rnd <= 6:
-            toot_now = 'ﾅﾝ :nan:'
-            id_now = None
-    elif re.search(r"^ちくわ大明神$", content):
+        toot_now = 'ﾅﾝ :nan:'
+    elif re_search_rnd(r"^ちくわ大明神$", content, 6):
         SM.update(acct, 'func', score=-1)
-        if rnd <= 6:
-            toot_now = 'ﾀﾞｯ'
-            id_now = None
-    elif re.search(r"ボロン$|ぼろん$", content):
+        toot_now = 'ﾀﾞｯ'
+    elif re_search_rnd(r"ボロン$|ぼろん$", content, 2):
         SM.update(acct, 'func', score=-2)
-        if rnd <= 2:
-            toot_now = f':@{acct}: ✂️チョキン！！'
-            id_now = None
-    elif re.search(r"さむい$|寒い$", content):
+        toot_now = f':@{acct}: ✂️チョキン！！'
+    elif re_search_rnd(r"さむい$|寒い$", content, 2):
         SM.update(acct, 'func', score=-1)
-        if rnd <= 2:
-            toot_now = f'(((🔥)))(((🔥)))(((🔥)))\n(((🔥))) :@{acct}: (((🔥)))\n(((🔥)))(((🔥)))(((🔥))) '
-            id_now = None
-    elif re.search(r"あつい$|暑い$", content):
+        toot_now = f'(((🔥)))(((🔥)))(((🔥)))\n(((🔥))):@{acct}:(((🔥)))\n(((🔥)))(((🔥)))(((🔥))) '
+    elif re_search_rnd(r"あつい$|暑い$", content, 2):
         SM.update(acct, 'func', score=-1)
-        if rnd <= 2:
-            toot_now = f'[[[❄]]][[[❄]]][[[❄]]]\n[[[❄]]] :@{acct}: [[[❄]]]\n[[[❄]]][[[❄]]][[[❄]]] '
-            id_now = None
-    elif re.search(r"^(今|いま)の[な|無|ナ][し|シ]$", content):
+        toot_now = f'[[[❄]]][[[❄]]][[[❄]]]\n[[[❄]]]:@{acct}:[[[❄]]]\n[[[❄]]][[[❄]]][[[❄]]] '
+    elif re_search_rnd(r"^(今|いま)の[な|無|ナ][し|シ]$", content, 4):
         SM.update(acct, 'func', score=-1)
-        if rnd <= 4:
-            toot_now = f':@{acct}: 🚓🚓🚓＜う〜う〜！いまのなし警察でーす！'
-            id_now = None
-    elif re.search(r"ツイッター|ツイート|[tT]witter", content):
+        toot_now = f':@{acct}: 🚓🚓🚓＜う〜う〜！いまのなし警察でーす！'
+    elif re_search_rnd(r"ツイッター|ツイート|[tT]witter", content, 1):
         SM.update(acct, 'func', score=-1)
-        if rnd <= 1:
+        if random.randint(0,10)%2 ==0:
             toot_now = 'つ、つつつ、つい〜〜！！？！？？！？！'
-            id_now = None
-        elif rnd == 6:
+        else:
             toot_now = 'つい〜……'
-            id_now = None
-    elif re.search(r"[な撫]でて", content):
+    elif re_search_rnd(r"[な撫]でて", content):
         fav_now(id)
         SM.update(acct, 'reply')
-    elif re.search(r"なんでも|何でも", content):
+    elif re_search_rnd(r"なんでも|何でも", content, 2):
         SM.update(acct, 'func', score=-1)
-        if rnd <= 2:
-            toot_now = 'ん？'
-            id_now = None
-    elif re.search(r"泣いてる|泣いた|涙が出[るた(そう)]", content):
+        toot_now = 'ん？'
+    elif re_search_rnd(r"泣いてる|泣いた|涙が出[るた(そう)]", content, 2):
         SM.update(acct, 'func')
-        if rnd <= 2:
-            toot_now = f'( *ˊᵕˋ)ﾉ :@{acct}: ﾅﾃﾞﾅﾃﾞ'
-            id_now = None
-    elif re.search(r"^桐乃じゃないが$", content+spoiler_text):
+        toot_now = f'( *ˊᵕˋ)ﾉ :@{acct}: ﾅﾃﾞﾅﾃﾞ'
+    elif re_search_rnd(r"^桐乃じゃないが$", content+spoiler_text, 6):
         SM.update(acct, 'func')
-        if rnd <= 6:
-            toot_now = f'桐乃じゃないね〜'
-            id_now = None
-    elif re.search(r"^.+じゃないが$", content+spoiler_text):
+        toot_now = f'桐乃じゃないね〜'
+    elif re_search_rnd(r"^.+じゃないが$", content+spoiler_text, 6):
         word = re.search(r"^(.+)じゃないが$", content+spoiler_text).group(1)
         SM.update(acct, 'func')
-        if rnd <= 6 and len(word) < 10:
-            toot_now = f'{word}じゃが！'
-            id_now = None
-    elif re.search(r"惚気|ほっけ|ホッケ", content+spoiler_text):
+        toot_now = f'{word}じゃが！'
+    elif re_search_rnd(r"惚気|ほっけ|ホッケ", content+spoiler_text, 2):
         SM.update(acct, 'func', score=-1)
-        if rnd <= 2:
-            toot_now = '(((🔥🔥🔥🔥)))＜ごぉぉぉっ！'
-            id_now = None
-    elif re.search(r"^燃やして$|^火$|^炎$", content+spoiler_text):
+        toot_now = '(((🔥🔥🔥🔥)))＜ごぉぉぉっ！'
+    elif re_search_rnd(r"^燃やして$|^火$|^炎$", content+spoiler_text, 6):
         SM.update(acct, 'func')
-        if rnd <= 6:
-            toot_now = '(((🔥🔥🔥🔥)))＜ごぉぉぉっ！'
-            id_now = None
-    elif re.search(r"[ご御夕昼朝][食飯][食た]べ[よるた]|(腹|はら)[へ減]った|お(腹|なか)[空す]いた|(何|なに)[食た]べよ", content):
+        toot_now = '(((🔥🔥🔥🔥)))＜ごぉぉぉっ！'
+    elif re_search_rnd(r"[ご御夕昼朝][食飯][食た]べ[よるた]|(腹|はら)[へ減]った|お(腹|なか)[空す]いた|(何|なに)[食た]べよ", content, 3):
         SM.update(acct, 'func')
-        if rnd <= 3:
-            recipe_service(content=content, acct=acct, id=id, g_vis=g_vis)
-    elif re.search(r"^.+じゃね[ぇえ]ぞ", content+spoiler_text):
+        recipe_service(content=content, acct=acct, id=id, g_vis=g_vis)
+    elif re_search_rnd(r"^.+じゃね[ぇえ]ぞ", content+spoiler_text, 4):
         word = re.search(r"^(.+)じゃね[ぇえ]ぞ", content+spoiler_text).group(1)
         SM.update(acct, 'func')
-        if rnd <= 4 and len(word) <= 5:
+        if len(word) <= 5:
             toot_now = f'{word}じゃぞ……{{{{{{💃}}}}}}'
-            id_now = None
-    elif re.search(r"止まるんじゃね[ぇえ]ぞ", content+spoiler_text):
+    elif re_search_rnd(r"止まるんじゃね[ぇえ]ぞ", content+spoiler_text, 4):
         SM.update(acct, 'func')
-        if rnd <= 4:
-            toot_now = r'止まるんじゃぞ……{{{💃}}}'
-            id_now = None
-    elif re.search(r"[おぉ][じぢ]|[おぉ][じぢ]さん", content+spoiler_text):
+        toot_now = r'止まるんじゃぞ……{{{💃}}}'
+    elif re_search_rnd(r"[おぉ][じぢ]|[おぉ][じぢ]さん", content+spoiler_text, 4):
         SM.update(acct, 'func')
-        if rnd <= 4:
-            tmp = []
-            tmp.append('٩(`^´๑ )۶三٩(๑`^´๑)۶三٩( ๑`^´)۶')
-            tmp.append('٩(`^´๑ )۶三٩( ๑`^´)۶')
-            tmp.append(' ₍₍ ٩(๑`^´๑)۶ ⁾⁾ぉぢぉぢダンスーー♪')
-            tmp.append('٩(٩`^´๑ )三( ๑`^´۶)۶')
-            toot_now = random.choice(tmp)
-            id_now = None
-    elif re.search(r"^う$", content):
+        tmp = []
+        tmp.append('٩(`^´๑ )۶三٩(๑`^´๑)۶三٩( ๑`^´)۶')
+        tmp.append('٩(`^´๑ )۶三٩( ๑`^´)۶')
+        tmp.append(' ₍₍ ٩(๑`^´๑)۶ ⁾⁾ぉぢぉぢダンスーー♪')
+        tmp.append('٩(٩`^´๑ )三( ๑`^´۶)۶')
+        toot_now = random.choice(tmp)
+    elif re_search_rnd(r"^う$", content, 6):
         SM.update(acct, 'func')
-        if rnd <= 6:
-            toot_now = 'え'
-            id_now = None
-    elif re.search(r"^うっ$", content):
+        toot_now = 'え'
+    elif re_search_rnd(r"^うっ$", content, 6):
         SM.update(acct, 'func')
-        if rnd <= 6:
-            toot_now = 'えっ'
-            id_now = None
-    elif re.search(r"^は？$", content):
+        toot_now = 'えっ'
+    elif re_search_rnd(r"^は？$", content, 6):
         SM.update(acct, 'func')
-        if rnd <= 6:
-            toot_now = 'ひ？'
-            id_now = None
+        toot_now = 'ひ？'
     elif "マストドン閉じろ" in content:
         toot_now = 'はい'
-        id_now = None
         interval = random.uniform(0.01, 0.7)
     elif "(ง ˆᴗˆ)ว" in content:
         SM.update(acct, 'func')
-        if rnd <= 6:
-            toot_now = '◝( ・_・)◟ <ﾋﾟﾀｯ!'
-            id_now = None
-    elif re.search(r".+とかけまして.+と[と解]きます|.+とかけて.+と[と解]く$", content):
+        toot_now = '◝( ・_・)◟ <ﾋﾟﾀｯ!'
+    elif re_search_rnd(r".+とかけまして.+と[と解]きます|.+とかけて.+と[と解]く$", content):
         SM.update(acct, 'func', score=2)
         toot_now = 'その心は？'
-        id_now = None
         interval = 1
-    elif re.search(r"^しばちゃんは.+[\?？]$", content) and acct in ['Ko4ba', MASTER_ID]:
+    elif re_search_rnd(r"^しばちゃんは.+[\?？]$", content) and acct in ['Ko4ba', MASTER_ID]:
         SM.update(acct, 'func')
         toot_now = '＼絶好調に美少女ー！／'
         interval = 1
-        id_now = None
-    elif re.search(r"^きりたんは.+[\?？]$", content) and acct == MASTER_ID:
+    elif re_search_rnd(r"^きりたんは.+[\?？]$", content) and acct == MASTER_ID:
         SM.update(acct, 'func')
         toot_now = '＼そこにいるー！／'
         interval = 1
-        id_now = None
-    elif re.search(r"^あのねあのね", content):
-        if rnd <= 6:
+    elif re_search_rnd(r"^あのねあのね", content, 6):
+        SM.update(acct, 'func')
+        toot_now = 'なになにー？'
+        interval = 0
+    elif re_search_rnd(r"パソコンつけ", content) and acct == "12":
             SM.update(acct, 'func')
-            toot_now = 'なになにー？'
-            interval = 0
-            id_now = None
-    elif re.search(r"パソコンつけ", content) and acct == "12":
-            SM.update(acct, 'func')
-            if rnd % 2 == 0:
+            if random.randint(0,10) % 2 == 0:
                 toot_now = '!お年玉'
             else:
                 toot_now = '!おみくじ10連'
             interval = 8
-            id_now = None
-    elif re.search("寝(ます|る|マス)([よかぞね]?|[…。うぅー～！・]+)$|^寝(ます|る|よ)[…。うぅー～！・]*$|\
+    elif re_search_rnd("寝(ます|る|マス)([よかぞね]?|[…。うぅー～！・]+)$|^寝(ます|る|よ)[…。うぅー～！・]*$|\
                     寝(ます|る|マス)(.*)[ぽお]や[ユすしー]|きりぼ(.*)[ぽお]や[ユすしー]", content):
-        if not re.search("寝る(かた|方|人|ひと|民)", content):
+        if not re_search_rnd("寝る(かた|方|人|ひと|民)", content):
             toot_now = f":@{acct}: おやすみ〜 {random.choice([tmp.strip() for tmp in open(KAOMOJI_PATH,'r').readlines() if os.path.exists(KAOMOJI_PATH) and len(tmp.strip())>0])}\n#挨拶部"
-            id_now = None
             interval = 5
-    elif re.search(r"^[こコ][らラ][きキ][りリ][ぼボぽポ]", content):
+    elif re_search_rnd(r"^[こコ][らラ][きキ][りリ][ぼボぽポ]", content):
         toot_now = random.choice([tmp.strip() for tmp in open(KORA_PATH, 'r').readlines() if os.path.exists(KORA_PATH) and len(tmp.strip()) > 0])
-        id_now = None
 
-    return toot_now, id_now, vis_now, interval
+    elif re_search_rnd(r"[へヘはハ][くク].*[しシ][ょョ][んン].*[出でデ][たタ]", content):
+        r = max([0, int(random.gauss(30, 30))])
+        maoudict = {"大魔王": 100, "中魔王": 10, "小魔王": 1}
+        result = {}
+        for k, v in maoudict.items():
+            if r >= v:
+                result[k] = int(r//v)
+                r = r % v
+        if len(result) > 0:
+            toot_now = f":@{acct}: 只今の記録"
+            for k, v in result.items():
+                toot_now += f"、{k}:{v}"
+            toot_now += "、でした〜\n#魔王チャレンジ"
+            if "大魔王" in result.keys():
+                toot_now += " #大魔王"
+        else:
+            toot_now = f":@{acct}: 只今の記録、０魔王でした〜\n#魔王チャレンジ"
+    
+    elif re_search_rnd(r"(.+)[出でデ][たタ].?$", content, 4):
+        r = max([0, int(random.gauss(30, 30))])
+        maoudict = {"大魔王": 100, "中魔王": 10, "小魔王": 1}
+        word = re.search(r"(.+)[出でデ][たタ].?$", str(content)).group(1).strip()
+        wakati_list = deep.tagger.parse(word).strip().split()
+        wakati_list = [w for w in wakati_list if len(w) > 1]
+        if len(wakati_list) > 0:
+            word = sorted([(s, len(s))
+                        for s in wakati_list], key=lambda x: -x[1])[0][0]
+            result = {}
+            for k, v in maoudict.items():
+                if r >= v:
+                    result[k] = int(r//v)
+                    r = r % v
+            if len(result) > 0:
+                toot_now = f":@{acct}: 只今の記録"
+                for k, v in result.items():
+                    toot_now += f"、{word}{k}:{v}"
+                toot_now += f"、でした〜\n#{word}魔王チャレンジ"
+                if "大魔王" in result.keys():
+                    toot_now += " #大魔王"
+            else:
+                toot_now = f":@{acct}: 只今の記録、０{word}魔王でした〜\n#{word}魔王チャレンジ"
+
+    return toot_now, id_now, vis_now, interval, reply
 
 
 def ana_image(media_file, acct):
@@ -1281,8 +1210,8 @@ def recipe_service(content=None, acct=MASTER_ID, id=None, g_vis='unlisted'):
     text_chu.extend(text_end)
     gen_txt += '＜作り方＞\n'
     for i, text in enumerate(text_chu):
-        gen_txt += f'@{acct}\n{i+1}.{text}\n'
-    gen_txt += "\n#きり料理提案サービス #きりぼっと"
+        gen_txt += f' {i+1}. {text}\n'
+    gen_txt = f"@{acct}\n{gen_txt}\n#きり料理提案サービス #きりぼっと"
     toot(gen_txt, g_vis, id, f":@{acct}: {spoiler}")
 
 
@@ -1382,7 +1311,7 @@ def th_worker():
             if WorkerQ.qsize() <= 1:  # キューが詰まってたらスルー
                 worker(status)
         except Exception as e:
-            logger.error(e)
+            logger.error(e, exc_info=True)
             sleep(30)
 
 
@@ -1457,12 +1386,12 @@ def bottlemail_sending():
 
 def lstm_tooter():
 # きりぼっとのつぶやき
-    seeds = DAO.get_least_10toots(limit=30)
+    seeds = DAO.get_least_10toots(limit=30, time=True)
     if len(seeds) <= 2:
         return
     spoiler = None
 
-    gen_txt = lstm_gen_rapper(seeds, rndvec=random.uniform(0.05, 0.2))
+    gen_txt = lstm_gen_rapper(seeds, rndvec=random.uniform(0.05, 0.1))
     gen_txt = util.content_cleanser_light(gen_txt)
     if gen_txt[0:1] == '。':
         gen_txt = gen_txt[1:]
@@ -1515,7 +1444,7 @@ def th_hint_de_pinto(gtime=20):
                           img.height*MAX_SIZE//max(img.size)), Image.LANCZOS)
         
         mask_map = [i for i in range(len(term))]
-        for loop, p in enumerate(range(3, 9, 1)):
+        for loop, p in enumerate(range(3, 8, 1)):
             loop_cnt.append(loop)
             if loop == 0:
                 hint_text = "なし"
@@ -1534,7 +1463,7 @@ def th_hint_de_pinto(gtime=20):
             if len(break_flg) == 0:
                 # LANCZOS BICUBIC NEAREST
                 re_size = (img.width*(2**p)//max(img.size),
-                            img.height*(2**p)//max(img.size))
+                           img.height*(2**p)//max(img.size))
                 tmp = img.resize(re_size, Image.NEAREST)
                 tmp = tmp.resize(img.size, Image.NEAREST)
                 filename = path.split('.')[0] + f'_{loop}.png'
@@ -1600,8 +1529,6 @@ def th_hint_de_pinto(gtime=20):
         while True:
             try:
                 acct, _, ans, vis, *_ = HintPinto_ansQ.get(timeout=2)
-                if not th.is_alive():
-                    break
                 if g_acct != acct and term in ans:
                     loop = len(loop_cnt) - 1
                     a_score = max(int(min([10, len(term)])*16//(2**loop)),1)
@@ -1624,6 +1551,8 @@ def th_hint_de_pinto(gtime=20):
                     break
             except queue.Empty:
                 logger.debug(f"ひんぴんデバッグ:{th.is_alive()}")
+                if not th.is_alive():
+                    break
 
         th.join()
         logger.debug(f"ひんぴんデバッグ:終了")
@@ -1769,7 +1698,7 @@ def th_saver():
 
 def wan_time():
 # わんタイム
-    gen_txt = 'わんわんわんわん！\n（（（｛｛｛∪･ω･∪｝｝｝）））（（（｛｛｛∪￣ᴥ￣∪｝｝｝）））'
+    gen_txt = 'わんわんわんわん！\n₍₍ （（（｛｛｛ฅ(  ᐡ ˘ܫ˘ ᐡ )ฅ｝｝｝））） ⁾⁾ ₍₍（（（｛｛｛ฅ( ᐡ╹ܫ╹ᐡ ฅ)｝｝｝）））⁾⁾'
     toot(gen_txt, "public")
 
 
@@ -1792,7 +1721,7 @@ def th_post():
         try:
             func, args = PostQ.get()
             func(*args)
-            sleep(1.1)
+            sleep(0.8)
         except Exception as e:
             logger.error(e)
             sleep(3)
@@ -1803,11 +1732,11 @@ def run():
     threads = []
     #タイムライン受信系
     mastodon.stream_local(ltl_listener(), run_async=True, timeout=180,
-                        reconnect_async=True, reconnect_async_wait_sec=5)
+                        reconnect_async=True, reconnect_async_wait_sec=15)
     publicdon.stream_local(public_listener(), run_async=True,
-                        timeout=180, reconnect_async=True, reconnect_async_wait_sec=5)
+                        timeout=180, reconnect_async=True, reconnect_async_wait_sec=15)
     mastodon.stream_user(notification_listener(), run_async=True,
-                        timeout=180, reconnect_async=True, reconnect_async_wait_sec=5)
+                        timeout=180, reconnect_async=True, reconnect_async_wait_sec=15)
     #タイムライン応答系
     threads.append(threading.Thread(target=th_delete))
     threads.append(threading.Thread(target=th_saver))

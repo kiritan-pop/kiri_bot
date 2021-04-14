@@ -38,6 +38,7 @@ class Trans:
             return result
         except Exception as e:
             logger.error(e)
+            logger.error(result)
             return None
 
     def __req_dec(self,url):
@@ -48,4 +49,5 @@ class Trans:
             return result
         except Exception as e:
             logger.error(e)
+            logger.error(result)
             return None

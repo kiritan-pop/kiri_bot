@@ -18,15 +18,15 @@ class CoolingManager():
 
     def count(self,created_at):
         self.created_ats.append(created_at.astimezone(timezone('Asia/Tokyo')))
-        if len(self.created_ats) > 100:
+        if len(self.created_ats) > 5:
             self.created_ats = self.created_ats[1:]
 
     def _flowrate(self):  # toot数/分 を返す
-        if len(self.created_ats) > 10:
+        if len(self.created_ats) > 1:
             delta = self.created_ats[-1] - self.created_ats[0]
             return len(self.created_ats)*60 /delta.total_seconds()
         else:
-            return 60
+            return 10
 
     def timer_showflowrate(self):
         while True:

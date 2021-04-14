@@ -21,9 +21,9 @@ class GenerateText(object):
     def generate(self,switch):
         self._print_log('@@@generate : %s'%switch)
         str_time = datetime.now(timezone('Asia/Tokyo'))
-        db_path = "db/" + switch + ".db"
+        db_path = "data/" + switch + ".db"
         if not os.path.exists(db_path):
-            con = sqlite3.connect('db/chain.db')
+            con = sqlite3.connect('data/chain.db')
         else:
             con = sqlite3.connect(db_path,check_same_thread=False)
 

@@ -101,6 +101,16 @@ def content_cleanser(content):
         return rtext
 
 #######################################################
+# トゥート内容の標準化・クレンジング
+def reply_to(content):
+    tmp = BeautifulSoup(content, 'lxml')
+    reply_to_list = []
+    for x in tmp.find_all("a", class_="u-url mention"):
+        reply_to_list.append(x.span.text)
+    return reply_to_list
+
+    
+#######################################################
 # トゥート内容の標準化・クレンジング・ライト
 def content_cleanser_light(text):
     rtext = re.sub(r'([^:])@', r'\1', text)
