@@ -363,7 +363,7 @@ def worker(status):
     sensitive = status['sensitive']
     created_at = status['created_at']
     created_at = created_at.astimezone(timezone('Asia/Tokyo'))
-    reply_to = util.reply_to(status['content'])
+    reply_to_acct_list = util.reply_to(status['content'])
 
     #botはスルー
     if status["account"]["bot"]:
@@ -409,7 +409,7 @@ def worker(status):
     # 定型文応答処理
     toot_now, id_now, vis_now, interval, reply = res_fixed_phrase(id, acct, username, g_vis, content, statuses_count,
                                                                spoiler_text, ac_ymd, now_ymd, media_attachments,
-                                                               sensitive, created_at, reply_to, ct)
+                                                                  sensitive, created_at, reply_to_acct_list, ct)
     if toot_now:
         toot(reply + toot_now, vis_now, id_now, None, None, interval)
         return
@@ -766,7 +766,7 @@ def worker(status):
 
 def res_fixed_phrase(id, acct, username, g_vis, content, statuses_count,
                      spoiler_text, ac_ymd, now_ymd, media_attachments,
-                     sensitive, created_at, reply_to, ct):
+                     sensitive, created_at, reply_to_acct_list, ct):
 # 定型文応答処理
 
     def re_search_rnd(re_txt, text, threshold=None, flags=0):
@@ -784,8 +784,8 @@ def res_fixed_phrase(id, acct, username, g_vis, content, statuses_count,
     toot_now = ''
     vis_now = g_vis
     interval = 0
-    reply = f"@{acct} " if BOT_ID in reply_to else ""
-    id_now = id if reply_to != "" else None
+    reply = f"@{acct} " if BOT_ID in reply_to_acct_list else ""
+    id_now = id if reply != "" else None
 
     if Toot1bQ.empty():
         content_1b, acct_1b = None, None
