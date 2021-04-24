@@ -12,6 +12,7 @@ import threading
 from pytz import timezone
 from datetime import datetime
 from bs4 import BeautifulSoup
+import jaconv
 import traceback
 from logging import getLogger, StreamHandler, Formatter, FileHandler, getLevelName
 
@@ -86,6 +87,8 @@ def content_cleanser(content):
         ps.append(p.text)
     rtext += '。\n'.join(ps)
     rtext = unicodedata.normalize("NFKC", rtext)
+    rtext = jaconv.h2z(jaconv.z2h(rtext, kana=False, digit=True,
+                                  ascii=True), kana=True, digit=False, ascii=False).lower()
     # rtext = re.sub(r'([^:])@', r'\1', rtext)
     rtext = rtext.replace("#","")
     rtext = re.sub(r'(___R___)\1{2,}', r'\1', rtext)
@@ -106,7 +109,8 @@ def reply_to(content):
     tmp = BeautifulSoup(content, 'lxml')
     reply_to_list = []
     for x in tmp.find_all("a", class_="u-url mention"):
-        reply_to_list.append(x.span.text)
+        if x.span != None:
+            reply_to_list.append(x.span.text)
     return reply_to_list
 
     
