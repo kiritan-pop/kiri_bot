@@ -30,7 +30,7 @@ from kiribo.config import MEDIA_PATH, GOOGLE_ENGINE_KEY, GOOGLE_KEY, MASTODON_UR
 # きりぼサブモジュール
 from kiribo import bottlemail, cooling_manager, dao, deep, game, generate_text,\
     get_images_ggl, imaging, kishou, romasaga, scheduler, score_manager, stat, tenki,\
-    timer, toot_summary, trans, util
+    timer, toot_summary, trans, util, haiku
 
 logger = util.setup_logger(__name__)
 
@@ -364,6 +364,7 @@ def worker(status):
     created_at = status['created_at']
     created_at = created_at.astimezone(timezone('Asia/Tokyo'))
     reply_to_acct_list = util.reply_to(status['content'])
+    display_name = status["account"]['display_name']
 
     #botはスルー
     if status["account"]["bot"]:
@@ -763,6 +764,13 @@ def worker(status):
             else:
                 toot(toot_now, g_vis=g_vis)
 
+    else:
+        if re.search(r'[a-zA-Z0-9!-/:-@¥[-`{-~]', content.replace("___R___", '')) == None:
+            haiku_list, _, kigo, *_ = haiku.haiku_check(content.replace("___R___", ''))
+            if len(haiku_list) >= 3:
+                toot(
+                    f"{haiku_list[0]}\n{haiku_list[1]}\n{haiku_list[2]}\n{'　'*8}:@{acct}: {display_name} {'（季語：'+kigo+'）' if kigo else ''}",
+                    spo=f"{'俳句' if kigo else '川柳'}を検出したよ〜", g_vis=g_vis)
 
 def res_fixed_phrase(id, acct, username, g_vis, content, statuses_count,
                      spoiler_text, ac_ymd, now_ymd, media_attachments,
