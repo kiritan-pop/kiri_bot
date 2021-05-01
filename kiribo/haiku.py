@@ -62,7 +62,9 @@ def haiku_check(content):
                 word += k["origin"]
                 k = keitai.pop(0)
     except IndexError:
-        pass
+        # ピッタシ終わりじゃないと除外
+        if len(keitai) > 0:
+            haiku = []
 
     # 季語有無判定
     haiku_hantei = False

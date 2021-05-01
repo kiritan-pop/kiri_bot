@@ -3,6 +3,7 @@
 import random,json
 import os,sys,io,re
 import requests
+from requests.exceptions import Timeout
 import http.client
 import urllib.parse
 from urllib.parse import quote
@@ -40,6 +41,8 @@ def setup_logger(modname):
     logger.addHandler(fh)
     return logger
 
+
+logger = setup_logger(__name__)
 
 #######################################################
 # ネイティオ語翻訳
@@ -126,6 +129,8 @@ def content_cleanser_light(text):
         rtext = re.sub(ng_word, '■'*len(ng_word), rtext)
     return rtext
 
+def display_name_cleanser(display_name):
+    return re.sub(r'@', '＠', display_name)
 
 #######################################################
 # 日本語っぽいかどうか判定
@@ -140,7 +145,7 @@ def is_japanese(string):
 #######################################################
 # メディアダウンロード
 def get_file_name(url):
-    print(f'url:{url}')
+    logger.debug(f'url:{url}')
     temp = url.split("/")[-1].split("?", 1)[0].split(",", 1)[0]
     filename = temp.split(".")[0]
     file_extension = temp.split(".")[-1]
@@ -154,8 +159,19 @@ def download_media(url, save_path=MEDIA_PATH, subdir=""):
     filename = get_file_name(url)
     if filename:
         ret_path = os.path.join(save_path, subdir, filename)
-        response = requests.get(url)
-        print(response.status_code)
+        logger.debug("download_media start")
+        try:
+            response = requests.get(url, timeout=2)
+        except Timeout as e:
+            logger.warn(e)
+            logger.warn("requests retry")
+            try:
+                response = requests.get(url, timeout=3)
+            except Timeout as e1:
+                logger.warn(e1)
+                return None
+        
+        logger.debug(f"download_media end code:{response.status_code}")
         if response.status_code == 200:
             with open(ret_path, 'wb') as file:
                 file.write(response.content)

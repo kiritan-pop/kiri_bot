@@ -30,7 +30,7 @@ from kiribo.config import MEDIA_PATH, GOOGLE_ENGINE_KEY, GOOGLE_KEY, MASTODON_UR
 # きりぼサブモジュール
 from kiribo import bottlemail, cooling_manager, dao, deep, game, generate_text,\
     get_images_ggl, imaging, kishou, romasaga, scheduler, score_manager, stat, tenki,\
-    timer, toot_summary, trans, util, haiku
+    timer, toot_summary, trans, util, haiku, tarot
 
 logger = util.setup_logger(__name__)
 
@@ -364,7 +364,7 @@ def worker(status):
     created_at = status['created_at']
     created_at = created_at.astimezone(timezone('Asia/Tokyo'))
     reply_to_acct_list = util.reply_to(status['content'])
-    display_name = status["account"]['display_name']
+    display_name = util.display_name_cleanser(status["account"]['display_name'])
 
     #botはスルー
     if status["account"]["bot"]:
@@ -388,6 +388,7 @@ def worker(status):
     media_file = []
     for media in media_attachments:
         media_file.append(util.download_media(media["url"]))
+    media_file = [m for m in media_file if m]
 
     ct = int(CM.get_coolingtime())
 
@@ -718,6 +719,17 @@ def worker(status):
                 media_files.append(mastodon.media_post(p, 'image/png'))
             # , spo=sptxt+"だよ〜")
             toot(toot_now, g_vis=g_vis, rep=id, media_ids=media_files)
+
+    elif re.search(r"!tarot|きりぼ(くん|君|さん|様|さま|ちゃん)?[!！、\s]?(占って|占い)", content):
+        if tarot.tarot_check(acct):
+            text, img = tarot.tarot_main()
+            media_files = []
+            media_files.append(
+                mastodon.media_post(img, 'image/png'))
+            toot(f"@{acct}\n{text}", g_vis=g_vis, rep=id,
+                 spo=f":@{acct}: を占ったよ〜", media_ids=media_files)
+        else:
+            toot(f"@{acct} 前回占ったばっかりなので、もう少し舞っててね〜", g_vis=g_vis, rep=id)
 
     elif re.search(r'[^:]@%s' % BOT_ID, status['content']):
         SM.update(acct, 'reply')
@@ -1132,7 +1144,7 @@ def business_contact(status):
     content = util.content_cleanser(status['content'])
     statuses_count = status["account"]["statuses_count"]
     created_at = status['created_at']
-    display_name = status["account"]['display_name']
+    display_name = util.display_name_cleanser(status["account"]['display_name'])
     ac_created_at = status["account"]["created_at"]
     ac_created_at = ac_created_at.astimezone(timezone('Asia/Tokyo'))
     if '@' in acct:  # 連合スルー
