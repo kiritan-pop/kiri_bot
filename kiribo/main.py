@@ -1160,7 +1160,7 @@ def business_contact(status):
 
     jst_now = datetime.now(timezone('Asia/Tokyo'))
     jst_now_hh = int(jst_now.strftime("%H"))
-    logger.info(f'「{content[:50]:<50}」by {acct}')
+    logger.info(f'「{content[:30]:<30}」by {acct}')
 
     kaomoji = random.choice([tmp.strip() for tmp in open(KAOMOJI_PATH, 'r').readlines() if os.path.exists(KAOMOJI_PATH) and len(tmp.strip()) > 0])
     if statuses_count == 1:

@@ -23,11 +23,15 @@ def haiku_check(content):
             continue
         temp["hinshi1"], temp["hinshi2"], _, _, _, temp["katsuyou"], _, temp["yomi"], \
             *_ = w2.split(",")
+        # 記号はスキップ
+        if temp["hinshi1"] == "記号":
+            continue
         # ャュョァィゥェォはカウントしない
         temp["yomi"] = re.sub(r"[ャュョァィゥェォ]", "", temp["yomi"])
         temp["len"] = len(temp["yomi"])
         keitai.append(temp)
 
+    logger.debug(keitai)
     # ５７５判定
     haiku = []
     numlist = [5, 7, 5]
@@ -66,6 +70,7 @@ def haiku_check(content):
         if len(keitai) > 0:
             haiku = []
 
+    logger.debug(haiku)
     # 季語有無判定
     haiku_hantei = False
     kigo = None
@@ -81,4 +86,4 @@ def haiku_check(content):
 if __name__ == '__main__':
     # そうなのかなかなか判定難しそう いや別に俳句得意じゃないけどな
     # さっきから下品な川柳いやになる
-    print(haiku_check("さっきから下品な川柳いやになる"))
+    print(haiku_check(input(">>").strip()))

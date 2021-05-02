@@ -90,12 +90,12 @@ def content_cleanser(content):
         ps.append(p.text)
     rtext += '。\n'.join(ps)
     rtext = unicodedata.normalize("NFKC", rtext)
+    rtext = rtext.replace("#", "")
+    rtext = re.sub(r'(___R___)\1{2,}', r'\1', rtext)
+    rtext = re.sub(r'___R___', r'\n', rtext)
     rtext = jaconv.h2z(jaconv.z2h(rtext, kana=False, digit=True,
                                   ascii=True), kana=True, digit=False, ascii=False).lower()
     # rtext = re.sub(r'([^:])@', r'\1', rtext)
-    rtext = rtext.replace("#","")
-    rtext = re.sub(r'(___R___)\1{2,}', r'\1', rtext)
-    rtext = re.sub(r'___R___', r'\n', rtext)
     #NGワード
     ng_words = set(word.strip() for word in open(NG_WORDS_PATH).readlines())
     for ng_word in ng_words:
