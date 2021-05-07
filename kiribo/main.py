@@ -365,6 +365,7 @@ def worker(status):
     created_at = created_at.astimezone(timezone('Asia/Tokyo'))
     reply_to_acct_list = util.reply_to(status['content'])
     display_name = util.display_name_cleanser(status["account"]['display_name'])
+    avatar_static = status["account"]['avatar_static']
 
     #botはスルー
     if status["account"]["bot"]:
@@ -722,10 +723,12 @@ def worker(status):
 
     elif re.search(r"!tarot|きりぼ(くん|君|さん|様|さま|ちゃん)?[!！、\s]?(占って|占い)", content):
         if tarot.tarot_check(acct):
-            text, img = tarot.tarot_main()
+            text, img_path, tarot_result = tarot.tarot_main()
+            img_path = tarot.make_tarot_image(
+                tarot_result, img_path, avatar_static)
             media_files = []
             media_files.append(
-                mastodon.media_post(img, 'image/png'))
+                mastodon.media_post(img_path, 'image/png'))
             toot(f"@{acct}\n{text}", g_vis=g_vis, rep=id,
                  spo=f":@{acct}: を占ったよ〜", media_ids=media_files)
         else:
@@ -1456,6 +1459,15 @@ def th_delete():
 
 
 def th_hint_de_pinto(gtime=20):
+    try:
+        th_hint_de_pinto_sub(gtime)
+    except Exception as e:
+        logger.error(e)
+        sleep(5)
+        th_hint_de_pinto_sub(gtime)
+
+
+def th_hint_de_pinto_sub(gtime=20):
     MAX_SIZE = 512
 # ヒントでピントゲーム
     def th_shududai(path):
