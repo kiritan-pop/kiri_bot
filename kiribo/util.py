@@ -94,7 +94,7 @@ def content_cleanser(content):
     rtext = re.sub(r'(___R___)\1{2,}', r'\1', rtext)
     rtext = re.sub(r'___R___', r'\n', rtext)
     rtext = jaconv.h2z(jaconv.z2h(rtext, kana=False, digit=True,
-                                  ascii=True), kana=True, digit=False, ascii=False).lower()
+                                  ascii=True), kana=True, digit=False, ascii=False)
     # rtext = re.sub(r'([^:])@', r'\1', rtext)
     #NGワード
     ng_words = set(word.strip() for word in open(NG_WORDS_PATH).readlines())

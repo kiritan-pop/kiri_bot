@@ -1,16 +1,11 @@
 # coding: utf-8
 from mastodon import Mastodon, StreamListener
-import requests
 import re
 import os
-import json
 import random
-import unicodedata
 import signal
-import sys
 import threading
 import queue
-import urllib
 from time import sleep
 from pytz import timezone
 import dateutil
@@ -521,7 +516,7 @@ def worker(status):
     elif re.search(r"(ヒントでピント)[：:](.+)", content):
         if g_vis == 'direct':
             word = re.search(r"(ヒントでピント)[：:](.+)",
-                             str(content)).group(2).strip()
+                             str(content)).group(2).strip().lower()
             if len(word) < 3:
                 toot(f'@{acct} お題は３文字以上にしてね〜', 'direct', rep=id)
                 return
@@ -549,6 +544,8 @@ def worker(status):
         try:
             word = re.sub(
                 r".*(へい)?きりぼ(っと)?(くん|君|さん|様|さま|ちゃん)?[!,.]?", "", word).strip()
+            if len(word) == 0:
+                return
             page = wikipedia.page(word)
         except wikipedia.exceptions.DisambiguationError as e:
             nl = "\n"
@@ -662,7 +659,8 @@ def worker(status):
         for tid, tcontent, tdate, ttime in toots:
             try:
                 status = mastodon.status(tid)
-            except:
+            except Exception as e:
+                logger.error(e)
                 sleep(2)
                 continue
             else:
@@ -721,7 +719,7 @@ def worker(status):
             # , spo=sptxt+"だよ〜")
             toot(toot_now, g_vis=g_vis, rep=id, media_ids=media_files)
 
-    elif re.search(r"!tarot|きりぼ(くん|君|さん|様|さま|ちゃん)?[!！、\s]?(占って|占い)", content):
+    elif re.search(r"!tarot|きりぼ(くん|君|さん|様|さま|ちゃん)?[!！、\s]?(占って|占い|占う|占え)", content):
         if tarot.tarot_check(acct):
             text, img_path, tarot_result = tarot.tarot_main()
             img_path = tarot.make_tarot_image(
@@ -1793,3 +1791,10 @@ def run():
 
     for th in threads:
         th.start()
+
+
+if __name__ == '__main__':
+    toots = DAO.get_user_toots('5M')
+    for tid, tcontent, tdate, ttime in toots:
+        status = mastodon.status(tid)
+        print(status)

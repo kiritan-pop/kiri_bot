@@ -245,3 +245,8 @@ class Dao():
             return parser.parse(ymdhms).astimezone(timezone('Asia/Tokyo'))
         else:
             return None
+
+
+if __name__ == '__main__':
+    d = Dao()
+    print(d.get_user_toots('5M'))
