@@ -1554,7 +1554,7 @@ def th_hint_de_pinto_sub(gtime=20):
         loop_cnt = []
         th = threading.Thread(target=th_shududai, args=(path,))
         th.start()
-        sleep(1.0)
+        sleep(3.0)
         HintPinto_flg.append('ON')
         while True:
             try:

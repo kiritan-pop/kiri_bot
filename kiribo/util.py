@@ -74,17 +74,17 @@ def hashtag(content):
 #######################################################
 # トゥート内容の標準化・クレンジング
 def content_cleanser(content):
-    tmp = BeautifulSoup(content.replace("<br />","___R___").strip(),'lxml')
     hashtag = ""
-    for x in tmp.find_all("a",rel="tag"):
+    rtext = ""
+
+    tmp = BeautifulSoup(content.replace("<br />", "___R___").strip(), 'lxml')
+    for x in tmp.find_all("a", rel="tag"):
         hashtag = x.span.text
     for x in tmp.find_all("a"):
         x.extract()
-
     if tmp.text == None:
         return ""
 
-    rtext = ''
     ps = []
     for p in tmp.find_all("p"):
         ps.append(p.text)
@@ -95,16 +95,23 @@ def content_cleanser(content):
     rtext = re.sub(r'___R___', r'\n', rtext)
     rtext = jaconv.h2z(jaconv.z2h(rtext, kana=False, digit=True,
                                   ascii=True), kana=True, digit=False, ascii=False)
-    # rtext = re.sub(r'([^:])@', r'\1', rtext)
-    #NGワード
-    ng_words = set(word.strip() for word in open(NG_WORDS_PATH).readlines())
-    for ng_word in ng_words:
-        # rtext = rtext.replace(ng_word,'■■■')
-        rtext = re.sub(ng_word, '■'*len(ng_word), rtext)
+    rtext = replace_ng_word(rtext)
     if hashtag != "":
         return rtext + " #" + hashtag
     else:
         return rtext
+
+
+def replace_ng_word(text):
+    #NGワード
+    ng_words = set(word.strip() for word in open(NG_WORDS_PATH).readlines())
+    for ng_word in ng_words:
+        if re.search(ng_word, text):
+            text = re.sub(
+                ng_word, '■'*len(re.search(ng_word, text).group(0)), text)
+    
+    return text
+
 
 #######################################################
 # トゥート内容の標準化・クレンジング
@@ -116,21 +123,20 @@ def reply_to(content):
             reply_to_list.append(x.span.text)
     return reply_to_list
 
-    
+
 #######################################################
 # トゥート内容の標準化・クレンジング・ライト
 def content_cleanser_light(text):
     rtext = re.sub(r'([^:])@', r'\1', text)
     rtext = re.sub(r'(___R___)\1{2,}', r'\1', rtext)
     rtext = re.sub(r'___R___', r'\n', rtext)
-    #NGワード
-    ng_words = set(word.strip() for word in open(NG_WORDS_PATH).readlines())
-    for ng_word in ng_words:
-        rtext = re.sub(ng_word, '■'*len(ng_word), rtext)
+    rtext = replace_ng_word(rtext)
     return rtext
+
 
 def display_name_cleanser(display_name):
     return re.sub(r'@', '＠', display_name)
+
 
 #######################################################
 # 日本語っぽいかどうか判定
@@ -180,3 +186,8 @@ def download_media(url, save_path=MEDIA_PATH, subdir=""):
             return None
     else:
         return None
+
+
+if __name__ == '__main__':
+    print(content_cleanser("<p>xxxx</p>"))
+    print(content_cleanser_light("<p>xxxxx</p>"))
