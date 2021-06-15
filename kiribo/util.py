@@ -93,8 +93,6 @@ def content_cleanser(content):
     rtext = rtext.replace("#", "")
     rtext = re.sub(r'(___R___)\1{2,}', r'\1', rtext)
     rtext = re.sub(r'___R___', r'\n', rtext)
-    rtext = jaconv.h2z(jaconv.z2h(rtext, kana=False, digit=True,
-                                  ascii=True), kana=True, digit=False, ascii=False)
     rtext = replace_ng_word(rtext)
     if hashtag != "":
         return rtext + " #" + hashtag
@@ -104,13 +102,29 @@ def content_cleanser(content):
 
 def replace_ng_word(text):
     #NGワード
-    ng_words = set(word.strip() for word in open(NG_WORDS_PATH).readlines())
-    for ng_word in ng_words:
+    for ng_word in read_ng_words():
         if re.search(ng_word, text):
             text = re.sub(
                 ng_word, '■'*len(re.search(ng_word, text).group(0)), text)
     
     return text
+
+
+def read_ng_words():
+    return set(word.strip() for word in open(NG_WORDS_PATH).readlines())
+
+
+def is_ng(text):
+    #NGワード
+    for ng_word in read_ng_words():
+        if re.search(ng_word, text):
+            return True
+    return False
+
+
+def normalize_txt(text):
+    return jaconv.h2z(jaconv.z2h(text.strip(), kana=False, digit=True,
+                                  ascii=True), kana=True, digit=False, ascii=False).lower()
 
 
 #######################################################

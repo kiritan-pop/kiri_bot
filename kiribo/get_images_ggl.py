@@ -33,7 +33,7 @@ class GetImagesGGL:
             logger.info(f'Searching images for: {term}')
             url_list = self.ImageSearch(term)
         except Exception as err:
-            print(err)
+            logger.error(err)
             return []
 
         img_paths = []

@@ -12,6 +12,7 @@ from kiribo.config import TAROT_DATA_PATH, TAROT_IMG_PATH, TAROT_CHK_PATH, FONT_
 with open(TAROT_DATA_PATH, 'r') as f:
     tarot_data = json.load(f)
 
+ORDER = ["総合", "金運", "恋愛", "健康", "仕事", "遊び"]
 
 def tarot_reading():
     return tarot_data[str(random.randrange(len(tarot_data)))]
@@ -22,12 +23,11 @@ def get_tarot_image(tarot):
 
 
 def tarot_main():
-    order = ["総合", "金運", "恋愛", "健康", "仕事", "遊び"]
     tarot = tarot_reading()
     img_path = get_tarot_image(tarot)
     text = f"【{tarot['name']}】{'逆位置' if tarot['rev'] else '正位置'}\n"
     text += f"{tarot['txt1']}\n{tarot['txt2'] if len(tarot['txt2'])>0 else ''}\n"
-    text += "\n".join([f"{o}：{'☆'*tarot['stars'][o]}" for o in order])
+    text += "\n".join([f"{o}：{'☆'*tarot['stars'][o]}" for o in ORDER])
     text += "\n powerd by :@HKSN:"
     text += "\n 画像提供 https://www.pixiv.net/artworks/71664018"
     return text, img_path, tarot
