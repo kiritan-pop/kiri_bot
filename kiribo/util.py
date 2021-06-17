@@ -1,20 +1,12 @@
 # coding: utf-8
 
-import random,json
-import os,sys,io,re
+import os,re
 import requests
 from requests.exceptions import Timeout
-import http.client
-import urllib.parse
-from urllib.parse import quote
-from time import time, sleep
+import urllib3
 import unicodedata
-import threading
-from pytz import timezone
-from datetime import datetime
 from bs4 import BeautifulSoup
 import jaconv
-import traceback
 from logging import getLogger, StreamHandler, Formatter, FileHandler, getLevelName
 
 # きりぼコンフィグ
@@ -181,13 +173,13 @@ def download_media(url, save_path=MEDIA_PATH, subdir=""):
         ret_path = os.path.join(save_path, subdir, filename)
         logger.debug("download_media start")
         try:
-            response = requests.get(url, timeout=2)
-        except Timeout as e:
-            logger.warn(e)
+            response = requests.get(url, timeout=3)
+        except urllib3.exceptions.ReadTimeoutError as e:
             logger.warn("requests retry")
+            logger.warn(e)
             try:
                 response = requests.get(url, timeout=3)
-            except Timeout as e1:
+            except urllib3.exceptions.ReadTimeoutError as e1:
                 logger.warn(e1)
                 return None
         

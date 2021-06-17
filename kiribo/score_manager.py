@@ -112,7 +112,7 @@ class ScoreManager():
 if __name__ == '__main__':
     from pprint import pprint as pp
     cm = ScoreManager()
-    acct = "HKSN"
+    acct = "mio_KiKi"
     pp(cm.show(acct=acct))
-    cm.update(acct=acct, key='getnum', score=28)
+    cm.update(acct=acct, key='getnum', score=168)
     pp(cm.show(acct=acct))
