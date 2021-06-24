@@ -723,9 +723,8 @@ def worker(status):
 
     elif re.search(r"!tarot|きりぼ(くん|君|さん|様|さま|ちゃん)?[!！、\s]?(占って|占い|占う|占え)", content):
         if tarot.tarot_check(acct):
-            text, img_path, tarot_result = tarot.tarot_main()
-            img_path = tarot.make_tarot_image(
-                tarot_result, img_path, avatar_static)
+            text, tarot_result = tarot.tarot_main()
+            img_path = tarot.make_tarot_image(tarot_result, avatar_static)
             media_files = []
             media_files.append(
                 mastodon.media_post(img_path, 'image/png'))
