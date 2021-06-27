@@ -119,6 +119,7 @@ jihou_dict = {
     "23": "🕚",
 }
 
+BACKSLASH = '\n'
 
 def get_args():
 # アーギュメントのやつ
@@ -774,21 +775,22 @@ def worker(status):
             if len(attach_files) > 0:
                 toot_now = "#exp15m"
                 toot(toot_now, g_vis=g_vis, rep=None,
-                     spo='おわかりいただけるだろうか……', media_ids=media_files, interval=5)
+                    spo='おわかりいただけるだろうか……', media_ids=media_files, interval=5)
             else:
                 toot(toot_now, g_vis=g_vis)
 
     else:
         if re.search(r'[a-zA-Z0-9!-/:-@¥[-`{-~]', content.replace("___R___", '')) == None:
-            haiku_list, _, kigo, *_ = haiku.haiku_check(content.replace("___R___", ''))
-            if len(haiku_list) >= 3:
+            ikku = haiku.Reviewer()
+            song = ikku.find(content.replace("___R___", ''))
+            if len(song.surfaces) >= 3:
                 toot(
-                    f"{haiku_list[0]}\n{haiku_list[1]}\n{haiku_list[2]}\n{'　'*8}:@{acct}: {display_name} {'（季語：'+kigo+'）' if kigo else ''}",
-                    spo=f"{'俳句' if kigo else '川柳'}を検出したよ〜", g_vis=g_vis)
+                    f"{BACKSLASH.join([''.join([node.surface for node in phrase]) for phrase in song.phrases])}{BACKSLASH}{'　'*4}:@{acct}:{display_name} {'（季語：'+song.season_word+'）' if song.season_word else ''}",
+                    spo=f"{'俳句' if song.season_word else '川柳'}を検出したよ〜", g_vis=g_vis)
 
 def res_fixed_phrase(id, acct, username, g_vis, content, statuses_count,
-                     spoiler_text, ac_ymd, now_ymd, media_attachments,
-                     sensitive, created_at, reply_to_acct_list, ct):
+                    spoiler_text, ac_ymd, now_ymd, media_attachments,
+                    sensitive, created_at, reply_to_acct_list, ct):
 # 定型文応答処理
 
     def re_search_rnd(re_txt, text, threshold=None, flags=0):
