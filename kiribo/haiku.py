@@ -102,7 +102,7 @@ class Node():
         self.conjugation1 = self.feature[4]
         self.conjugation2 = self.feature[5]
         self.root_form = self.feature[6]
-        self.pronunciation = self.feature[8] if len(self.feature) >= 9 else 0
+        self.pronunciation = self.feature[8] if len(self.feature) >= 9 else ""
         self.pronunciation_mora = re.sub(
             r'[^アイウエオカ-モヤユヨラ-ロワヲンヴー]', '', jaconv.hira2kata(self.pronunciation))
         self.pronunciation_length = len(self.pronunciation_mora)
