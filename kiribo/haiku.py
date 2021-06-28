@@ -1,14 +1,48 @@
 # coding: utf-8
 
 import MeCab
-import re
+import re, os
 import jaconv
 import itertools
+from PIL import Image, ImageFont, ImageDraw
 
-from kiribo.config import IPADIC_PATH, KIGO_PATH
+from kiribo.config import IPADIC_PATH, KIGO_PATH, FONT_PATH_IKKU, MEDIA_PATH
 from kiribo import  util
 
 logger = util.setup_logger(__name__)
+
+
+def make_ikku_image(song, avatar_static):
+    frame_img = Image.open('./data/ikku_frame.png').convert("RGBA")
+
+    avatar_static_img_path = util.download_media(avatar_static)
+    img_clear = Image.new("RGBA", frame_img.size, (255, 255, 255, 0))
+    # アイコン
+    if avatar_static_img_path:
+        avatar_static_img = Image.open(avatar_static_img_path).convert("RGBA")
+        max_size = max(avatar_static_img.width, avatar_static_img.height)
+        RS_SIZE = 120
+        avatar_static_img = avatar_static_img.resize(
+            (avatar_static_img.width*RS_SIZE//max_size, avatar_static_img.height*RS_SIZE//max_size), resample=Image.LANCZOS)
+        img_clear.paste(avatar_static_img, (frame_img.width -
+                                            RS_SIZE - 40, frame_img.height - RS_SIZE - 40))
+
+    # 文字追加
+    FONT_SIZE = 48
+    font = ImageFont.truetype(
+        FONT_PATH_IKKU, size=FONT_SIZE, layout_engine=ImageFont.LAYOUT_RAQM)
+    draw = ImageDraw.Draw(img_clear)
+    for index, phrase in enumerate(song.phrases):
+
+        draw.text((img_clear.width - (FONT_SIZE+16) * (index+1) - 36, FONT_SIZE*index*(index + 1) + 128),
+                  "".join([node.surface for node in phrase]),
+                  fill=(20, 20, 20), font=font, direction="ttb")
+
+    frame_img = Image.alpha_composite(frame_img, img_clear)
+    save_path = os.path.join(MEDIA_PATH, "ikku_tmp.png")
+    frame_img.save(save_path)
+    return save_path
+
 
 class Reviewer():
     def __init__(self, rule=None):
@@ -264,3 +298,7 @@ if __name__ == '__main__':
         print("\n".join(["".join([node.surface for node in phrase])
                         for phrase in song.phrases]))
         print(f"{song.season_word}")
+
+        make_ikku_image(
+            song, "https://kiritan.work/system/accounts/avatars/000/000/001/original/039525c0ca872f5d.png")
+# インストール fribidi  libraqm

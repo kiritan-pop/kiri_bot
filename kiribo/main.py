@@ -775,7 +775,7 @@ def worker(status):
             if len(attach_files) > 0:
                 toot_now = "#exp15m"
                 toot(toot_now, g_vis=g_vis, rep=None,
-                    spo='おわかりいただけるだろうか……', media_ids=media_files, interval=5)
+                     spo='おわかりいただけるだろうか……', media_ids=attach_files, interval=5)
             else:
                 toot(toot_now, g_vis=g_vis)
 
@@ -784,9 +784,12 @@ def worker(status):
             ikku = haiku.Reviewer()
             song = ikku.find(content.replace("___R___", ''))
             if len(song.surfaces) >= 3:
+                media_files = []
+                media_files.append(
+                    mastodon.media_post(haiku.make_ikku_image(song, avatar_static), 'image/png'))
                 toot(
                     f"{BACKSLASH.join([''.join([node.surface for node in phrase]) for phrase in song.phrases])}{BACKSLASH}{'　'*4}:@{acct}:{display_name} {'（季語：'+song.season_word+'）' if song.season_word else ''}",
-                    spo=f"{'俳句' if song.season_word else '川柳'}を検出したよ〜", g_vis=g_vis)
+                    spo=f"{'俳句' if song.season_word else '川柳'}を検出したよ〜", g_vis=g_vis, media_ids=media_files)
 
 def res_fixed_phrase(id, acct, username, g_vis, content, statuses_count,
                     spoiler_text, ac_ymd, now_ymd, media_attachments,
