@@ -376,7 +376,7 @@ def worker(status):
     Toot1bQ.put((content, acct))
 
     if re.search(r"^(緊急|強制)(停止|終了|再起動)$", content) and acct == MASTER_ID:
-        logger.info("＊＊＊＊＊＊＊＊＊＊＊緊急停止したよー！＊＊＊＊＊＊＊＊＊＊＊")
+        logger.warn("＊＊＊＊＊＊＊＊＊＊＊緊急停止したよー！＊＊＊＊＊＊＊＊＊＊＊")
         toot(f"@{MASTER_ID} 緊急停止しまーす！", 'direct', id, None)
         sleep(10)
         os.kill(os.getpid(), signal.SIGKILL)
@@ -498,7 +498,7 @@ def worker(status):
         slotgame = game.Friends_nico_slot(
             acct, slot_accts, slot_rate, reelsize)
         slot_rows, slot_score = slotgame.start()
-        logger.info(f'acct={acct} reel_num={reel_num} reelsize={reelsize}')
+        logger.debug(f'acct={acct} reel_num={reel_num} reelsize={reelsize}')
         sl_txt = ''
         for row in slot_rows:
             for c in row:
@@ -532,7 +532,7 @@ def worker(status):
             toot(f'@{acct} ＤＭで依頼してねー！周りの人に答え見えちゃうよー！', 'direct', rep=id)
 
     elif re.search(r"([ぼボ][とト][るル][メめ]ー[るル])([サさ]ー[ビび][スす])[：:]", content):
-        logger.info("★ボトルメールサービス")
+        logger.debug("★ボトルメールサービス")
         bottlemail_service(content=content, acct=acct, id=id, g_vis=g_vis)
         SM.update(acct, 'func')
 
@@ -604,7 +604,7 @@ def worker(status):
         show_rank(acct=acct, target=word, id=id, g_vis=g_vis)
         SM.update(acct, 'func')
     elif re.search(r"(数取りゲーム|かずとりげぇむ).*(おねがい|お願い)", content):
-        logger.info('数取りゲーム受信')
+        logger.debug('数取りゲーム受信')
         if len(GetNum_flg) > 0:
             toot(f"@{acct} 数取りゲーム開催中だよー！急いで投票してー！", 'public', id)
         else:
@@ -647,7 +647,7 @@ def worker(status):
         gen_txt = toot_summary.summarize(content, limit=10, lmtpcs=1, m=1, f=4)
         if gen_txt[-1] == '#':
             gen_txt = gen_txt[:-1]
-        logger.info(f'★要約結果：{gen_txt}')
+        logger.debug(f'★要約結果：{gen_txt}')
         if util.is_japanese(gen_txt):
             if len(gen_txt) > 5:
                 gen_txt += "\n#きり要約 #きりぼっと"
@@ -1064,7 +1064,7 @@ def ana_image(media_file, acct):
     logger.debug(media_file)
     for f in media_file:
         result = deep.takoramen(f)
-        logger.info(result)
+        logger.debug(result)
         if result in ['風景', '夜景', 'other']:
             tmp = imaging.face_search(f)
             if tmp:
@@ -1242,7 +1242,7 @@ def show_rank(acct=None, target=None, id=None, g_vis=None):
 # ランク表示
     ############################################################
     # 数取りゲームスコアなど
-    logger.info(f"show_rank target={target}")
+    logger.debug(f"show_rank target={target}")
     if id:
         fav_now(id)
     sm = score_manager.ScoreManager()
@@ -1467,7 +1467,7 @@ def th_hint_de_pinto(gtime=20):
         try:
             tmp_list = HintPintoQ.get(timeout=60)
             g_acct, g_id, term = tmp_list[0], tmp_list[1], tmp_list[2]
-            logger.info(f"ひんぴん開始:{tmp_list}")
+            logger.debug(f"ひんぴん開始:{tmp_list}")
 
             # 準備中確認
             if junbiTM.check() > 0:
@@ -1555,7 +1555,7 @@ def th_hint_de_pinto(gtime=20):
                 junbiTM.start()
 
         except queue.Empty:
-            logger.info(f"ひんぴん出題待ちループ:残り{junbiTM.check()}秒")
+            logger.debug(f"ひんぴん出題待ちループ:残り{junbiTM.check()}秒")
         except Exception as e:
             logger.error(e)
             sleep(5)
