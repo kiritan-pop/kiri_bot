@@ -61,7 +61,7 @@ class Reviewer():
 
     def search(self, text):
         nodes = self.parser.parse(text)
-        return [song for song in [SongWithSeasonWord(nodes[index:], rule=self.rule) for index in len(nodes)] if song.is_valid()]
+        return [song for song in [SongWithSeasonWord(nodes[index:], rule=self.rule) for index in range(len(nodes))] if song.is_valid()]
 
 
 class Song():
@@ -77,7 +77,7 @@ class Song():
         self.bracket_state = BracketState(self.surfaces)
 
     def is_valid(self):
-        if self.phrases == None:
+        if self.phrases == []:
             return False
         elif self.bracket_state.is_odd():
             return False

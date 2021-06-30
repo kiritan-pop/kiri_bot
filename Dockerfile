@@ -39,11 +39,12 @@ RUN apt install -y python3-pip build-essential libssl-dev \
     libgstreamer-plugins-base1.0-dev \
     libopencv-highgui-dev \
     libnvidia-encode-465 \
-    ffmpeg
+    ffmpeg \
+    fonts-takao
 
 RUN apt -y install locales && \
     localedef -f UTF-8 -i ja_JP ja_JP.UTF-8
-ADD requirements.txt .
+COPY requirements.txt .
 
 RUN pip3 install --upgrade pip
 RUN pip install --upgrade setuptools

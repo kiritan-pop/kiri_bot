@@ -783,7 +783,7 @@ def worker(status):
         if re.search(r'[a-zA-Z0-9!-/:-@¥[-`{-~]', content.replace("___R___", '')) == None:
             ikku = haiku.Reviewer()
             song = ikku.find(content.replace("___R___", ''))
-            if len(song.surfaces) >= 3:
+            if song:
                 media_files = []
                 media_files.append(
                     mastodon.media_post(haiku.make_ikku_image(song, avatar_static), 'image/png'))

@@ -2,22 +2,17 @@
 import os
 import requests
 import json
-from bs4 import BeautifulSoup
-from time import sleep
-from collections import defaultdict
 import pandas as pd
 import plotly.graph_objects as go
-import plotly.express as px
 import urllib.request
 from pytz import timezone
-from datetime import datetime, timedelta
+from datetime import datetime
 from PIL import Image
 import locale
 locale.setlocale(locale.LC_TIME, 'ja_JP.UTF-8')
 
 # きりぼコンフィグ
-import kiribo.util
-from kiribo.config import CITY_LATLOC_PATH
+from kiribo.config import CITY_LATLOC_PATH, FONT_PATH
 
 IMAGE_H = 1260
 IMAGE_W = 800
@@ -157,14 +152,14 @@ def make_weather_image_daily(wd, skcs_name, tz):
                   '最低気温℃', '降水確率％', '風向', '風速m/s', '気圧hPa', 'UV指数']]  # テーブルの作成
     fig = go.Figure(data=[go.Table(
         columnwidth=[25, 10, 25, 20, 20, 20, 20, 20, 20, 20],  # カラム幅の変更
-        header=dict(values=df.columns, align='center', font=dict(color=FONT_COLOR, size=18), height=30,
+        header=dict(values=df.columns, align='center', font=dict(family=FONT_PATH, color=FONT_COLOR, size=18), height=30,
                     line_color=LINE_COLOR, fill_color=BG_COLOR),
-        cells=dict(values=df.values.T, align='center', font=dict(color=[df_temp.font_color]*9 + [df_temp.uv_color], size=18), height=30,
+        cells=dict(values=df.values.T, align='center', font=dict(family=FONT_PATH, color=[df_temp.font_color]*9 + [df_temp.uv_color], size=18), height=30,
                    line_color=LINE_COLOR, fill_color=BG_COLOR),
     )],
         layout=dict(margin=dict(l=0, r=0, t=30, b=0), paper_bgcolor=BG_COLOR,
                     title=dict(
-                        text=skcs_name+"の１週間天気", x=0.5, y=1.0, font=dict(color=FONT_COLOR, size=24), xanchor='center', yanchor='top', pad=dict(l=0, r=0, t=5, b=0))
+                        text=skcs_name+"の１週間天気", x=0.5, y=1.0, font=dict(family=FONT_PATH, color=FONT_COLOR, size=24), xanchor='center', yanchor='top', pad=dict(l=0, r=0, t=5, b=0))
                     )
     )
 
@@ -211,14 +206,14 @@ def make_weather_image_hourly(wd, skcs_name, tz):
     fig = go.Figure(data=[go.Table(
         # columnorder=[10, 20, 30, 40, 50, 25, 70],
         columnwidth=[25, 10, 25, 20, 20, 20, 20, 20, 20, 20],  # カラム幅の変更
-        header=dict(values=df.columns, align='center', font=dict(color=FONT_COLOR, size=18), height=30,
+        header=dict(values=df.columns, align='center', font=dict(family=FONT_PATH, color=FONT_COLOR, size=18), height=30,
                     line_color=LINE_COLOR, fill_color=BG_COLOR),
-        cells=dict(values=df.values.T, align='center', font=dict(color=FONT_COLOR, size=18), height=30,
+        cells=dict(values=df.values.T, align='center', font=dict(family=FONT_PATH, color=FONT_COLOR, size=18), height=30,
                    line_color=LINE_COLOR, fill_color=BG_COLOR),
     )],
         layout=dict(margin=dict(l=0, r=0, t=30, b=0), paper_bgcolor=BG_COLOR,
                     title=dict(
-                        text=skcs_name+"の４８時間天気", x=0.5, y=1.0, font=dict(color=FONT_COLOR, size=24), xanchor='center', yanchor='top', pad=dict(l=0, r=0, t=5, b=0))
+                        text=skcs_name+"の４８時間天気", x=0.5, y=1.0, font=dict(family=FONT_PATH, color=FONT_COLOR, size=24), xanchor='center', yanchor='top', pad=dict(l=0, r=0, t=5, b=0))
                     ),
 
     )
@@ -258,8 +253,8 @@ def make_weather_image_minutely(wd, skcs_name, tz):
                             )],
                     layout=dict(margin=dict(l=0, r=0, t=30, b=0), paper_bgcolor=BG_COLOR, plot_bgcolor=BG_COLOR,
                                 title=dict(
-                                    text=skcs_name+"の１時間の降水量", x=0.5, y=1.0, font=dict(color=FONT_COLOR, size=24), xanchor='center', yanchor='top', pad=dict(l=0, r=0, t=5, b=0)),
-                                font=dict(color=FONT_COLOR, size=18),
+                                    text=skcs_name+"の１時間の降水量", x=0.5, y=1.0, font=dict(family=FONT_PATH, color=FONT_COLOR, size=24), xanchor='center', yanchor='top', pad=dict(l=0, r=0, t=5, b=0)),
+                                font=dict(family=FONT_PATH, color=FONT_COLOR, size=18),
                                 xaxis=dict(title='時刻', showgrid=False),
                                 yaxis=dict(title='降水量mm', showgrid=False,
                                            rangemode='nonnegative')
