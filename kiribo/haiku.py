@@ -56,6 +56,11 @@ class Reviewer():
             if song.is_valid():
                 return song
 
+    def find_just(self, text):
+        song = SongWithSeasonWord(self.parser.parse(text), exactly=True, rule=self.rule)
+        if song.is_valid():
+            return song
+
     def judge(self, text):
         return SongWithSeasonWord(self.parser.parse(text), exactly=True, rule=self.rule).is_valid()
 
@@ -281,9 +286,9 @@ class Scanner():
                             return self.phrases
                 else:
                     return
-
-            if self.is_satisfied():
-                return self.phrases
+            else:
+                if self.is_satisfied():
+                    return self.phrases
 
 
 if __name__ == '__main__':
@@ -292,7 +297,7 @@ if __name__ == '__main__':
     # print(haiku_check(input(">>").strip()))
 
     ikku = Reviewer()
-    song = ikku.find("古池や蛙飛びこむ水の音")
+    song = ikku.find("五月雨を\n集めてはやし\n相模川")
     if len(song.surfaces) > 0:
         print(f"{song.surfaces}")
         print("\n".join(["".join([node.surface for node in phrase])

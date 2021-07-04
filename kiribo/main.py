@@ -71,7 +71,7 @@ HintPinto_flg = []
 slot_bal = []
 toot_cnt = 0
 TCNT_RESET = 15
-acct_least_created_at = {}
+acct_least_created_at = dict()
 pita_list = []
 
 toots_for_rep = defaultdict(list)
@@ -204,14 +204,14 @@ def exe_toot(toot_now, g_vis='direct', rep=None, spo=None, media_ids=None, inter
     if rep != None:
         try:
             sleep(1.4)
-            mastodon.status_post(status=toot_now[0:490-spo_len], visibility=g_vis,
+            mastodon.status_post(status=util.replace_ng_word(toot_now[0:490-spo_len]), visibility=g_vis,
                                  in_reply_to_id=rep, spoiler_text=spo, media_ids=media_ids)
         except Exception:
             sleep(1.4)
-            mastodon.status_post(status=toot_now[0:490-spo_len], visibility=g_vis,
+            mastodon.status_post(status=util.replace_ng_word(toot_now[0:490-spo_len]), visibility=g_vis,
                                  in_reply_to_id=None, spoiler_text=spo, media_ids=media_ids)
     else:
-        mastodon.status_post(status=toot_now[0:490-spo_len], visibility=g_vis,
+        mastodon.status_post(status=util.replace_ng_word(toot_now[0:490-spo_len]), visibility=g_vis,
                              in_reply_to_id=None, spoiler_text=spo, media_ids=media_ids)
 
     logger.info(f"🆕toot:{toot_now[0:300]}:{g_vis}")
@@ -717,9 +717,8 @@ def worker(status):
         else:
             toot_now = f"@{acct}\n" + toot_now
             media_files = []
-            for p in weather_image_paths:
+            for p in [p for p in weather_image_paths if p]:
                 media_files.append(mastodon.media_post(p, 'image/png'))
-            # , spo=sptxt+"だよ〜")
             toot(toot_now, g_vis=g_vis, rep=id, media_ids=media_files)
 
     elif re.search(r"!tarot|きりぼ(くん|君|さん|様|さま|ちゃん)?[!！、\s]?(占って|占い|占う|占え)", content):
@@ -782,7 +781,7 @@ def worker(status):
     else:
         if re.search(r'[a-zA-Z0-9!-/:-@¥[-`{-~]', content.replace("___R___", '')) == None:
             ikku = haiku.Reviewer()
-            song = ikku.find(content.replace("___R___", ''))
+            song = ikku.find_just(content.replace("___R___", ''))
             if song:
                 media_files = []
                 media_files.append(
@@ -1174,6 +1173,7 @@ def business_contact(status):
         toot(toot_now, g_vis='public', interval=3)
     elif ymdhms == None or ymdhms + diff < created_at:
         fav_now(id)
+        logger.info(f"ymdhms={ymdhms}, created={created_at}, acct_least_created_at[acct]={acct_least_created_at[acct]}, dao={DAO.get_least_created_at(acct)}")
         aisatsu = "おかえり〜！"
         bure = random.randint(-1, 1)
         if 0 <= jst_now_hh <= 3 + bure:
@@ -1461,7 +1461,7 @@ def th_delete():
             logger.error(e)
 
 
-def th_hint_de_pinto(gtime=20):
+def th_hint_de_pinto(gtime=5):
     # 初期タイマーセット
     junbiTM = timer.Timer(30*60)
     junbiTM.reset(gtime*60)
@@ -1476,7 +1476,7 @@ def th_hint_de_pinto(gtime=20):
             if junbiTM.check() > 0:
                 sleep(3)
                 remaintm = junbiTM.check()
-                toot(f'@{g_acct}\n開催準備中だよー！あと{remaintm//60}分{remaintm%60}秒待ってねー！',
+                toot(f'@{g_acct}\nまだ準備中なのであとで依頼してね〜（準備完了まで{remaintm//60}分{remaintm%60}秒）',
                     'direct', g_id, None)
                 sleep(27)
                 continue

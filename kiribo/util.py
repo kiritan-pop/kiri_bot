@@ -85,7 +85,6 @@ def content_cleanser(content):
     rtext = rtext.replace("#", "")
     rtext = re.sub(r'(___R___)\1{2,}', r'\1', rtext)
     rtext = re.sub(r'___R___', r'\n', rtext)
-    rtext = replace_ng_word(rtext)
     if hashtag != "":
         return rtext + " #" + hashtag
     else:
@@ -136,7 +135,6 @@ def content_cleanser_light(text):
     rtext = re.sub(r'([^:])@', r'\1', text)
     rtext = re.sub(r'(___R___)\1{2,}', r'\1', rtext)
     rtext = re.sub(r'___R___', r'\n', rtext)
-    rtext = replace_ng_word(rtext)
     return rtext
 
 
