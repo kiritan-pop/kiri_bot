@@ -55,7 +55,10 @@ def get_forecast_data(quary):
 
 
 def format_text(text):
-    return re.sub(r"\s", "", text)
+    if text:
+        return re.sub(r"\s", "", text)
+    else:
+        return None
 
 
 def svg2png2image(url):
@@ -134,8 +137,22 @@ def make_forecast_image(quary):
         outline=default_color)
     image.paste(overview_image, (HEADER_SIZE,
                                  total_height - overview_image.height))
+
+    # タイトル
+    bg_image = Image.new(
+        "RGBA", (HEADER_SIZE + BASE_COLUMN_SIZE*3, BASE_ROW_SIZE*sum(column_header_size)+32), (0, 0, 0, 255))
+    title_draw = ImageDraw.Draw(bg_image)
+    title = format_text(forecast['title'])
+    str_dt = dt.strptime(forecast["publicTime"],
+                        '%Y-%m-%dT%H:%M:%S%z').strftime('%-d日%-H時')
+    office = forecast["publishingOffice"]
+    title = f"{title}（{office} {str_dt} 発表）"
+    title_draw.text(((bg_image.width - len_text_eaw(title)*default_font.size)//2, 4), title,
+                    font=default_font, fill=default_color)
+    bg_image.paste(image, (0, 32))
+
     file_path = os.path.join(MEDIA_PATH, "tmp_weather.png")
-    image.save(file_path)
+    bg_image.save(file_path)
     return 0, file_path
 
 
