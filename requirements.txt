@@ -13,3 +13,4 @@ tensorflow>=2.3.0
 wikipedia>=1.4.0
 xmltodict>=0.12.0
 jaconv
+cairosvg

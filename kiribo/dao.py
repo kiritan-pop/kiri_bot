@@ -230,10 +230,10 @@ class Dao():
         con = sqlite3.connect(STATUSES_DB_PATH, timeout=self.timeout, isolation_level='DEFERRED')
         c = con.cursor()
         if ymd == ymd2 and int(hms) <= int(hms2):
-            c.execute( r"select date, time from statuses where acct = ? and (date = ? and time >= ? and time <= ? ) limit 1",
+            c.execute(r"select date, time from statuses where acct = ? and (date = ? and time >= ? and time <= ? ) order by id desc limit 1",
                         (acct,ymd,hms,hms2) )
         else:
-            c.execute( r"select date, time  from statuses where acct = ? and ((date = ? and time >= ?) or (date = ? and time <= ? ) or (date > ? and date < ?)) limit 1",
+            c.execute(r"select date, time from statuses where acct = ? and ((date = ? and time >= ?) or (date = ? and time <= ? ) or (date > ? and date < ?)) order by id desc limit 1",
                         (acct,ymd,hms,ymd2,hms2,ymd,ymd2) )
 
         row = c.fetchone()

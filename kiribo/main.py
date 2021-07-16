@@ -686,40 +686,23 @@ def worker(status):
         stats = stat.sys_stat()
         logger.debug(f"stats={stats}")
         toot(
-            f"@{acct} \nただいまの気温{stats['cpu_temp']}℃、忙しさ{stats['cpu']:.1f}％、気持ちの余裕{stats['mem_available']/(10**9):.1f}GB、クローゼットの空き{stats['disk_usage']/(10**9):.1f}GB", g_vis=g_vis, rep=id)
+            f"@{acct} \nただいまの気温{stats['cpu_temp']}℃、忙しさ{stats['cpu']:.1f}％、気持ちの余裕{stats['mem_available']/(10**9):.1f}GB、懐の広さ{stats['disk_usage']/(10**9):.1f}GB", g_vis=g_vis, rep=id)
 
     elif re.search(r"きりぼ(くん|君|さん|様|さま|ちゃん)?[!！、\s]?.+の天気.*(おしえて|教え|おせーて)?", content):
-        word1 = re.search(
+        tenki_area = re.search(
             r"きりぼ(くん|君|さん|様|さま|ちゃん)?[!！、\s]?(.+)の天気.*(おしえて|教え|おせーて)?", str(content)).group(2).strip()
-        if len(word1.split("の")) == 2:
-            word1, word2 = word1.split("の")
-            if word1 in ["今日", "明日", "明後日"]:
-                tenki_area = word2
-            elif word2 in ["今日", "明日", "明後日"]:
-                tenki_area = word1
-            else:
-                return
-        elif len(word1.split("の")) == 1:
-            if word1 in ["今日", "明日", "明後日"]:
-                tenki_area = "東京都千代田区"  # デフォルト地点
-            else:
-                tenki_area = word1
-        else:
-            return
 
-        retcode, sptxt, toot_now, weather_image_paths, * \
-            _ = tenki.get_tenki(quary=tenki_area, appid=OPENWEATHER_APPID)
-        if retcode == 900:
+        retcode, weather_image_path = tenki.make_forecast_image(quary=tenki_area)
+        if retcode == 9:
             toot(f"@{acct} 知らない場所の天気はわからないよ〜", g_vis=g_vis, rep=id)
-        elif retcode == 901:
-            toot(f"@{acct} 複数地名が見つかったので、次の地名でもっかい呼んでみてー\n{toot_now}",
+        elif retcode == 2:
+            toot(f"@{acct} 複数地名が見つかったので、次の地名でもっかい呼んでみてー\n{'、'.join(weather_image_path)}",
                  g_vis=g_vis, rep=id)
         else:
-            toot_now = f"@{acct}\n" + toot_now
+            toot_now = f"@{acct}\n(C) 天気予報 API（livedoor 天気互換）\n気象庁 Japan Meteorological Agency\n気象庁 HP にて配信されている天気予報を JSON データへ編集しています。"
             media_files = []
-            for p in [p for p in weather_image_paths if p]:
-                media_files.append(mastodon.media_post(p, 'image/png'))
-            toot(toot_now, g_vis=g_vis, rep=id, media_ids=media_files)
+            media_files.append(mastodon.media_post(weather_image_path, 'image/png'))
+            toot(toot_now, g_vis=g_vis, rep=id, media_ids=media_files, spo=f"{tenki_area}に関する天気だよ〜")
 
     elif re.search(r"!tarot|きりぼ(くん|君|さん|様|さま|ちゃん)?[!！、\s]?(占って|占い|占う|占え)", content):
         if tarot.tarot_check(acct):
@@ -1552,6 +1535,9 @@ def th_hint_de_pinto(gtime=5):
                     toot_now =  f'正解者なしのため出題者[[[ :@{hinpin_sts["pinto_info"]["q_acct"]}:]]] にペナルティ〜！' 
                     toot_now += f'\n減点{hinpin_sts["pinto_info"]["q_score"]}点だよ〜'
                     toot(toot_now, g_vis='public', rep=None, spo=None)
+                elif hinpin_sts["pinto_info"]["sts"] == "無効":
+                    toot_now = f'誰もいなかったので無効試合になったよ〜'
+                    toot(toot_now, g_vis='public', rep=None, spo=None)
 
                 HintPinto_flg.remove('ON')
                 junbiTM.reset()
@@ -1562,7 +1548,7 @@ def th_hint_de_pinto(gtime=5):
         except Exception as e:
             logger.error(e)
             sleep(5)
-            toot(f':@{MASTER_ID} ヒントでピントで何かエラー出た！', g_vis="public")
+            toot(f'@{MASTER_ID} ヒントでピントで何かエラー出た！', g_vis="public")
 
 
 def hinpin_hint(event, g_acct, term, path, hinpin_sts, loop_cnt):
@@ -1620,21 +1606,25 @@ def hinpin_pinto(event, g_acct, term, path, hinpin_sts, loop_cnt):
     # 回答スレッド
     event.wait()
     event.clear()
+    ans_cnt = 0
+    base_score = min([10, len(term)])
+    max_score = base_score*16
     while True:
         try:
             logger.debug(f"ひんぴんデバッグ:{hinpin_sts}")
             acct, _, ans, vis, *_ = HintPinto_ansQ.get(timeout=0.5)
+            ans_cnt += 1
             if g_acct != acct and util.normalize_txt(term) in util.normalize_txt(ans):
                 # スコア計算
-                a_score = max(
-                    int(min([10, len(term)])*16//(2**(len(loop_cnt) - 1))), 1)
-                q_score = max(a_score//2, 1)
+                a_score = min(
+                    int(max_score//(2**(len(loop_cnt) - 1))), max_score)
+                q_score = int(base_score*2**(len(loop_cnt) - 2)) + ans_cnt * 4
                 SM.update(acct, 'getnum', score=a_score)
                 SM.update(g_acct, 'getnum', score=q_score)
                 hinpin_sts["pinto_info"] = dict(sts="正解", a_acct=acct, a_score=a_score, q_acct=g_acct, q_score=q_score)
                 break
             elif g_acct == acct and vis != 'direct' and term in ans:
-                score = min([10, len(term)])*8*3
+                score = max_score*2
                 SM.update(g_acct, 'getnum', score=score*-1)
                 hinpin_sts["pinto_info"] = dict(
                     sts="ばらし", a_acct=acct, a_score=0, q_acct=g_acct, q_score=score)
@@ -1642,11 +1632,17 @@ def hinpin_pinto(event, g_acct, term, path, hinpin_sts, loop_cnt):
         except queue.Empty:
             # 出題が終わってたら終了
             if hinpin_sts["hint"]: # 出題が終わった場合
-                score = min([10, len(term)])*8//2
-                SM.update(g_acct, 'getnum', score=-1*score)
-                hinpin_sts["pinto_info"] = dict(
-                    sts="正解なし", a_acct=None, a_score=0, q_acct=g_acct, q_score=score)
-                break
+                if ans_cnt > 0:
+                    score = max_score
+                    SM.update(g_acct, 'getnum', score=-1*score)
+                    hinpin_sts["pinto_info"] = dict(
+                        sts="正解なし", a_acct=None, a_score=0, q_acct=g_acct, q_score=score)
+                    break
+                else:
+                    hinpin_sts["pinto_info"] = dict(
+                        sts="無効", a_acct=None, a_score=0, q_acct=None, q_score=0)
+                    break
+
     # 終了フラグ
     hinpin_sts["pinto"] = True
 
