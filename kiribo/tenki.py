@@ -125,9 +125,9 @@ def make_forecast_image(quary):
     overview_image = Image.new(
         "RGBA", (BASE_COLUMN_SIZE*len(forecast['forecasts']), BASE_ROW_SIZE*5), (0, 0, 0, 255))
     overview_draw = ImageDraw.Draw(overview_image)
-    font = ImageFont.truetype(FONT_PATH, 16)
+    font = ImageFont.truetype(FONT_PATH, 18)
     MAXLEN = 55
-    wrap_list = text_wrap(overview_text, 55)
+    wrap_list = text_wrap(overview_text, 48)
     for i, wrap_text in enumerate(wrap_list):
         overview_draw.text((2, (font.size + 2)*i+2), wrap_text,
                            font=font, fill=default_color)
