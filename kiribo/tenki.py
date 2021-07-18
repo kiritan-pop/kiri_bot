@@ -160,7 +160,7 @@ def text_wrap(text, width=70):
     wrap_list = []
     tmp_text = text
     while True:
-        if len(tmp_text) < width:
+        if len(tmp_text) <= width:
             wrap_list.append(tmp_text)
             break
         if tmp_text[width] in "」』）｝】＞≫］ぁぃぅぇぉっゃゅょァィゥェォッャュョー―-、。,.ゝ々！？：；／":
