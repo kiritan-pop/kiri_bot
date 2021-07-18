@@ -97,8 +97,8 @@ def make_forecast_image(quary):
     # 天気予報情報
     color_list = [default_color] * 6 + \
         [(80, 80, 240), (240, 80, 80)] + [default_color] * 2
-    font_list = [default_font] * 5 + \
-        [ImageFont.truetype(FONT_PATH, 16)] + [default_font] * 4
+    font_list = [default_font] * 4 + \
+        [ImageFont.truetype(FONT_PATH, 16)] * 2 + [default_font] * 4
 
     for i, fc in enumerate(forecast['forecasts']):
         column_image = draw_table(
@@ -108,7 +108,7 @@ def make_forecast_image(quary):
                     fc['dateLabel'],
                     svg2png2image(fc['image']['url']),
                     fc['telop'],
-                    fc['detail']['wind'],
+                    format_text(fc['detail']['wind']),
                     format_text(fc['detail']['wave']),
                     fc['temperature']['min']['celsius'],
                     fc['temperature']['max']['celsius'],

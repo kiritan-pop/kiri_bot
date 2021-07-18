@@ -1618,7 +1618,7 @@ def hinpin_pinto(event, g_acct, term, path, hinpin_sts, loop_cnt):
                 # スコア計算
                 a_score = min(
                     int(max_score//(2**(len(loop_cnt) - 1))), max_score)
-                q_score = int(base_score*2**(len(loop_cnt) - 2)) + ans_cnt * 4
+                q_score = a_score//2 + ans_cnt * 2
                 SM.update(acct, 'getnum', score=a_score)
                 SM.update(g_acct, 'getnum', score=q_score)
                 hinpin_sts["pinto_info"] = dict(sts="正解", a_acct=acct, a_score=a_score, q_acct=g_acct, q_score=q_score)
@@ -1633,7 +1633,7 @@ def hinpin_pinto(event, g_acct, term, path, hinpin_sts, loop_cnt):
             # 出題が終わってたら終了
             if hinpin_sts["hint"]: # 出題が終わった場合
                 if ans_cnt > 0:
-                    score = max_score
+                    score = max_score//4
                     SM.update(g_acct, 'getnum', score=-1*score)
                     hinpin_sts["pinto_info"] = dict(
                         sts="正解なし", a_acct=None, a_score=0, q_acct=g_acct, q_score=score)
