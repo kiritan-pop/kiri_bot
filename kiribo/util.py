@@ -8,6 +8,7 @@ import unicodedata
 from bs4 import BeautifulSoup
 import jaconv
 from logging import getLogger, StreamHandler, Formatter, FileHandler, getLevelName
+from queue import Queue, Empty
 
 # きりぼコンフィグ
 from kiribo.config import TWOTWO_DIC_PATH, NG_WORDS_PATH, LOG_LEVEL, LOG_PATH, MEDIA_PATH
@@ -190,6 +191,16 @@ def download_media(url, save_path=MEDIA_PATH, subdir=""):
             return None
     else:
         return None
+
+
+class ClearableQueue(Queue):
+
+    def clear(self):
+        try:
+            while True:
+                self.get_nowait()
+        except Empty:
+            pass
 
 
 if __name__ == '__main__':

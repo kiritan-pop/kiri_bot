@@ -24,7 +24,7 @@ from kiribo.config import MEDIA_PATH, GOOGLE_ENGINE_KEY, GOOGLE_KEY, MASTODON_UR
 
 # きりぼサブモジュール
 from kiribo import bottlemail, cooling_manager, dao, deep, game, generate_text,\
-    get_images_ggl, imaging, kishou, romasaga, scheduler, score_manager, stat, tenki,\
+    get_images_ggl, imaging, romasaga, scheduler, score_manager, stat, tenki,\
     timer, toot_summary, trans, util, haiku, tarot
 
 logger = util.setup_logger(__name__)
@@ -61,11 +61,11 @@ TimerDelQ = queue.Queue()
 StatusQ = queue.Queue()
 Toot1bQ = queue.Queue()
 DelQ = queue.Queue()
-GetNumQ = queue.Queue()
-GetNumVoteQ = queue.Queue()
+GetNumQ = util.ClearableQueue()
+GetNumVoteQ = util.ClearableQueue()
 GetNum_flg = []
-HintPintoQ = queue.Queue()
-HintPinto_ansQ = queue.Queue()
+HintPintoQ = util.ClearableQueue()
+HintPinto_ansQ = util.ClearableQueue()
 HintPinto_flg = []
 
 slot_bal = []
@@ -1449,6 +1449,7 @@ def th_hint_de_pinto(gtime=5):
     junbiTM = timer.Timer(30*60)
     junbiTM.reset(gtime*60)
     junbiTM.start()
+    HintPintoQ.clear()
     while True:
         try:
             tmp_list = HintPintoQ.get(timeout=60)
@@ -1490,6 +1491,7 @@ def th_hint_de_pinto(gtime=5):
             hinpin_sts = dict(hint=False, pinto=False)
             loop_cnt = []
             HintPinto_flg.append('ON')
+            HintPinto_ansQ.clear()
 
             th_hint = threading.Thread(target=hinpin_hint,
                                     args=(event, g_acct, term, path, hinpin_sts, loop_cnt))
@@ -1609,11 +1611,14 @@ def hinpin_pinto(event, g_acct, term, path, hinpin_sts, loop_cnt):
     ans_cnt = 0
     base_score = min([10, len(term)])
     max_score = base_score*16
+    logger.debug(f"ひんぴんデバッグ:{hinpin_sts}")
     while True:
         try:
             logger.debug(f"ひんぴんデバッグ:{hinpin_sts}")
             acct, _, ans, vis, *_ = HintPinto_ansQ.get(timeout=0.5)
             ans_cnt += 1
+            logger.debug(
+                f"ひんぴんデバッグ:acct={acct}  ans={ans}  vis={vis}  cnt={ans_cnt}")
             if g_acct != acct and util.normalize_txt(term) in util.normalize_txt(ans):
                 # スコア計算
                 a_score = min(
@@ -1666,6 +1671,7 @@ def th_gettingnum(gtime=30):
             #ゲーム開始ー！
             fav_now(g_id)
             gm = game.GettingNum(gamenum)
+            GetNumVoteQ.clear()
             gameTM.reset()
             gameTM.start()
             toot(f'🔸1〜{gamenum}の中から誰とも被らない最大の整数に投票した人が勝ちだよー！\
