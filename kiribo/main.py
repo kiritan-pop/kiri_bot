@@ -25,7 +25,7 @@ from kiribo.config import MEDIA_PATH, GOOGLE_ENGINE_KEY, GOOGLE_KEY, MASTODON_UR
 # きりぼサブモジュール
 from kiribo import bottlemail, cooling_manager, dao, deep, game, generate_text,\
     get_images_ggl, imaging, romasaga, scheduler, score_manager, stat, tenki,\
-    timer, toot_summary, trans, util, haiku, tarot
+    timer, toot_summary, trans, util, haiku, tarot, bert
 
 logger = util.setup_logger(__name__)
 
@@ -397,7 +397,7 @@ def worker(status):
     toot_cnt += 1
     if toot_cnt >= (TCNT_RESET + random.randint(-(3+ct), 2)):
         toot_cnt = 0
-        lstm_tooter()
+        auto_tooter()
 
     # 高感度下げ
     if re.search(r"死ね", content+spoiler_text):
@@ -725,13 +725,12 @@ def worker(status):
         fav_now(id)
         toots_for_rep[acct].append((content.strip(), created_at))
         toot_now = f"@{acct}\n"
-        seeds = DAO.get_least_10toots(time=True, limit=30)
+        seeds = DAO.get_least_10toots(time=True, limit=5)
         seeds.extend(toots_for_rep[acct])
         #時系列ソート
         seeds.sort(key=lambda x: (x[1]))
         #
-        tmp = lstm_gen_rapper(seeds, rndvec=random.uniform(
-            0.025, min(len(toots_for_rep[acct])*0.025, 0.1)))
+        tmp = bert.generator.gen_text("\n".join([toot for toot, _ in seeds]))
         tmp = util.content_cleanser_light(tmp)
         toot_now += tmp
         toots_for_rep[acct].append((tmp, jst_now))
@@ -744,8 +743,8 @@ def worker(status):
             return
         fav_now(id)
         toot_now = f"@{acct}\n"
-        seeds = DAO.get_least_10toots(limit=30, time=True)
-        tmp = lstm_gen_rapper(seeds, rndvec=random.uniform(0.05, 0.1))
+        seeds = DAO.get_least_10toots(limit=5, time=True)
+        tmp = bert.generator.gen_text("\n".join([toot for toot, _ in seeds]))
         tmp = util.content_cleanser_light(tmp)
         toot_now += tmp
         toot(toot_now, g_vis, id, None)
@@ -1118,13 +1117,6 @@ def ana_image(media_file, acct):
     return toot_now.strip(), attach_files
 
 
-def lstm_gen_rapper(seeds, rndvec=0):
-# 文章生成
-    new_seeds = [s for s in seeds if random.randint(1, 3) != 1]
-    ret_txt = deep.lstm_gentxt(new_seeds, rndvec=rndvec).strip()
-    return ret_txt
-
-
 def business_contact(status):
 # 認証なしタイムライン用（きりぼがブロックされてても反応する用）
     id = status["id"]
@@ -1393,14 +1385,14 @@ def bottlemail_sending():
         toot(toots, "direct", reply_id if reply_id != 0 else None, spoiler)
 
 
-def lstm_tooter():
+def auto_tooter():
 # きりぼっとのつぶやき
-    seeds = DAO.get_least_10toots(limit=30, time=True)
+    seeds = DAO.get_least_10toots(limit=5, time=True)
     if len(seeds) <= 2:
         return
     spoiler = None
 
-    gen_txt = lstm_gen_rapper(seeds, rndvec=random.uniform(0.05, 0.1))
+    gen_txt = bert.generator.gen_text("\n".join([toot for toot, _ in seeds]))
     gen_txt = util.content_cleanser_light(gen_txt)
     if gen_txt[0:1] == '。':
         gen_txt = gen_txt[1:]
@@ -1802,6 +1794,7 @@ def th_post():
 def run():
     args = get_args()
     threads = []
+    CM.run()
     #タイムライン受信系
     mastodon.stream_local(ltl_listener(), run_async=True, timeout=180,
                         reconnect_async=True, reconnect_async_wait_sec=15)
@@ -1827,7 +1820,7 @@ def run():
 
     #スケジュール起動系(間隔)
     threads.append(scheduler.Scheduler(
-        lstm_tooter, hhmm_list=None, intvl=60, rndmin=-10, rndmax=4, cm=CM))
+        auto_tooter, hhmm_list=None, intvl=60, rndmin=-10, rndmax=4, cm=CM))
     threads.append(scheduler.Scheduler(
         jinkei_tooter, hhmm_list=None, intvl=120, rndmin=-10, rndmax=10, cm=CM))
 

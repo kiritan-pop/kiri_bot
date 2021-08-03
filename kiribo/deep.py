@@ -1,18 +1,12 @@
 # coding: utf-8
 
-from tensorflow.keras.models import load_model, Model
-from gensim.models.doc2vec import Doc2Vec
+from tensorflow.keras.models import load_model
 import MeCab
 import numpy as np
-import random,json
-import sys,io,re,gc,os
-from time import sleep
-from datetime import datetime,timedelta
-from pytz import timezone
-import unicodedata
-from PIL import Image, ImageOps, ImageFile, ImageChops, ImageFilter, ImageEnhance
+import json
+import re,os
+from PIL import Image
 import cv2
-import tensorflow as tf
 
 # きりぼコンフィグ
 from kiribo.config import NICODIC_PATH, IPADIC_PATH
@@ -51,100 +45,8 @@ tagger = MeCab.Tagger(f"-Owakati -u {NICODIC_PATH} -d {IPADIC_PATH}")
 pat3 = re.compile(r'^\n')
 pat4 = re.compile(r'\n')
 
-#辞書読み込み
-wl_chars = list(open('data/wl.txt').read())
-idx_char = {i:c for i,c in enumerate(wl_chars)}
-num_chars = len(idx_char)
-idx_char[num_chars] = MU
-idx_char[num_chars+1] = END
-char_idx = {c:i for i,c in enumerate(wl_chars)}
-char_idx[MU] = num_chars
-char_idx[END] = num_chars + 1
-
-d2vmodel = Doc2Vec.load('data/d2v.model')
-lstm_vec_model = load_model('data/lstm_vec.h5')
-lstm_set_model = load_model('data/lstm_set.h5')
-
 takomodel = load_model('data/cnn.h5')
 
-
-def sample(preds, temperature=1.2):
-    # helper function to sample an index from a probability array
-    preds = np.asarray(preds).astype('float64')
-    preds = np.log(preds) / temperature
-    exp_preds = np.exp(preds)
-    preds = exp_preds / np.sum(exp_preds)
-    probas = np.random.multinomial(1, preds, 1)
-    return np.argmax(probas)
-
-def lstm_gentxt(seeds, rndvec=0):
-    # 入力トゥート（VEC_MAXLEN）をベクトル化。
-    toots = [t for t,_ in seeds]
-    input_vec = np.zeros((VEC_MAXLEN + AVE_LEN, DOC_VEC_SIZE))
-    input_mean_vec = np.zeros((VEC_MAXLEN, DOC_VEC_SIZE))
-    temp_toots = [t.strip() for t in toots if len(t.strip()) > 0]
-
-    # トゥート時刻をUNIX時間で取得し、０〜１標準化（モデル作成時のmin〜max使用）
-    created_ats = np.asarray([c.timestamp() for _, c in seeds[:VEC_MAXLEN]])
-    created_ats = (created_ats - TIME_MIN)/(TIME_MAX - TIME_MIN)
-    logger.debug(f"created_ats={created_ats}")
-
-    # 現在時刻取得
-    now = datetime.now().timestamp()
-    now = (now - TIME_MIN)/(TIME_MAX - TIME_MIN)
-    logger.debug(f"now={now}")
-
-    if len(temp_toots) >= VEC_MAXLEN + AVE_LEN:
-        toots_nrm = temp_toots[-(VEC_MAXLEN + AVE_LEN):]
-    else:
-        toots_nrm = temp_toots + [temp_toots[-1]]*(VEC_MAXLEN + AVE_LEN -len(temp_toots))
-
-    logger.debug("lstm_gen --------------------")
-    logger.debug("  inputトゥート")
-    for i,toot in enumerate(toots_nrm):
-        logger.debug(toot)
-        wakati = tagger.parse(toot).split(" ")
-        input_vec[i] = d2vmodel.infer_vector(wakati)
-
-    for i in range(VEC_MAXLEN):
-        input_mean_vec[i] = np.mean(input_vec[i:i+AVE_LEN], axis=0)
-
-    # ベクトル推定
-    # input_mean_vec = input_mean_vec.reshape((1,VEC_MAXLEN, DOC_VEC_SIZE))
-    output_vec = lstm_vec_model.predict_on_batch(
-        [input_mean_vec.reshape((1, VEC_MAXLEN, DOC_VEC_SIZE)), created_ats.reshape((1, VEC_MAXLEN)), np.asarray([now])])[0]
-
-    output_vec2 = np.zeros((DOC_VEC_SIZE,))
-    # ベクトルをランダム改変
-    for i in range(DOC_VEC_SIZE):
-        output_vec2[i] = output_vec[i] + random.gauss(0, rndvec)
-
-    # 推定したベクトルから文章生成
-    generated = ''
-    char_IDs = [char_idx[MU] for _ in range(TXT_MAXLEN)]    #初期値は無
-    rnd = random.uniform(0.15,0.3)
-
-    for i in range(500):
-        preds = lstm_set_model.predict_on_batch([ np.asarray([output_vec2]),  np.asarray([char_IDs]) ])
-
-        next_index = sample(preds[0], rnd)
-        char_IDs = char_IDs[1:]
-        char_IDs.append(next_index)
-        next_char = idx_char[next_index]
-        generated += next_char
-        if next_char == END:
-            break
-
-    rtn_text = generated
-    rtn_text = re.sub(END,r'',rtn_text, flags=(re.MULTILINE | re.DOTALL))
-    rtn_text = re.sub(r'(.)(.)(.)(.)(.)(.)(\1\2\3\4\5\6){4,}',r'\7\7',rtn_text, flags=(re.MULTILINE | re.DOTALL))
-    rtn_text = re.sub(r'(.)(.)(.)(.)(.)(\1\2\3\4\5){4,}',r'\6\6',rtn_text, flags=(re.MULTILINE | re.DOTALL))
-    rtn_text = re.sub(r'(.)(.)(.)(.)(\1\2\3\4){4,}',r'\5\5',rtn_text, flags=(re.MULTILINE | re.DOTALL))
-    rtn_text = re.sub(r'(.)(.)(.)(\1\2\3){4,}',r'\4\4',rtn_text, flags=(re.MULTILINE | re.DOTALL))
-    rtn_text = re.sub(r'(.)(.)(\1\2){4,}',r'\3\3',rtn_text, flags=(re.MULTILINE | re.DOTALL))
-    rtn_text = re.sub(r'(.)\1{4,}',r'\1\1',rtn_text, flags=(re.MULTILINE | re.DOTALL))
-    logger.debug(f'gen text,rnd={rtn_text},{rnd:2f}')
-    return rtn_text
 
 def takoramen(filepath):
     logger.debug(f"{filepath}")
@@ -179,8 +81,4 @@ def takoramen(filepath):
         return 'other'
 
 if __name__ == '__main__':
-    toots=''
-    while toots != 'exit':
-        print('input path')
-        toots = input('>>>').split()
-        print(lstm_gentxt(toots))
+    pass

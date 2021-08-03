@@ -14,6 +14,8 @@ class CoolingManager():
     def __init__(self,base_time=10):
         self.base_time = base_time
         self.created_ats = []
+
+    def run(self):
         threading.Thread(target=self.timer_showflowrate).start()
 
     def count(self,created_at):
