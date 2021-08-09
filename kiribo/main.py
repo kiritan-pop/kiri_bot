@@ -730,7 +730,7 @@ def worker(status):
         #時系列ソート
         seeds.sort(key=lambda x: (x[1]))
         #
-        tmp = bert.generator.gen_text("\n".join([toot for toot, _ in seeds]))
+        tmp = dnn_gen_text_wrapper("\n".join([toot for toot, _ in seeds]))
         tmp = util.content_cleanser_light(tmp)
         toot_now += tmp
         toots_for_rep[acct].append((tmp, jst_now))
@@ -744,7 +744,7 @@ def worker(status):
         fav_now(id)
         toot_now = f"@{acct}\n"
         seeds = DAO.get_least_10toots(limit=5, time=True)
-        tmp = bert.generator.gen_text("\n".join([toot for toot, _ in seeds]))
+        tmp = dnn_gen_text_wrapper("\n".join([toot for toot, _ in seeds]))
         tmp = util.content_cleanser_light(tmp)
         toot_now += tmp
         toot(toot_now, g_vis, id, None)
@@ -1392,7 +1392,7 @@ def auto_tooter():
         return
     spoiler = None
 
-    gen_txt = bert.generator.gen_text("\n".join([toot for toot, _ in seeds]))
+    gen_txt = dnn_gen_text_wrapper("\n".join([toot for toot, _ in seeds]))
     gen_txt = util.content_cleanser_light(gen_txt)
     if gen_txt[0:1] == '。':
         gen_txt = gen_txt[1:]
@@ -1400,6 +1400,10 @@ def auto_tooter():
         spoiler = f':@{BOT_ID}: 💭'
 
     toot(gen_txt, "public", None, spoiler)
+
+
+def dnn_gen_text_wrapper(input_text):
+    return bert.generator.gen_text(input_text, temperature=sum([random.uniform(0.4, 1.0) for _ in range(3)])/3.0, topk=random.randint(50, 200))
 
 
 def th_delete():

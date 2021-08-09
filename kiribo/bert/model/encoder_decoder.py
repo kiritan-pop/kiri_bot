@@ -39,7 +39,8 @@ def build_decoder(
         ) -> tf.keras.models.Model:
 
     encoder_output = tf.keras.layers.Input((encoder_output_dim,), dtype=tf.int32, name="encoder_output")
-    x = tf.keras.layers.Dense(hidden_dim*2)(encoder_output)
+    x = tf.keras.layers.Dense(
+        hidden_dim*2, activation='relu')(encoder_output)
     x = tf.keras.layers.Reshape((1, hidden_dim*2))(x)
 
     target_ids = tf.keras.layers.Input((target_length,), dtype=tf.int32, name="target_ids")

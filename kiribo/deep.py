@@ -32,13 +32,6 @@ AVE_LEN = 2        # vec推定で平均化する幅
 TXT_MAXLEN = 5      # 
 MU = "🧪"       # 無
 END = "🦷"      # 終わりマーク
-# TIME_MIN = 1535206317.0
-# TIME_MAX = 1611832085.0
-with open('data/dt_minmax.json', 'r') as f:
-    TIME_MINMAX = json.load(f)
-TIME_MIN = TIME_MINMAX["min"]
-TIME_MAX = TIME_MINMAX["max"]
-
 
 tagger = MeCab.Tagger(f"-Owakati -u {NICODIC_PATH} -d {IPADIC_PATH}")
 
