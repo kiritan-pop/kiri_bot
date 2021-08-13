@@ -72,7 +72,7 @@ def content_cleanser(content):
 
     tmp = BeautifulSoup(content.replace("<br />", "___R___").strip(), 'lxml')
     for x in tmp.find_all("a", rel="tag"):
-        hashtag = x.span.text
+        hashtag = x.span.text.strip()
     for x in tmp.find_all("a"):
         x.extract()
     if tmp.text == None:
@@ -86,6 +86,7 @@ def content_cleanser(content):
     rtext = rtext.replace("#", "")
     rtext = re.sub(r'(___R___)\1{2,}', r'\1', rtext)
     rtext = re.sub(r'___R___', r'\n', rtext)
+    rtext = rtext.strip()
     if hashtag != "":
         return rtext + " #" + hashtag
     else:

@@ -187,19 +187,13 @@ class public_listener(StreamListener):
         DelQ.put(status_id)
 
 
-def toot(toot_content, visibility='direct', in_reply_to_id=None, spoiler_text=None, media_ids=None, interval=0):
-    logger.info(f"visibility={visibility}")
-# トゥート処理
-    def qput(toot_content, visibility, in_reply_to_id, spoiler_text, media_ids):
-        PostQ.put((exe_toot, (toot_content, visibility, in_reply_to_id, spoiler_text, media_ids)))
-
-    th = threading.Timer(interval=interval, function=qput,
-                        args=(toot_content, visibility, in_reply_to_id, spoiler_text, media_ids))
+def toot(*args, interval=0, **kwargs):
+    th = threading.Timer(interval=interval, function=PostQ.put,
+                         args=((exe_toot, args, kwargs),))
     th.start()
 
 
-def exe_toot(toot_content:str, visibility:str, in_reply_to_id, spoiler_text:str, media_ids:list):
-    logger.info(f"visibility={visibility}")
+def exe_toot(toot_content:str, visibility:str="direct", in_reply_to_id=None, spoiler_text:str=None, media_ids:list=None, *args, **kwargs):
     if spoiler_text:
         spo_len = len(spoiler_text)
     else:
@@ -210,16 +204,16 @@ def exe_toot(toot_content:str, visibility:str, in_reply_to_id, spoiler_text:str,
         visibility=visibility,
         in_reply_to_id=in_reply_to_id,
         spoiler_text=spoiler_text,
-        media_ids=media_ids)
+        media_ids=media_ids, **kwargs)
     logger.info(f"🆕toot:{toot_content[0:300]}:{visibility}")
 
 
-def fav_now(id):  # ニコります
+def fav_now(*args, **kwargs):  # ニコります
 # ファボ処理
-    PostQ.put((exe_fav_now, (id,)))
+    PostQ.put((exe_fav_now, args, kwargs))
 
 
-def exe_fav_now(id):  # ニコります
+def exe_fav_now(id, *args, **kwargs):  # ニコります
     try:
         status = mastodon.status(id)
     except Exception as e:
@@ -232,12 +226,12 @@ def exe_fav_now(id):  # ニコります
             logger.info("🙆Fav")
 
 
-def boost_now(id):  # ぶーすと！
+def boost_now(*args, **kwargs):  # ぶーすと！
 # ブースト
-    PostQ.put((exe_boost_now, (id,)))
+    PostQ.put((exe_boost_now, args, kwargs))
 
 
-def exe_boost_now(id):  # ぶーすと！
+def exe_boost_now(id, *args, **kwargs):  # ぶーすと！
     try:
         status = mastodon.status(id)
     except Exception as e:
@@ -252,48 +246,45 @@ def exe_boost_now(id):  # ぶーすと！
         logger.info("🙆boost")
 
 
-def boocan_now(id):  # ぶーすと！
+def boocan_now(*args, **kwargs):  # ぶーすと！
 # ブーキャン
-    PostQ.put((exe_boocan_now, (id,)))
+    PostQ.put((exe_boocan_now, args, kwargs))
 
 
-def exe_boocan_now(id):  # ぶーすと！
+def exe_boocan_now(id, *args, **kwargs):  # ぶーすと！
     status = mastodon.status(id)
     if status['reblogged'] == True:
         mastodon.status_unreblog(id)
         logger.info("🙆unboost")
 
 
-def follow(id):
+def follow(*args, **kwargs):
 # フォロー
-    PostQ.put((exe_follow, (id,)))
+    PostQ.put((exe_follow, args, kwargs))
 
 
-def exe_follow(id):
+def exe_follow(id, *args, **kwargs):
     mastodon.account_follow(id)
     logger.info("💖follow")
 
 
-def unfollow(id):
+def unfollow(*args, **kwargs):
 # アンフォロー
-    PostQ.put((exe_unfollow, (id,)))
+    PostQ.put((exe_unfollow, args, kwargs))
 
 
-def exe_unfollow(id):
+def exe_unfollow(id, *args, **kwargs):
     mastodon.account_unfollow(id)
     logger.info("💔unfollow")
 
 
-def toot_delete(id, interval=5):
+def toot_delete(*args, interval=5, **kwargs):
 # トゥー消し
-    def qput(id):
-        PostQ.put((exe_toot_delete, (id,)))
-
-    th = threading.Timer(interval=interval, function=qput, args=(id,))
+    th = threading.Timer(interval=interval, function=PostQ.put, args=((exe_toot_delete, args, kwargs),))
     th.start()
 
 
-def exe_toot_delete(id):
+def exe_toot_delete(id, *args, **kwargs):
     mastodon.status_delete(id)
     logger.info("♥toot delete")
 
@@ -359,6 +350,7 @@ def worker(status):
     reply_to_acct_list = util.reply_to(status['content'])
     display_name = util.display_name_cleanser(status["account"]['display_name'])
     avatar_static = status["account"]['avatar_static']
+    tags = status["tags"]
 
     #botはスルー
     if status["account"]["bot"]:
@@ -750,9 +742,9 @@ def worker(status):
                 toot(toot_now, visibility=visibility)
 
     else:
-        if re.search(r'[a-zA-Z0-9!-/:-@¥[-`{-~]', content.replace("___R___", '')) == None:
+        if re.search(r'[a-zA-Z0-9!-/:-@¥[-`{-~]', content) == None and len(tags) == 0 and len(content.replace('\n', '')) > 5:
             ikku = haiku.Reviewer()
-            song = ikku.find_just(content.replace("___R___", ''))
+            song = ikku.find_just(content.replace('\n', ''))
             if song:
                 media_files = []
                 media_files.append(
@@ -1786,11 +1778,8 @@ def th_post():
 # post用worker
     while True:
         try:
-            func, args = PostQ.get()
-            logger.info("*********************")
-            logger.info(args)
-            logger.info("*********************")
-            func(*args)
+            func, args, kwargs = PostQ.get()
+            func(*args, **kwargs)
             sleep(0.8)
         except Exception as e:
             logger.error(e + traceback.format_exc())
