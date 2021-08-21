@@ -187,25 +187,32 @@ class public_listener(StreamListener):
         DelQ.put(status_id)
 
 
-def toot(*args, interval=0, **kwargs):
+def toot(toot_content: str, visibility: str = "direct", in_reply_to_id=None, spoiler_text: str = None, media_ids: list = None, interval=0, **kwargs):
     th = threading.Timer(interval=interval, function=PostQ.put,
-                         args=((exe_toot, args, kwargs),))
+                         args=((exe_toot, (toot_content, visibility, in_reply_to_id, spoiler_text, media_ids), kwargs),))
     th.start()
 
 
-def exe_toot(toot_content:str, visibility:str="direct", in_reply_to_id=None, spoiler_text:str=None, media_ids:list=None, *args, **kwargs):
+def exe_toot(toot_content:str, visibility:str="direct", in_reply_to_id=None, spoiler_text:str=None, media_ids:list=None, **kwargs):
     if spoiler_text:
         spo_len = len(spoiler_text)
     else:
         spo_len = 0
 
-    mastodon.status_post(
-        util.replace_ng_word(toot_content[0:490-spo_len]),
-        visibility=visibility,
-        in_reply_to_id=in_reply_to_id,
-        spoiler_text=spoiler_text,
-        media_ids=media_ids, **kwargs)
-    logger.info(f"🆕toot:{toot_content[0:300]}:{visibility}")
+    try:
+        mastodon.status_post(
+            util.replace_ng_word(toot_content[0:490-spo_len]),
+            visibility=visibility,
+            in_reply_to_id=in_reply_to_id,
+            spoiler_text=spoiler_text,
+            media_ids=media_ids, **kwargs)
+        logger.info(f"🆕toot:{toot_content[0:300]}:{visibility}")
+    except Exception as e:
+        logger.error(e)
+        logger.error("POST リトライ")
+        toot(toot_content, visibility, None, spoiler_text, media_ids, interval=4, **kwargs) 
+    else:
+       logger.info(f"🆕toot:{toot_content[0:300]}:{visibility}")
 
 
 def fav_now(*args, **kwargs):  # ニコります
