@@ -38,10 +38,9 @@ def build_decoder(
             target_length: int = 64,
         ) -> tf.keras.models.Model:
 
-    encoder_output = tf.keras.layers.Input((encoder_output_dim,), dtype=tf.int32, name="encoder_output")
-    x = tf.keras.layers.Dense(
-        hidden_dim*2, activation='relu')(encoder_output)
-    x = tf.keras.layers.Reshape((1, hidden_dim*2))(x)
+    encoder_output = tf.keras.layers.Input((encoder_output_dim,), name="encoder_output")
+    x = tf.keras.layers.GaussianNoise(0.05)(encoder_output)
+    x = tf.keras.layers.Reshape((1, hidden_dim))(x)
 
     target_ids = tf.keras.layers.Input((target_length,), dtype=tf.int32, name="target_ids")
     decoder = Decoder(
@@ -197,19 +196,3 @@ class Decoder(tf.keras.models.Model):
             tf.linalg.band_part(tf.ones([length, length], dtype=tf.bool), -1, 0))  # 下三角が False
         autoregression_array = tf.reshape(autoregression_array, [1, 1, length, length])
         return tf.logical_or(pad_array, autoregression_array)
-
-"""
-# 'token_type_ids': [[0, 0, 0, 0, 0, 0, 0, 0, 0],  <- self_attention
-#                     [0, 0, 0, 0, 0],
-#                     [0, 0, 0, 0, 0, 0, 0, 0]],
-#  'attention_mask': [[1, 1, 1, 1, 1, 1, 1, 1, 1],
-#                     [1, 1, 1, 1, 1],
-#                     [1, 1, 1, 1, 1, 1, 1, 1]]}
->>> tokenizer.all_special_tokens
-['[UNK]', '[SEP]', '[PAD]', '[CLS]', '[MASK]']
->>> tokenizer.all_special_tokens_extended
-['[UNK]', '[SEP]', '[PAD]', '[CLS]', '[MASK]']
->>> tokenizer.all_special_ids
-[1, 3, 0, 2, 4]
-
-"""

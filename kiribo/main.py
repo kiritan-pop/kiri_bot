@@ -172,6 +172,7 @@ class ltl_listener(StreamListener):
         if re.search(r'[^:]@' + BOT_ID, status['content']):
             return
         acct = status["account"]["acct"]
+        logger.info(f"「{util.content_cleanser(status['content'])[:30]:<30}」by {acct}")
         if acct != BOT_ID:
             WorkerQ.put(status)
 
@@ -206,7 +207,6 @@ def exe_toot(toot_content:str, visibility:str="direct", in_reply_to_id=None, spo
             in_reply_to_id=in_reply_to_id,
             spoiler_text=spoiler_text,
             media_ids=media_ids, **kwargs)
-        logger.info(f"🆕toot:{toot_content[0:300]}:{visibility}")
     except Exception as e:
         logger.error(e)
         logger.error("POST リトライ")
@@ -590,7 +590,7 @@ def worker(status):
         toot_now = f"@{acct} できたよ〜 \n#exp15m"
         toot(toot_now, visibility=visibility, in_reply_to_id=id, media_ids=[media])
 
-    elif re.search(r"([わワ][てテ]|拙僧|小職|私|[わワ][たタ][しシ]|[わワ][たタ][くク][しシ]|自分|僕|[ぼボ][くク]|俺|[オお][レれ]|朕|ちん|余|[アあ][タた][シし]|ミー|あちき|あちし|あたち|[あア][たタ][いイ]|[わワ][いイ]|わっち|おいどん|[わワ][しシ]|[うウ][ちチ]|[おオ][らラ]|儂|[おオ][いイ][らラ]|あだす|某|麿|拙者|小生|あっし|手前|吾輩|我輩|わらわ|ぅゅ|のどに|ちゃそ)の(ランク|ランキング|順位|スコア|成績|せいせき|らんく|らんきんぐ|すこあ)", content):
+    elif re.search(r"([わワ][てテ]|拙僧|小職|私|[わワ][たタ][しシ]|[わワ][たタ][くク][しシ]|自分|僕|[ぼボ][くク]|俺|[オお][レれ]|朕|ちん|余|[アあ][タた][シし]|ミー|あちき|あちし|あたち|[あア][たタ][いイ]|[わワ][いイ]|わっち|おいどん|[わワ][しシ]|[うウ][ちチ]|[おオ][らラ]|儂|[おオ][いイ][らラ]|あだす|某|麿|拙者|小生|あっし|手前|吾輩|我輩|わらわ|妾|ぅゅ|のどに|ちゃそ)の(ランク|ランキング|順位|スコア|成績|せいせき|らんく|らんきんぐ|すこあ)", content):
         show_rank(acct=acct, target=acct, id=id, visibility=visibility)
         SM.update(acct, 'func')
 
@@ -1128,7 +1128,7 @@ def business_contact(status):
 
     jst_now = datetime.now(timezone('Asia/Tokyo'))
     jst_now_hh = int(jst_now.strftime("%H"))
-    logger.info(f'「{content[:30]:<30}」by {acct}')
+    # logger.info(f'「{content[:30]:<30}」by {acct}')
 
     kaomoji = random.choice([tmp.strip() for tmp in open(KAOMOJI_PATH, 'r').readlines() if os.path.exists(KAOMOJI_PATH) and len(tmp.strip()) > 0])
     if statuses_count == 1:
@@ -1380,7 +1380,7 @@ def auto_tooter():
         return
     spoiler = None
 
-    gen_txt = dnn_gen_text_wrapper("\n".join([toot for toot, _ in seeds]))
+    gen_txt = dnn_gen_text_wrapper("[SEP]".join([toot for toot, _ in seeds]))
     gen_txt = util.content_cleanser_light(gen_txt)
     if gen_txt[0:1] == '。':
         gen_txt = gen_txt[1:]
@@ -1391,12 +1391,12 @@ def auto_tooter():
 
 
 def dnn_gen_text_wrapper(input_text):
-    return bert.generator.gen_text(input_text, temperature=sum([random.uniform(0.4, 1.0) for _ in range(3)])/3.0, topk=random.randint(50, 200))
+    return bert.generator.gen_text(input_text, temperature=random.uniform(0.2, 1.0), topk=random.randint(50, 200))
 
 
 def dnn_gen_toot_sub(acct: str, seeds: list, visibility: str, in_reply_to_id: int = None, toots_for_rep:list = None):
     toot_now = f"@{acct}\n"
-    tmp = dnn_gen_text_wrapper("\n".join([toot for toot, _ in seeds]))
+    tmp = dnn_gen_text_wrapper("[SEP]".join([toot for toot, _ in seeds]))
     tmp = util.content_cleanser_light(tmp)
     if toots_for_rep:
         toots_for_rep[acct].append([tmp, datetime.now(timezone('Asia/Tokyo'))])

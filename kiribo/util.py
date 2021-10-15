@@ -57,7 +57,7 @@ def two2jp(twotwo_text):
 #######################################################
 # ハッシュタグ抽出
 def hashtag(content):
-    tmp = BeautifulSoup(content.replace("<br />","___R___").strip(),'lxml')
+    tmp = BeautifulSoup(content.replace("<br>","___R___").strip(),'lxml')
     hashtag = []
     for x in tmp.find_all("a",rel="tag"):
         hashtag.append(x.span.text)
@@ -70,7 +70,7 @@ def content_cleanser(content):
     hashtag = ""
     rtext = ""
 
-    tmp = BeautifulSoup(content.replace("<br />", "___R___").strip(), 'lxml')
+    tmp = BeautifulSoup(content.replace("<br>", "___R___").strip(), 'lxml')
     for x in tmp.find_all("a", rel="tag"):
         hashtag = x.span.text.strip()
     for x in tmp.find_all("a"):
@@ -81,7 +81,9 @@ def content_cleanser(content):
     ps = []
     for p in tmp.find_all("p"):
         ps.append(p.text)
-    rtext += '。\n'.join(ps)
+        p.extract()
+    ps.append(tmp.text)
+    rtext += '\n'.join(ps).strip()
     rtext = unicodedata.normalize("NFKC", rtext)
     rtext = rtext.replace("#", "")
     rtext = re.sub(r'(___R___)\1{2,}', r'\1', rtext)

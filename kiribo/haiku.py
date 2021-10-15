@@ -297,7 +297,7 @@ if __name__ == '__main__':
     # print(haiku_check(input(">>").strip()))
 
     ikku = Reviewer()
-    song = ikku.find("五月雨を\n集めてはやし\n相模川")
+    song = ikku.find("いつまでも\nあると思うな\n親と金")
     if len(song.surfaces) > 0:
         print(f"{song.surfaces}")
         print("\n".join(["".join([node.surface for node in phrase])

@@ -15,7 +15,6 @@ logging.basicConfig(level=logging.INFO)
 logging.info('*** Initializing ***')
 tokenizer = AutoTokenizer.from_pretrained(KiriConfig.MODEL_NAME)
 dataset = KiriDataset(tokenizer=tokenizer, config=KiriConfig)
-dataset.read_encoder_output()
 encoder_model = build_encoder(
             input_length=KiriConfig.MAX_LENGTH,
             model_name=KiriConfig.MODEL_NAME,
@@ -27,7 +26,7 @@ decoder_model = build_decoder(
             hidden_dim = KiriConfig.HIDDEN_DIM,
             dropout_rate = KiriConfig.DROPOUT_RATE,
             target_length=KiriConfig.MAX_CHAR_LEN,
-            encoder_output_dim = dataset.encoder_output.shape[1],
+            encoder_output_dim = 768,
 )
 
 latest = tf.train.latest_checkpoint(os.path.dirname(KiriConfig.SAVE_PATH))
@@ -41,7 +40,7 @@ else:
 def gen_text(
         input_text,
         temperature=1.0,
-        topk=100,
+        topk=1000,
     ):
     return _gen_text(
             encoder_model=encoder_model, 
@@ -50,7 +49,6 @@ def gen_text(
             config=KiriConfig,
             dataset=dataset, 
             input_text=input_text,
-            gen_num=1,
             temperature=temperature,
             topk=topk,
         )[:-1]
