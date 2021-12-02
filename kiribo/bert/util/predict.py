@@ -18,8 +18,16 @@ def gen_text(
         ):
         
     logging.info('*** Generating text after Epoch ***')
-    input_token_dic = tokenizer(input_text, padding='max_length',
-                                truncation=True, max_length=config.MAX_LENGTH, return_tensors='tf')
+    input_token_dic = tokenizer(input_text,
+                                truncation=True, max_length=512, return_tensors='tf')
+
+    if len(input_token_dic['input_ids']) > config.MAX_LENGTH:
+        input_token_dic['input_ids'] = input_token_dic['input_ids'][:, -config.MAX_LENGTH:]
+        input_token_dic['attention_mask'] = input_token_dic['attention_mask'][:, -config.MAX_LENGTH:]
+        input_token_dic['token_type_ids'] = input_token_dic['token_type_ids'][:, -config.MAX_LENGTH:]
+    else:
+        input_token_dic = tokenizer(input_text, padding='max_length',
+                                    truncation=True, max_length=config.MAX_LENGTH, return_tensors='tf')
     encoder_output = encoder_model.predict_on_batch(
         (input_token_dic['input_ids'], input_token_dic['attention_mask']))
 

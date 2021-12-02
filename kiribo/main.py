@@ -20,9 +20,8 @@ import traceback
 # きりぼコンフィグ
 from kiribo.config import MEDIA_PATH, GOOGLE_ENGINE_KEY, GOOGLE_KEY, MASTODON_URL, MASTODON_ACCESS_TOKEN,\
     MASTER_ID, BOT_ID, BOT_LIST_PATH, KAOMOJI_PATH, KORA_PATH, HINPINED_WORDS_PATH,\
-    OPENWEATHER_APPID, WATCH_LIST_PATH, NADE_PATH, RECIPE_Z_PATH, RECIPE_A_PATH, NO_BOTTLE_PATH,\
-    KISHOU_WS, KISHOU_WS_PORT
-
+    WATCH_LIST_PATH, NADE_PATH, RECIPE_Z_PATH, RECIPE_A_PATH, NO_BOTTLE_PATH
+    
 # きりぼサブモジュール
 from kiribo import bottlemail, cooling_manager, dao, deep, game, generate_text,\
     get_images_ggl, imaging, romasaga, scheduler, score_manager, stat, tenki,\
@@ -720,7 +719,7 @@ def worker(status):
             return
         fav_now(id)
         toots_for_rep[acct].append((content.strip(), created_at))
-        seeds = DAO.get_least_10toots(time=True, limit=5)
+        seeds = DAO.get_least_10toots(time=True, limit=10)
         seeds.extend(toots_for_rep[acct])
         #時系列ソート
         seeds.sort(key=lambda x: (x[1]))
@@ -733,7 +732,7 @@ def worker(status):
         if random.randint(0, 10+ct) > 9:
             return
         fav_now(id)
-        seeds = DAO.get_least_10toots(limit=5, time=True)
+        seeds = DAO.get_least_10toots(limit=10, time=True)
         threading.Thread(target=dnn_gen_toot_sub, args=(
             acct, seeds, visibility, id)).start()
         SM.update(acct, 'reply')
@@ -1375,7 +1374,7 @@ def bottlemail_sending():
 
 def auto_tooter():
 # きりぼっとのつぶやき
-    seeds = DAO.get_least_10toots(limit=5, time=True)
+    seeds = DAO.get_least_10toots(limit=10, time=True)
     if len(seeds) <= 2:
         return
     spoiler = None
@@ -1391,7 +1390,7 @@ def auto_tooter():
 
 
 def dnn_gen_text_wrapper(input_text):
-    return bert.generator.gen_text(input_text, temperature=random.uniform(0.2, 1.0), topk=random.randint(50, 200))
+    return bert.generator.gen_text(input_text, temperature=random.uniform(0.5, 0.9), topk=100)
 
 
 def dnn_gen_toot_sub(acct: str, seeds: list, visibility: str, in_reply_to_id: int = None, toots_for_rep:list = None):
@@ -1514,8 +1513,16 @@ def th_hint_de_pinto(gtime=5):
                 ex = path.rsplit('.')[-1]
                 if ex == 'jpg':
                     ex = 'jpeg'
+
+                MAX_SIZE = 512
+                img = Image.open(path).convert('RGB')
+                img = img.resize((img.width*MAX_SIZE//max(img.size),
+                                    img.height*MAX_SIZE//max(img.size)), Image.LANCZOS)
+                filename = path.split('.')[0] + '_resize.png'
+                img.save(filename, "png")
+                
                 media_files = []
-                media_files.append(mastodon.media_post(path, 'image/' + ex))
+                media_files.append(mastodon.media_post(filename, 'image/' + ex))
                 toot(toot_now, visibility='public', in_reply_to_id=None,
                     spoiler_text=None, media_ids=media_files)
 
