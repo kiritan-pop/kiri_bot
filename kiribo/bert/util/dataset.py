@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 
+import os
+import json
+import random
 import logging
 import tensorflow as tf
 import numpy as np
@@ -7,15 +10,33 @@ import numpy as np
 logging.basicConfig(level=logging.INFO)
 
 class KiriDataset:
-    MU = "🧪"       # 無
+    MU = "🧪"       # 無 padding
     STR = "🦷"      # 始まりマーク
-    def __init__(self, tokenizer, config) -> None:
-        logging.info('*** read data ***')
+    def __init__(self, tokenizer, config, encoder_model=None) -> None:
+        logging.info('*** data initializing***')
         self.tokenizer = tokenizer
         self.config = config
+        self.encoder_model = encoder_model
         # 使用する文字種
-        wl_chars = list(open(config.WL_PATH).read())
+        # wl_chars = list(open(config.WL_PATH).read())
+        cnt_dict = {}
+        for line in open(self.config.DATA_FILE_PATH, 'r'):
+            for c in list(line):
+                if c in cnt_dict:
+                    cnt_dict[c] += 1
+                else:
+                    cnt_dict[c] = 1
+
+        sorted_dict = {}
+        for k, v in sorted(cnt_dict.items(), key=lambda x: -x[1]):
+            sorted_dict[k] = v
+        wl_chars = list(sorted_dict.keys())
+        print(f"wl_chars:{len(wl_chars)}")
+
         wl_chars = [c for c in wl_chars if c not in [KiriDataset.MU, KiriDataset.STR]]
+        with open(config.WL_PATH, "w") as f:
+            f.writelines(wl_chars)
+
         wl_chars.insert(0, KiriDataset.STR)
         wl_chars.insert(0, KiriDataset.MU)
         self.char_size = len(wl_chars)
@@ -27,86 +48,79 @@ class KiriDataset:
         self.input_encoded_dict = None
         self.encoder_output = None
         self.tf_ds = None
+        self.train_data_num_list = []
 
     def read_input_data(self):
+        logging.info('*** reading data ***')
         with open(self.config.DATA_FILE_PATH, 'r') as f:
             lines = [l.strip() for l in f.readlines()] #[:20000]
 
-        for i in range(len(lines) - self.config.SUM_LINES_SIZE):
-            self.lines_q.append(
-                "\n".join(lines[i:i + self.config.SUM_LINES_SIZE]))
-            self.lines_a.append(lines[i + self.config.SUM_LINES_SIZE])
+        for size in range(3, self.config.SUM_LINES_SIZE + 1):
+            for i in range(len(lines) - size):
+                self.lines_q.append(
+                    self.config.SEP.join(lines[i:i + size]))
+                self.lines_a.append(lines[i + size])
 
-
-    def tokenize(self):
-        if len(self.lines_q) == 0:
-            self.read_input_data()
-        self.input_encoded_dict = self.tokenizer(self.lines_q, padding='max_length', truncation=True, max_length=self.config.MAX_LENGTH)
-
-
-    def read_encoder_output(self):
-        self.encoder_output = np.load(self.config.ENCODER_OUTPUT_PATH)
-
-
-    def _gen(self):
-        for input_ids, input_mask, toot_org in zip(self.input_encoded_dict['input_ids'], self.input_encoded_dict['attention_mask'], self.lines_a):
-            toot = KiriDataset.STR + toot_org
-            idxs = np.zeros((self.config.MAX_CHAR_LEN + 1,), dtype=int)
-            for i in range( min([self.config.MAX_CHAR_LEN + 1, len(toot)])):
-                idxs[i] = self.char_idx[toot[i]]
-            yield ((input_ids, input_mask, idxs[:-1]),
-                    tf.one_hot(idxs[1:], self.char_size, dtype=tf.uint8))
-
+        logging.info(f'*** data len = {len(self.lines_a)}***')
+        with open("data/tmp.txt", 'w') as f:
+            for q, a in zip(self.lines_q, self.lines_a):
+                f.write(q + ">>>>>" + a + "\n")
 
     def build_tf_ds(self):
-        if self.input_encoded_dict is None:
-            self.tokenize()
-        tf_ds = tf.data.Dataset.from_generator(
-                    self._gen,
-                    output_signature=(
-                        (
-                            tf.TensorSpec(shape=(self.config.MAX_LENGTH,), dtype=tf.int16),
-                            tf.TensorSpec(shape=(self.config.MAX_LENGTH,), dtype=tf.uint8),
-                            tf.TensorSpec(shape=(self.config.MAX_CHAR_LEN,), dtype=tf.int16),
-                        ),
-                        tf.TensorSpec(shape=(self.config.MAX_CHAR_LEN, self.char_size), dtype=tf.uint8),
-                    )
-        )
-        tf_ds = tf_ds.shuffle(self.config.BATCH_SIZE*2)
-        tf_ds = tf_ds.batch(self.config.BATCH_SIZE, drop_remainder=True)
-        tf_ds = tf_ds.prefetch(tf.data.experimental.AUTOTUNE)
-        self.tf_ds = tf_ds
+        logging.info('*** building tf.dataset ***')
+
+        def gen():
+            if self.config.STEPS_PER_EPOCH > 0:
+                if len(self.train_data_num_list) < self.config.STEPS_PER_EPOCH*self.config.BATCH_SIZE:
+                    self.train_data_num_list = list(range(len(self.lines_q)))
+
+                nums = random.sample(self.train_data_num_list, min(
+                    [self.config.STEPS_PER_EPOCH*self.config.BATCH_SIZE, len(self.train_data_num_list)]))
+                self.train_data_num_list = list(
+                    set(self.train_data_num_list) - set(nums))
+            else:
+                nums = list(range(len(self.lines_a)))
+                random.shuffle(nums)
+            for i1 in nums:
+                # input テキストのトークナイズ
+                input_text = self.lines_q[i1]
+                input_token_dic = self.tokenizer(input_text,
+                                                 truncation=True, max_length=512, return_tensors="tf")
+
+                if len(input_token_dic['input_ids']) > self.config.MAX_LENGTH:
+                    input_token_dic['input_ids'] = input_token_dic['input_ids'][:, -self.config.MAX_LENGTH:]
+                    input_token_dic['attention_mask'] = input_token_dic['attention_mask'][:, -self.config.MAX_LENGTH:]
+                    input_token_dic['token_type_ids'] = input_token_dic['token_type_ids'][:, -self.config.MAX_LENGTH:]
+                else:
+                    input_token_dic = self.tokenizer(input_text, padding='max_length',
+                                                     truncation=True, max_length=self.config.MAX_LENGTH, return_tensors="tf")
 
 
-    def _gen4decoder(self):
-        for i1 in range(len(self.lines_a)):
-        # for input_ids, input_mask, toot_org in zip(self.input_encoded_dict['input_ids'], self.input_encoded_dict['attention_mask'], self.lines_a):
-            toot = KiriDataset.STR + self.lines_a[i1]
-            idxs = np.zeros((self.config.MAX_CHAR_LEN + 1,), dtype=int)
-            for i2 in range( min([self.config.MAX_CHAR_LEN + 1, len(toot)])):
-                idxs[i2] = self.char_idx[toot[i2]]
-            yield ((self.encoder_output[i1,:], idxs[:-1]),
-                    tf.one_hot(idxs[1:], self.char_size, dtype=tf.uint8))
+                toot = KiriDataset.STR + self.lines_a[i1]
+                idxs = np.zeros((self.config.MAX_CHAR_LEN + 1,), dtype=int)
+                for i2 in range(min([self.config.MAX_CHAR_LEN + 1, len(toot)])):
+                    idxs[i2] = self.char_idx[toot[i2]]
+                yield ((input_token_dic['input_ids'][0], input_token_dic['attention_mask'][0], idxs[:-1]), idxs[1:])
 
-
-    def build_tf_ds4decoder(self):
         if len(self.lines_a) == 0:
             self.read_input_data()
-        if self.encoder_output is None:
-            self.read_encoder_output()
-        print(f"len(self.lines_a)={len(self.lines_a)}")
-        print(f"self.encoder_output.shape={self.encoder_output.shape}")
         tf_ds = tf.data.Dataset.from_generator(
-                    self._gen4decoder,
-                    output_signature=(
-                        (
-                            tf.TensorSpec(shape=(self.encoder_output.shape[1],), dtype=tf.float32),
-                            tf.TensorSpec(shape=(self.config.MAX_CHAR_LEN,), dtype=tf.int16),
-                        ),
-                        tf.TensorSpec(shape=(self.config.MAX_CHAR_LEN, self.char_size), dtype=tf.uint8),
-                    )
+            gen,
+            output_signature=(
+                (
+                    tf.TensorSpec(
+                        shape=(self.config.MAX_LENGTH,), dtype=tf.int16),
+                    tf.TensorSpec(
+                        shape=(self.config.MAX_LENGTH,), dtype=tf.int16),
+                    tf.TensorSpec(
+                        shape=(self.config.MAX_CHAR_LEN,), dtype=tf.int16),
+                ),
+                tf.TensorSpec(
+                    shape=(self.config.MAX_CHAR_LEN,), dtype=tf.int16),
+            )
         )
-        tf_ds = tf_ds.shuffle(self.config.BATCH_SIZE*2)
+        # tf_ds = tf_ds.cache()
+        # tf_ds = tf_ds.shuffle(5000)
         tf_ds = tf_ds.batch(self.config.BATCH_SIZE, drop_remainder=True)
         tf_ds = tf_ds.prefetch(tf.data.experimental.AUTOTUNE)
         self.tf_ds = tf_ds

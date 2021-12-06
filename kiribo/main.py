@@ -72,9 +72,9 @@ slot_bal = []
 toot_cnt = 0
 TCNT_RESET = 15
 acct_least_created_at = dict()
-pita_list = []
 
 toots_for_rep = defaultdict(list)
+toots_in_ltl = []
 
 # 花宅配サービス用の花リスト
 hanalist = []
@@ -119,7 +119,7 @@ jihou_dict = {
     "23": "🕚",
 }
 
-BACKSLASH = '\n'
+NN = '\n'
 
 def get_args():
 # アーギュメントのやつ
@@ -370,12 +370,6 @@ def worker(status):
 
     Toot1bQ.put((content, acct))
 
-    if re.search(r"^(緊急|強制)(停止|終了|再起動)$", content) and acct == MASTER_ID:
-        logger.warn("＊＊＊＊＊＊＊＊＊＊＊緊急停止したよー！＊＊＊＊＊＊＊＊＊＊＊")
-        toot(f"@{MASTER_ID} 緊急停止しまーす！", 'direct', id, None)
-        sleep(10)
-        os.kill(os.getpid(), signal.SIGKILL)
-
     # 画像があればダウンロード
     media_file = []
     for media in media_attachments:
@@ -389,10 +383,8 @@ def worker(status):
         fav_now(id)
 
     # 定期トゥート
-    toot_cnt += 1
-    if toot_cnt >= (TCNT_RESET + random.randint(-(3+ct), 2)):
-        toot_cnt = 0
-        auto_tooter()
+    if acct != BOT_ID:
+        toots_in_ltl.append((content.strip(), created_at))
 
     # 高感度下げ
     if re.search(r"死ね", content+spoiler_text):
@@ -719,7 +711,7 @@ def worker(status):
             return
         fav_now(id)
         toots_for_rep[acct].append((content.strip(), created_at))
-        seeds = DAO.get_least_10toots(time=True, limit=10)
+        seeds = toots_in_ltl[:5]
         seeds.extend(toots_for_rep[acct])
         #時系列ソート
         seeds.sort(key=lambda x: (x[1]))
@@ -732,7 +724,7 @@ def worker(status):
         if random.randint(0, 10+ct) > 9:
             return
         fav_now(id)
-        seeds = DAO.get_least_10toots(limit=10, time=True)
+        seeds = toots_in_ltl[:5]
         threading.Thread(target=dnn_gen_toot_sub, args=(
             acct, seeds, visibility, id)).start()
         SM.update(acct, 'reply')
@@ -756,7 +748,7 @@ def worker(status):
                 media_files.append(
                     mastodon.media_post(haiku.make_ikku_image(song, avatar_static), 'image/png'))
                 toot(
-                    f"{BACKSLASH.join([''.join([node.surface for node in phrase]) for phrase in song.phrases])}{BACKSLASH}{'　'*4}:@{acct}:{display_name} {'（季語：'+song.season_word+'）' if song.season_word else ''}",
+                    f"{NN.join([''.join([node.surface for node in phrase]) for phrase in song.phrases])}{NN}{'　'*4}:@{acct}:{display_name} {'（季語：'+song.season_word+'）' if song.season_word else ''}",
                     spoiler_text=f"{'俳句' if song.season_word else '川柳'}を検出したよ〜", visibility=visibility, media_ids=media_files)
 
 def res_fixed_phrase(id, acct, username, visibility, content, statuses_count,
@@ -1114,6 +1106,13 @@ def business_contact(status):
     display_name = util.display_name_cleanser(status["account"]['display_name'])
     ac_created_at = status["account"]["created_at"]
     ac_created_at = ac_created_at.astimezone(timezone('Asia/Tokyo'))
+
+    if re.search(r"^(緊急|強制)(停止|終了|再起動)$", content) and acct == MASTER_ID:
+        logger.warn("＊＊＊＊＊＊＊＊＊＊＊緊急停止したよー！＊＊＊＊＊＊＊＊＊＊＊")
+        toot(f"@{MASTER_ID} 緊急停止しまーす！", 'direct', id, None)
+        sleep(10)
+        os.kill(os.getpid(), signal.SIGKILL)
+
     if '@' in acct:  # 連合スルー
         return
     #最後にトゥートしてから3時間以上？
@@ -1127,7 +1126,6 @@ def business_contact(status):
 
     jst_now = datetime.now(timezone('Asia/Tokyo'))
     jst_now_hh = int(jst_now.strftime("%H"))
-    # logger.info(f'「{content[:30]:<30}」by {acct}')
 
     kaomoji = random.choice([tmp.strip() for tmp in open(KAOMOJI_PATH, 'r').readlines() if os.path.exists(KAOMOJI_PATH) and len(tmp.strip()) > 0])
     if statuses_count == 1:
@@ -1149,10 +1147,6 @@ def business_contact(status):
 
         toot_now = f':@{acct}: {display_name}\n{aisatsu} {kaomoji}\n #挨拶部'
         toot(toot_now, visibility='public', interval=3)
-
-    pita_list.append(created_at)
-    if len(pita_list) > 1:
-        pita_list.pop(0)
 
     watch_list = set([tmp.strip() for tmp in open(WATCH_LIST_PATH).readlines(
     ) if os.path.exists(WATCH_LIST_PATH) and len(tmp.strip()) > 0])
@@ -1374,7 +1368,7 @@ def bottlemail_sending():
 
 def auto_tooter():
 # きりぼっとのつぶやき
-    seeds = DAO.get_least_10toots(limit=10, time=True)
+    seeds = toots_in_ltl[:5]
     if len(seeds) <= 2:
         return
     spoiler = None
@@ -1389,8 +1383,28 @@ def auto_tooter():
     toot(gen_txt, "public", None, spoiler)
 
 
+def th_auto_tooter():
+    TT_INT = 1800
+    tt_cnt = TT_INT
+    pre_toots_len = len(toots_in_ltl)
+    while True:
+        try:
+            sleep(1)
+            tt_cnt -= 1
+            if len(toots_in_ltl) != pre_toots_len:
+                tt_cnt -= random.randint(2,5) * 60
+            if len(toots_in_ltl) > 50:
+                toots_in_ltl.pop(0)
+            pre_toots_len = len(toots_in_ltl)
+            if tt_cnt <= 0:
+                auto_tooter()
+                tt_cnt = TT_INT
+        except Exception as e:
+            logger.error(e)
+
+
 def dnn_gen_text_wrapper(input_text):
-    return bert.generator.gen_text(input_text, temperature=random.uniform(0.5, 0.9), topk=100)
+    return bert.generator.gen_text(input_text, temperature=random.uniform(0.3, 0.8), topk=random.randint(50,500))
 
 
 def dnn_gen_toot_sub(acct: str, seeds: list, visibility: str, in_reply_to_id: int = None, toots_for_rep:list = None):
@@ -1819,6 +1833,7 @@ def run():
     threads.append(threading.Thread(target=th_worker))
     threads.append(threading.Thread(target=th_timerDel))
     threads.append(threading.Thread(target=th_post))
+    threads.append(threading.Thread(target=th_auto_tooter))
     #スケジュール起動系(時刻)
     threads.append(scheduler.Scheduler(
         bottlemail_sending, hhmm_list=['23:05']))
@@ -1828,8 +1843,6 @@ def run():
     threads.append(scheduler.Scheduler(jihou, hhmm_list=['**:00']))
 
     #スケジュール起動系(間隔)
-    threads.append(scheduler.Scheduler(
-        auto_tooter, hhmm_list=None, intvl=60, rndmin=-10, rndmax=4, cm=CM))
     threads.append(scheduler.Scheduler(
         jinkei_tooter, hhmm_list=None, intvl=120, rndmin=-10, rndmax=10, cm=CM))
 
