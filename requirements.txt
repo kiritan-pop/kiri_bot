@@ -17,3 +17,4 @@ cairosvg
 transformers
 fugashi
 ipadic
+tensorflow-addons

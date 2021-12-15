@@ -226,9 +226,8 @@ def exe_fav_now(id, *args, **kwargs):  # ニコります
         logger.error(e)
     else:
         if status['favourited'] == False:
-            th = threading.Timer(
-                interval=2, function=mastodon.status_favourite, args=(id,))
-            th.start()
+            sleep(0.2)
+            mastodon.status_favourite(id)
             logger.info("🙆Fav")
 
 
@@ -1392,7 +1391,7 @@ def th_auto_tooter():
             sleep(1)
             tt_cnt -= 1
             if len(toots_in_ltl) != pre_toots_len:
-                tt_cnt -= random.randint(2,5) * 60
+                tt_cnt -= random.randint(1,3) * 60
             if len(toots_in_ltl) > 50:
                 toots_in_ltl.pop(0)
             pre_toots_len = len(toots_in_ltl)
@@ -1804,11 +1803,20 @@ def jihou():
 
 def th_post():
 # post用worker
+    interval_time = 0
     while True:
+        logger.info(f"interval_time={interval_time}")
         try:
-            func, args, kwargs = PostQ.get()
+            func, args, kwargs = PostQ.get(timeout=2)
+            sleep(0.2 + interval_time)
             func(*args, **kwargs)
-            sleep(0.8)
+            interval_time += 1
+            if interval_time > 6:
+                interval_time = 6
+        except queue.Empty:
+            interval_time -= 0.2
+            if interval_time < 0:
+                interval_time = 0
         except Exception as e:
             logger.error(e + traceback.format_exc())
             sleep(3)
