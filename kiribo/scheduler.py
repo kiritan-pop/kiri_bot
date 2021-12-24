@@ -1,15 +1,14 @@
 # coding: utf-8
 
-from time import time, sleep
+from time import sleep
 from datetime import datetime
-from pytz import timezone
 import threading
 import random
 
 # きりぼコンフィグ
 from kiribo.config import TIMEZONE
-import kiribo.util
-logger = kiribo.util.setup_logger(__name__)
+import logging
+logger = logging.getLogger(__name__)
 
 #######################################################
 # スケジューラー！

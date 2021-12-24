@@ -8,8 +8,9 @@ from PIL import Image, ImageFont, ImageDraw
 
 from kiribo.config import IPADIC_PATH, KIGO_PATH, FONT_PATH_IKKU, MEDIA_PATH
 from kiribo import  util
+import logging
 
-logger = util.setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def make_ikku_image(song, avatar_static):

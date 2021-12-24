@@ -12,8 +12,9 @@ from datetime import datetime,timedelta
 
 # きりぼコンフィグ
 from kiribo.config import SIRITORI_DIC_PATH
-from kiribo import util
-logger = util.setup_logger(__name__)
+import logging
+
+logger = logging.getLogger(__name__)
 
 class GettingNum():
     def __init__(self,maxval=10):

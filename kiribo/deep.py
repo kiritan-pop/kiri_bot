@@ -1,5 +1,6 @@
 # coding: utf-8
 
+import logging
 from tensorflow.keras.models import load_model
 import MeCab
 import numpy as np
@@ -10,8 +11,9 @@ import cv2
 
 # きりぼコンフィグ
 from kiribo.config import NICODIC_PATH, IPADIC_PATH
-from kiribo import imaging, util
-logger = util.setup_logger(__name__)
+from kiribo import imaging
+
+logger = logging.getLogger(__name__)
 
 # 画像判定用ラベル
 labels = {}

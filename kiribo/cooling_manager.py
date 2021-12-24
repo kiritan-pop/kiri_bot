@@ -3,9 +3,9 @@
 import threading
 from pytz import timezone
 from time import sleep
+import logging
 
-from kiribo import util
-logger = util.setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 #######################################################

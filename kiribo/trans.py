@@ -3,8 +3,8 @@
 import json
 import requests
 
-import kiribo.util
-logger = kiribo.util.setup_logger(__name__)
+import logging
+logger = logging.getLogger(__name__)
 
 class Trans:
     def __init__(self, key):

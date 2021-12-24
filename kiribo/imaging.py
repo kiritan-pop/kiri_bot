@@ -1,14 +1,12 @@
 # coding: utf-8
 
-import os
+import logging
 import numpy as np
 import cv2
-import requests
 from PIL import Image, ImageOps, ImageFile, ImageChops, ImageFilter, ImageEnhance
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
-from kiribo import util
-logger = util.setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 def face_search(image_path):
     try:

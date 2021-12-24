@@ -2,40 +2,31 @@
 
 import os,re
 import requests
-from requests.exceptions import Timeout
 import urllib3
 import unicodedata
 from bs4 import BeautifulSoup
 import jaconv
-from logging import getLogger, StreamHandler, Formatter, FileHandler, getLevelName
+from logging import getLogger, StreamHandler, Formatter, FileHandler, getLevelName, basicConfig, NOTSET
 from queue import Queue, Empty
 
 # きりぼコンフィグ
 from kiribo.config import TWOTWO_DIC_PATH, NG_WORDS_PATH, LOG_LEVEL, LOG_PATH, MEDIA_PATH
 
 
-#######################################################
-# エラー時のログ書き込み
-def setup_logger(modname):
-    log_level = getLevelName(LOG_LEVEL)
-    logger = getLogger(modname)
-    logger.setLevel(log_level)
+log_level = getLevelName(LOG_LEVEL)
+sh = StreamHandler()
+sh.setLevel(log_level)
+formatter = Formatter('%(levelname)s:%(asctime)s - %(message)s')
+sh.setFormatter(formatter)
 
-    sh = StreamHandler()
-    sh.setLevel(log_level)
-    formatter = Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    sh.setFormatter(formatter)
-    logger.addHandler(sh)
+fh = FileHandler(LOG_PATH)  # fh = file handler
+fh.setLevel(log_level)
+fh_formatter = Formatter(
+    '%(levelname)s:%(asctime)s - %(filename)s - %(name)s - %(lineno)d - %(message)s')
+fh.setFormatter(fh_formatter)
+basicConfig(level=NOTSET, handlers=[sh, fh])
 
-    fh = FileHandler(LOG_PATH) #fh = file handler
-    fh.setLevel(log_level)
-    fh_formatter = Formatter('%(asctime)s - %(filename)s - %(name)s - %(lineno)d - %(levelname)s - %(message)s')
-    fh.setFormatter(fh_formatter)
-    logger.addHandler(fh)
-    return logger
-
-
-logger = setup_logger(__name__)
+logger = getLogger(__name__)
 
 #######################################################
 # ネイティオ語翻訳

@@ -27,7 +27,8 @@ from kiribo import bottlemail, cooling_manager, dao, deep, game, generate_text,\
     get_images_ggl, imaging, romasaga, scheduler, score_manager, stat, tenki,\
     timer, toot_summary, trans, util, haiku, tarot, bert
 
-logger = util.setup_logger(__name__)
+import logging
+logger = logging.getLogger(__name__)
 
 os.makedirs(MEDIA_PATH, exist_ok=True)
 
@@ -1819,14 +1820,47 @@ def th_post():
             sleep(3)
 
 
+def th_ltl():
+    # ltl監視
+    while True:
+        try:
+            mastodon.stream_local(ltl_listener())
+        except Exception as e:
+            logger.error(e + traceback.format_exc())
+            sleep(10)
+
+
+def th_ptl():
+    # ltl監視
+    while True:
+        try:
+            mastodon.stream_local(public_listener())
+        except Exception as e:
+            logger.error(e + traceback.format_exc())
+            sleep(10)
+
+
+def th_htl():
+    # ltl監視
+    while True:
+        try:
+            mastodon.stream_user(notification_listener())
+        except Exception as e:
+            logger.error(e + traceback.format_exc())
+            sleep(10)
+
+
 def run():
     args = get_args()
     threads = []
     CM.run()
     #タイムライン受信系
-    mastodon.stream_local(ltl_listener(), run_async=True)
-    publicdon.stream_local(public_listener(), run_async=True)
-    mastodon.stream_user(notification_listener(), run_async=True)
+    threads.append(threading.Thread(target=th_ltl))
+    threads.append(threading.Thread(target=th_ptl))
+    threads.append(threading.Thread(target=th_htl))
+    # mastodon.stream_local(ltl_listener(), run_async=True)
+    # publicdon.stream_local(public_listener(), run_async=True)
+    # mastodon.stream_user(notification_listener(), run_async=True)
     #タイムライン応答系
     threads.append(threading.Thread(target=th_delete))
     threads.append(threading.Thread(target=th_saver))

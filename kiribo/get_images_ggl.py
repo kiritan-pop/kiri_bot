@@ -5,9 +5,10 @@ import json
 import requests
 
 # きりぼコンフィグ
-from kiribo.config import MEDIA_PATH
 from kiribo import util
-logger = util.setup_logger(__name__)
+import logging
+
+logger = logging.getLogger(__name__)
 
 class GetImagesGGL:
     def __init__(self,key,engine_key):

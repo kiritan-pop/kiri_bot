@@ -1,12 +1,11 @@
 # coding: utf-8
-import os,sys,io,re,json
 from socketIO_client_nexus import SocketIO, LoggingNamespace
 import xmltodict
 from collections import OrderedDict
 import requests
+import logging
 
-from kiribo import util
-logger = util.setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 class Kirikishou():
     def __init__(self, ws_url, ws_port=80, kishou_target={}, on_msg_func=None):
