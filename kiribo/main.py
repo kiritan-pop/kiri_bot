@@ -1131,7 +1131,6 @@ def business_contact(status):
         toot_now = f':@{acct}: （{display_name}）ご新規さんかもー！{kaomoji}\n #挨拶部'
         toot(toot_now, visibility='public', interval=3)
     elif ymdhms == None or ymdhms + diff < created_at:
-        fav_now(id)
         logger.info(f"ymdhms={ymdhms}, created={created_at}, acct_least_created_at[acct]={acct_least_created_at[acct]}, dao={DAO.get_least_created_at(acct)}")
         aisatsu = "おかえり〜！"
         bure = random.randint(-1, 1)
@@ -1805,14 +1804,12 @@ def th_post():
 # post用worker
     interval_time = 0
     while True:
-        logger.info(f"interval_time={interval_time}")
+        logger.debug(f"interval_time={interval_time}")
         try:
             func, args, kwargs = PostQ.get(timeout=2)
-            sleep(0.2 + interval_time)
+            sleep(max(0.2,min(interval_time, 4)))
             func(*args, **kwargs)
-            interval_time += 1
-            if interval_time > 6:
-                interval_time = 6
+            interval_time += 0.4
         except queue.Empty:
             interval_time -= 0.2
             if interval_time < 0:
@@ -1827,12 +1824,9 @@ def run():
     threads = []
     CM.run()
     #タイムライン受信系
-    mastodon.stream_local(ltl_listener(), run_async=True, timeout=180,
-                        reconnect_async=True, reconnect_async_wait_sec=15)
-    publicdon.stream_local(public_listener(), run_async=True,
-                        timeout=180, reconnect_async=True, reconnect_async_wait_sec=15)
-    mastodon.stream_user(notification_listener(), run_async=True,
-                        timeout=180, reconnect_async=True, reconnect_async_wait_sec=15)
+    mastodon.stream_local(ltl_listener(), run_async=True)
+    publicdon.stream_local(public_listener(), run_async=True)
+    mastodon.stream_user(notification_listener(), run_async=True)
     #タイムライン応答系
     threads.append(threading.Thread(target=th_delete))
     threads.append(threading.Thread(target=th_saver))
