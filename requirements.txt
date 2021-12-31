@@ -18,3 +18,4 @@ transformers
 fugashi
 ipadic
 tensorflow-addons
+more_itertools

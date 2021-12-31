@@ -27,14 +27,12 @@ def build_transformer(
         input_shape, dtype=tf.int32, name="input_ids")
     input_attention_mask = tf.keras.layers.Input(
         input_shape, dtype=tf.int32, name="input_attention_mask")
-    encoder = TFBertModel.from_pretrained(model_name)
+    encoder = TFBertModel.from_pretrained(model_name) #, output_attentions=True)
     encoder.trainable = False
     encoder_output = encoder(
         input_ids,
         attention_mask=input_attention_mask,
     )
-
-    # e = tf.keras.layers.GaussianNoise(0.03)(encoder_output[0])
 
     target_ids = tf.keras.layers.Input(
         (target_length,), dtype=tf.int32, name="target_ids")

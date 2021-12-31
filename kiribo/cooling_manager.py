@@ -33,7 +33,7 @@ class CoolingManager():
     def timer_showflowrate(self):
         while True:
             sleep(60)
-            logger.info(f"***流速:{self._flowrate():.1f}toots/分")
+            logger.debug(f"***流速:{self._flowrate():.1f}toots/分")
 
     def get_coolingtime(self):
         return self._flowrate() * self.base_time / 60

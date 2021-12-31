@@ -15,7 +15,6 @@ from collections import defaultdict, Counter
 import wikipedia
 from PIL import Image
 import argparse
-import traceback
 
 # きりぼコンフィグ
 from kiribo.config import MEDIA_PATH, GOOGLE_ENGINE_KEY, GOOGLE_KEY, MASTODON_URL, MASTODON_ACCESS_TOKEN,\
@@ -172,7 +171,6 @@ class ltl_listener(StreamListener):
         if re.search(r'[^:]@' + BOT_ID, status['content']):
             return
         acct = status["account"]["acct"]
-        logger.info(f"「{util.content_cleanser(status['content'])[:30]:<30}」by {acct}")
         if acct != BOT_ID:
             WorkerQ.put(status)
 
@@ -182,6 +180,9 @@ class public_listener(StreamListener):
     def on_update(self, status):
         StatusQ.put(status)
         CM.count(status['created_at'])
+        acct = status["account"]["acct"]
+        logger.info(
+            f"「{util.content_cleanser(status['content'])[:30]:<30}」by {acct}")
 
     def on_delete(self, status_id):
         logger.info(f"===public_listener on_delete【{status_id}】===")
@@ -208,7 +209,7 @@ def exe_toot(toot_content:str, visibility:str="direct", in_reply_to_id=None, spo
             spoiler_text=spoiler_text,
             media_ids=media_ids, **kwargs)
     except Exception as e:
-        logger.error(e)
+        logger.error(e, exc_info=True)
         logger.error("POST リトライ")
         toot(toot_content, visibility, None, spoiler_text, media_ids, interval=4, **kwargs) 
     else:
@@ -224,7 +225,7 @@ def exe_fav_now(id, *args, **kwargs):  # ニコります
     try:
         status = mastodon.status(id)
     except Exception as e:
-        logger.error(e)
+        logger.error(e, exc_info=True)
     else:
         if status['favourited'] == False:
             sleep(0.2)
@@ -241,7 +242,7 @@ def exe_boost_now(id, *args, **kwargs):  # ぶーすと！
     try:
         status = mastodon.status(id)
     except Exception as e:
-        logger.error(e)
+        logger.error(e, exc_info=True)
     else:
         if status['reblogged'] == False:
             mastodon.status_reblog(id)
@@ -541,7 +542,7 @@ def worker(status):
             nl = "\n"
             toot(f'@{acct} 「{word}」にはいくつか意味があるみたいだよ〜{nl}次のいずれかのキーワードでもう一度調べてね〜{nl}{",".join(e.options)}', visibility, id, None)
         except Exception as e:
-            logger.error(e)
+            logger.error(e, exc_info=True)
             toot(f'@{acct} え？「{word}」しらなーい！', visibility, id, None)
         else:
             summary_text = page.summary
@@ -650,7 +651,7 @@ def worker(status):
             try:
                 status = mastodon.status(tid)
             except Exception as e:
-                logger.error(e)
+                logger.error(e, exc_info=True)
                 sleep(2)
                 continue
             else:
@@ -1283,7 +1284,6 @@ def bottlemail_service(content, acct, id, visibility):
     toot(toot_now, visibility, id, spoiler)
 
 
-
 def th_worker():
     # ワーカー処理のスレッド
     while True:
@@ -1293,8 +1293,7 @@ def th_worker():
                 worker(status)
         except Exception as e:
             logger.error(e, exc_info=True)
-            sleep(30)
-
+            sleep(5)
 
 
 def th_timerDel():
@@ -1326,7 +1325,7 @@ def th_timerDel():
                     toot_delete(id=id, interval=sec)
 
         except Exception as e:
-            logger.error(e)
+            logger.error(e, exc_info=True)
             sleep(30)
 
 
@@ -1399,7 +1398,7 @@ def th_auto_tooter():
                 auto_tooter()
                 tt_cnt = TT_INT
         except Exception as e:
-            logger.error(e)
+            logger.error(e, exc_info=True)
 
 
 def dnn_gen_text_wrapper(input_text):
@@ -1447,7 +1446,7 @@ def th_delete():
                     del_accts.pop(0)
 
         except Exception as e:
-            logger.error(e)
+            logger.error(e, exc_info=True)
 
 
 def th_hint_de_pinto(gtime=5):
@@ -1562,7 +1561,7 @@ def th_hint_de_pinto(gtime=5):
         except queue.Empty:
             logger.debug(f"ひんぴん出題待ちループ:残り{junbiTM.check()}秒")
         except Exception as e:
-            logger.error(e)
+            logger.error(e, exc_info=True)
             sleep(5)
             toot(f'@{MASTER_ID} ヒントでピントで何かエラー出た！', visibility="public")
 
@@ -1763,7 +1762,7 @@ def th_gettingnum(gtime=30):
                             'public', None, '数取りゲーム、結果発表ーー！！')
 
         except Exception as e:
-            logger.error(e)
+            logger.error(e, exc_info=True)
 
 
 def th_saver():
@@ -1777,9 +1776,9 @@ def th_saver():
             DAO.save_toot(status)
         except Exception as e:
             #保存失敗したら、キューに詰めてリトライ！
-            logger.error(e)
+            logger.error(e, exc_info=True)
             sleep(10)
-            StatusQ.put(status)
+            # StatusQ.put(status)
 
 
 def wan_time():
@@ -1816,7 +1815,7 @@ def th_post():
             if interval_time < 0:
                 interval_time = 0
         except Exception as e:
-            logger.error(e + traceback.format_exc())
+            logger.error(e, exc_info=True)
             sleep(3)
 
 
@@ -1826,7 +1825,7 @@ def th_ltl():
         try:
             mastodon.stream_local(ltl_listener())
         except Exception as e:
-            logger.error(e + traceback.format_exc())
+            logger.error(e, exc_info=True)
             sleep(10)
 
 
@@ -1834,9 +1833,9 @@ def th_ptl():
     # ltl監視
     while True:
         try:
-            mastodon.stream_local(public_listener())
+            publicdon.stream_local(public_listener())
         except Exception as e:
-            logger.error(e + traceback.format_exc())
+            logger.error(e, exc_info=True)
             sleep(10)
 
 
@@ -1846,7 +1845,7 @@ def th_htl():
         try:
             mastodon.stream_user(notification_listener())
         except Exception as e:
-            logger.error(e + traceback.format_exc())
+            logger.error(e, exc_info=True)
             sleep(10)
 
 

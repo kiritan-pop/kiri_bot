@@ -5,7 +5,7 @@ import tensorflow as tf
 import numpy as np
 from transformers import AutoTokenizer
 
-logging.basicConfig(level=logging.INFO)
+# logging.basicConfig(level=logging.DEBUG)
 
 def gen_text(
         transformer_model: tf.keras.Model,
@@ -32,6 +32,9 @@ def gen_text(
     output_ids[0,0] = dataset.char_idx[dataset.STR]
     generated_text = ""
     for cur in range(1, config.MAX_CHAR_LEN + 1):
+        # encoder_output = encoder_model.predict_on_batch((input_token_dic['input_ids'], input_token_dic['attention_mask']))
+        # preds = decoder_model.predict_on_batch(
+        #     (encoder_output, output_ids[:, :-1]))
         preds = transformer_model.predict_on_batch(
             (input_token_dic['input_ids'], input_token_dic['attention_mask'], output_ids[:, :-1]))
 
