@@ -9,3 +9,8 @@ services:
      - /usr/lib/x86_64-linux-gnu/mecab/dic/mecab-ipadic-neologd:/kiri_bot/mecab-ipadic-neologd
     working_dir: /kiri_bot
     restart: always
+    logging:
+      driver: json-file
+      options:
+        max-file: '5'
+        max-size: 1m

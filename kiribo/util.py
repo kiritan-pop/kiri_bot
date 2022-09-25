@@ -134,7 +134,7 @@ def content_cleanser_light(text):
 
 
 def display_name_cleanser(display_name):
-    return re.sub(r'@', '＠', display_name)
+    return re.sub(r'(?<!:)@', '＠', display_name)
 
 
 #######################################################

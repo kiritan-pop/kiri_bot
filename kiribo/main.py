@@ -377,7 +377,7 @@ def worker(status):
         media_file.append(util.download_media(media["url"]))
     media_file = [m for m in media_file if m]
 
-    ct = int(CM.get_coolingtime())
+    ct = max([int(CM.get_coolingtime()),0])
 
     # なでなで
     if acct in set([tmp.strip() for tmp in open(NADE_PATH).readlines() if os.path.exists(NADE_PATH) and len(tmp.strip()) > 0]):
@@ -758,7 +758,7 @@ def res_fixed_phrase(id, acct, username, visibility, content, statuses_count,
 # 定型文応答処理
 
     def re_search_rnd(re_txt, text, threshold=None, flags=0):
-        rnd = random.randint(0, 5+ct)
+        rnd = random.randint(0, ct+5)
         if acct == MASTER_ID:
             rnd = 0
         if re.search(re_txt, text, flags=flags) != None:
@@ -976,7 +976,7 @@ def res_fixed_phrase(id, acct, username, visibility, content, statuses_count,
     elif re_search_rnd(r"^[こコ][らラ][きキ][りリ][ぼボぽポ]", content):
         toot_now = random.choice([tmp.strip() for tmp in open(KORA_PATH, 'r').readlines() if os.path.exists(KORA_PATH) and len(tmp.strip()) > 0])
 
-    elif re_search_rnd(r"[へヘはハ][くク].*[しシ][ょョ][んン].*[出でデ][たタ]", content):
+    elif re_search_rnd(r"[へヘはハ][くク].*[しシ][ょョ][んン].*[出でデ][たタ]", content, 3):
         r = max([0, int(random.gauss(30, 30))])
         maoudict = {"大魔王": 100, "中魔王": 10, "小魔王": 1}
         result = {}
@@ -994,7 +994,7 @@ def res_fixed_phrase(id, acct, username, visibility, content, statuses_count,
         else:
             toot_now = f":@{acct}: 只今の記録、０魔王でした〜\n#魔王チャレンジ"
     
-    elif re_search_rnd(r"(.+)[出でデ][たタ].?$", content, 4):
+    elif re_search_rnd(r"(.+)[出でデ][たタ].?$", content, 2):
         r = max([0, int(random.gauss(30, 30))])
         maoudict = {"大魔王": 100, "中魔王": 10, "小魔王": 1}
         word = re.search(r"(.+)[出でデ][たタ].?$", str(content)).group(1).strip()
@@ -1402,7 +1402,7 @@ def th_auto_tooter():
 
 
 def dnn_gen_text_wrapper(input_text):
-    return bert.generator.gen_text(input_text, temperature=random.uniform(0.3, 0.8), topk=random.randint(50,500))
+    return bert.generator.gen_text(input_text, temperature=random.uniform(0.5, 1.0), topk=random.randint(100,500))
 
 
 def dnn_gen_toot_sub(acct: str, seeds: list, visibility: str, in_reply_to_id: int = None, toots_for_rep:list = None):
