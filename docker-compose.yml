@@ -6,7 +6,7 @@ services:
     command: python3 run_kiribo.py
     volumes:
      - /home/kiritan/kiri_bot:/kiri_bot
-     - /usr/lib/x86_64-linux-gnu/mecab/dic/mecab-ipadic-neologd:/kiri_bot/mecab-ipadic-neologd
+     - /usr/lib/x86_64-linux-gnu/mecab/dic/mecab-ipadic-neologd:/usr/lib/x86_64-linux-gnu/mecab/dic/mecab-ipadic-neologd
     working_dir: /kiri_bot
     restart: always
     logging:

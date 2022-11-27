@@ -758,7 +758,7 @@ def res_fixed_phrase(id, acct, username, visibility, content, statuses_count,
 # 定型文応答処理
 
     def re_search_rnd(re_txt, text, threshold=None, flags=0):
-        rnd = random.randint(0, ct+5)
+        rnd = random.randint(0, ct+6)
         if acct == MASTER_ID:
             rnd = 0
         if re.search(re_txt, text, flags=flags) != None:
@@ -825,14 +825,14 @@ def res_fixed_phrase(id, acct, username, visibility, content, statuses_count,
         tmp.append('( •́ฅ•̀ )ｸｯｻ')
         tmp.append(f"　:@{acct}:\nっ🚽")
         toot_now = random.choice(tmp)
-    elif re_search_rnd(r"^木$|^林$|^森$", content+spoiler_text, 6):
+    elif re_search_rnd(r"^木$|^林$|^森$", content+spoiler_text, 4):
         SM.update(acct, 'func')
         tmp = []
         tmp.append(r'{{{🌴🌴🌴🌴}}} ＜すくすくーっ！')
         tmp.append(r'{{{🌲🌲🌲🌲}}} ＜すくすくーっ！')
         tmp.append(r'{{{🌳🌳🌳🌳}}} ＜すくすくーっ！')
         toot_now = random.choice(tmp)
-    elif re_search_rnd(r"^流して$|^水$", content+spoiler_text, 6):
+    elif re_search_rnd(r"^流して$|^水$", content+spoiler_text, 4):
         SM.update(acct, 'func')
         toot_now = r'{{{🌊🌊🌊🌊}}} ＜ざばーっ！'
     elif re_search_rnd(r"^ふきふき$|^竜巻$|^風$", content, 4):
@@ -859,16 +859,16 @@ def res_fixed_phrase(id, acct, username, visibility, content, statuses_count,
     elif re_search_rnd(r"^ぬるぽ$|^[Nn]ull[Pp]ointer[Ee]xception$", content, 4):
         SM.update(acct, 'func', score=-1)
         toot_now = 'ｷﾘｯ'
-    elif re_search_rnd(r"^通過$", content, 6):
+    elif re_search_rnd(r"^通過$", content, 4):
         SM.update(acct, 'func')
         tmp = []
         tmp.append('⊂(˃̵᎑˂̵๑⊃ )彡　阻止！')
         tmp.append('　ミ(  っ˃̵ᴗ˂̵)っ　阻止！')
         toot_now = random.choice(tmp)
-    elif re_search_rnd(r"3.{0,1}3.{0,1}4", content, 6):
+    elif re_search_rnd(r"3.{0,1}3.{0,1}4", content, 4):
         SM.update(acct, 'func', score=-1)
         toot_now = 'ﾅﾝ :nan:'
-    elif re_search_rnd(r"^ちくわ大明神$", content, 6):
+    elif re_search_rnd(r"^ちくわ大明神$", content, 4):
         SM.update(acct, 'func', score=-1)
         toot_now = 'ﾀﾞｯ'
     elif re_search_rnd(r"ボロン$|ぼろん$", content, 2):
@@ -898,17 +898,17 @@ def res_fixed_phrase(id, acct, username, visibility, content, statuses_count,
     elif re_search_rnd(r"泣いてる|泣いた|涙が出[るた(そう)]", content, 2):
         SM.update(acct, 'func')
         toot_now = f'( *ˊᵕˋ)ﾉ :@{acct}: ﾅﾃﾞﾅﾃﾞ'
-    elif re_search_rnd(r"^桐乃じゃないが$", content+spoiler_text, 6):
+    elif re_search_rnd(r"^桐乃じゃないが$", content+spoiler_text, 2):
         SM.update(acct, 'func')
         toot_now = f'桐乃じゃないね〜'
-    elif re_search_rnd(r"^.+じゃないが$", content+spoiler_text, 6):
+    elif re_search_rnd(r"^.+じゃないが$", content+spoiler_text, 2):
         word = re.search(r"^(.+)じゃないが$", content+spoiler_text).group(1)
         SM.update(acct, 'func')
         toot_now = f'{word}じゃが！'
     elif re_search_rnd(r"惚気|ほっけ|ホッケ", content+spoiler_text, 2):
         SM.update(acct, 'func', score=-1)
         toot_now = '(((🔥🔥🔥🔥)))＜ごぉぉぉっ！'
-    elif re_search_rnd(r"^燃やして$|^火$|^炎$", content+spoiler_text, 6):
+    elif re_search_rnd(r"^燃やして$|^火$|^炎$", content+spoiler_text, 4):
         SM.update(acct, 'func')
         toot_now = '(((🔥🔥🔥🔥)))＜ごぉぉぉっ！'
     elif re_search_rnd(r"[ご御夕昼朝][食飯][食た]べ[よるた]|(腹|はら)[へ減]った|お(腹|なか)[空す]いた|(何|なに)[食た]べよ", content, 3):

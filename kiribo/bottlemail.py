@@ -43,7 +43,7 @@ class Bottlemail():
         con.commit()
 
         #カウント＞nの人抽出
-        for row in con.execute('select * from bottlemail where count>=? and send_fg=?',(500,0)):
+        for row in con.execute('select * from bottlemail where count>=? and send_fg=?',(2000,0)):
             arrival.append([row[0],row[1],row[2],row[6]])
         con.close()
         #送信対象を返すよー！
