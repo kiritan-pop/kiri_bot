@@ -1,7 +1,7 @@
 # coding: utf-8
 
 import logging
-from tensorflow.keras.models import load_model
+import tensorflow as tf
 import MeCab
 import numpy as np
 import json
@@ -17,30 +17,50 @@ logger = logging.getLogger(__name__)
 
 # 画像判定用ラベル
 labels = {}
-with open('data/.cnn_labels','r') as f:
+with open('data/cnn/.cnn_labels','r') as f:
     labels_index = json.load(f)
 for label,i in labels_index.items():
     labels[i] = label
 
-STANDARD_SIZE = (299, 299)
-STANDARD_SIZE_S1 = (128, 128)
-STANDARD_SIZE_S2 = (512, 512)
+STANDARD_SIZE = (480, 480)
 
 #いろいろなパラメータ
-#変更するとモデル再構築必要
-DOC_VEC_SIZE = 32  # Doc2vecの出力より
-VEC_MAXLEN = 10     # vec推定で参照するトゥート(vecor)数
-AVE_LEN = 2        # vec推定で平均化する幅
-TXT_MAXLEN = 5      # 
-MU = "🧪"       # 無
-END = "🦷"      # 終わりマーク
-
 tagger = MeCab.Tagger(f"-Owakati -u {NICODIC_PATH} -d {IPADIC_PATH}")
 
 pat3 = re.compile(r'^\n')
 pat4 = re.compile(r'\n')
 
-takomodel = load_model('data/cnn.h5')
+# モデル作成
+def build_cnn_model(labels):
+    input_image = tf.keras.layers.Input(shape=(480, 480, 3))
+    input = tf.keras.layers.GaussianNoise(0.1)(input_image)
+    input = tf.keras.layers.RandomFlip()(input)
+    # input = tf.keras.layers.RandomCrop(480, 480)(input)
+    input = tf.keras.layers.RandomZoom(0.2)(input)
+    input = tf.keras.layers.RandomContrast(0.2)(input)
+    input = tf.keras.layers.RandomRotation(0.5)(input)
+    input = tf.keras.layers.RandomTranslation(0.2, 0.2)(input)
+
+    base_model = tf.keras.applications.efficientnet_v2.EfficientNetV2M(
+        input_tensor=input, include_top=False, weights='imagenet')
+
+    x = base_model.output
+    x = tf.keras.layers.GlobalAveragePooling2D()(x)
+    x = tf.keras.layers.Dense(512, activation="relu")(x)
+    x = tf.keras.layers.Dropout(0.3)(x)
+    pred = tf.keras.layers.Dense(len(labels), activation="softmax")(x)
+
+    model = tf.keras.models.Model(inputs=input_image, outputs=pred)
+
+    return model
+
+
+takomodel = build_cnn_model(labels)
+# モデルを読み込む
+latest = tf.train.latest_checkpoint(os.path.dirname('data/cnn/checkpoints/cnn.model'))
+if latest:
+    print(f'*** load model-weights {latest} ***')
+    takomodel.load_weights(latest)
 
 
 def takoramen(filepath):
@@ -59,7 +79,7 @@ def takoramen(filepath):
     else:
         return 'other'
 
-    result = takomodel.predict(np.array([image/255.0]))
+    result = takomodel.predict(image[np.newaxis, ...])
 
     rslt_dict = {}
     for i,rslt in enumerate(result[0]):
