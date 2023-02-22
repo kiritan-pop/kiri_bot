@@ -1,5 +1,3 @@
-gensim>=3.8.3
-kaleido>=0.0.3
 lxml>=4.5.2
 Mastodon.py>=1.5.1
 mecab-python3>=1.0.1

@@ -384,7 +384,7 @@ def worker(status):
         fav_now(id)
 
     # 定期トゥート
-    if acct != BOT_ID:
+    if acct != BOT_ID and visibility == "public" and re.search(r'[^:]@%s' % BOT_ID, status['content']) is None:
         toots_in_ltl.append((content.strip(), created_at))
 
     # 高感度下げ
@@ -403,7 +403,7 @@ def worker(status):
 
     #各種機能
     if re.search(r"きりぼ.*(しりとり).*(しよ|やろ|おねがい|お願い)", content):
-        fav_now(id)
+        # fav_now(id)
         if StMG.is_game(acct):
             toot(f'@{acct} 今やってる！\n※やめる場合は「しりとり終了」って言ってね', 'direct', id, None)
             return
@@ -415,13 +415,13 @@ def worker(status):
              'direct',  id, None)
 
     elif StMG.is_game(acct) and re.search(r"(しりとり).*(終わ|おわ|終了|完了)", content) and visibility == 'direct':
-        fav_now(id)
+        # fav_now(id)
         toot(
             f'@{acct} おつかれさまー！\n(ラリー数：{StMG.games[acct].rcnt})', 'direct',  id, None)
         StMG.end_game(acct)
 
     elif StMG.is_game(acct) and visibility == 'direct':
-        fav_now(id)
+        # fav_now(id)
         word = str(content).strip()
         result, text = StMG.games[acct].judge(word)
         if result:
@@ -456,7 +456,7 @@ def worker(status):
             StMG.end_game(acct)
 
     elif re.search(r"[!！]スロット", content) and visibility == 'direct':
-        fav_now(id)
+        # fav_now(id)
         reelsize = 5
         if re.search(r"ミニ", content):
             slot_rate = 0.1
@@ -553,7 +553,7 @@ def worker(status):
                  visibility, id, f'なになに？「{word}」とは……')
 
     elif len(media_attachments) > 0 and re.search(r"色[ぬ塗]って", content + spoiler_text):
-        fav_now(id)
+        # fav_now(id)
         toot(f'@{acct} 色塗りサービスは終了したよ〜₍₍ ◝(╹ᗜ╹๑◝) ⁾⁾ ₍₍ (◟๑╹ᗜ╹)◟ ⁾⁾',
              visibility, id, None)
 
@@ -596,7 +596,7 @@ def worker(status):
         if len(GetNum_flg) > 0:
             toot(f"@{acct} 数取りゲーム開催中だよー！急いで投票してー！", 'public', id)
         else:
-            fav_now(id)
+            # fav_now(id)
             GetNumQ.put([acct, id])
             SM.update(acct, 'func')
 
@@ -608,7 +608,7 @@ def worker(status):
             SM.update(acct, 'func')
 
     elif len(content) > 140 and len(content) * 0.8 < sum([v for k, v in Counter(content).items() if k in abc]):
-        fav_now(id)
+        # fav_now(id)
         lang = TRANS.detect(content)
         if lang and lang != 'ja':
             toot_now = TRANS.xx2ja(lang, content)
@@ -621,7 +621,7 @@ def worker(status):
                     SM.update(acct, 'func')
 
     elif '翻訳して' in spoiler_text:
-        fav_now(id)
+        # fav_now(id)
         toot_now = TRANS.ja2en(content)
         if toot_now:
             if re.search(r"[^:]@|^@", toot_now):
@@ -710,9 +710,9 @@ def worker(status):
             return
         if len(content) == 0:
             return
-        fav_now(id)
+        # fav_now(id)
         toots_for_rep[acct].append((content.strip(), created_at))
-        seeds = toots_in_ltl[:5]
+        seeds = toots_in_ltl[-20:]
         seeds.extend(toots_for_rep[acct])
         #時系列ソート
         seeds.sort(key=lambda x: (x[1]))
@@ -724,8 +724,8 @@ def worker(status):
         SM.update(acct, 'reply')
         if random.randint(0, 10+ct) > 9:
             return
-        fav_now(id)
-        seeds = toots_in_ltl[:5]
+        # fav_now(id)
+        seeds = toots_in_ltl[-20:]
         threading.Thread(target=dnn_gen_toot_sub, args=(
             acct, seeds, visibility, id)).start()
         SM.update(acct, 'reply')
@@ -1157,7 +1157,7 @@ def business_contact(status):
 
 def recipe_service(content=None, acct=MASTER_ID, id=None, visibility='unlisted'):
 # レシピ提案
-    fav_now(id)
+    # fav_now(id)
     generator = generate_text.GenerateText(1)
     #料理名を取得ー！
     gen_txt = ''
@@ -1202,8 +1202,8 @@ def show_rank(acct=None, target=None, id=None, visibility=None):
     ############################################################
     # 数取りゲームスコアなど
     logger.debug(f"show_rank target={target}")
-    if id:
-        fav_now(id)
+    # if id:
+    #     fav_now(id)
     sm = score_manager.ScoreManager()
     score = defaultdict(int)
     like = defaultdict(int)
@@ -1265,7 +1265,7 @@ def show_rank(acct=None, target=None, id=None, visibility=None):
 
 def bottlemail_service(content, acct, id, visibility):
 # ボトルメールサービス　メッセージ登録
-    fav_now(id)
+    # fav_now(id)
     word = re.search(r"([ぼボ][とト][るル][メめ]ー[るル])([サさ]ー[ビび][スす])[：:](.*)",
                      str(content), flags=(re.MULTILINE | re.DOTALL)).group(3)
     toot_now = "@" + acct + "\n"
@@ -1287,6 +1287,7 @@ def bottlemail_service(content, acct, id, visibility):
 def th_worker():
     # ワーカー処理のスレッド
     while True:
+        sleep(0.5)
         try:
             status = WorkerQ.get()  # キューからトゥートを取り出すよー！なかったら待機してくれるはずー！
             if WorkerQ.qsize() <= 1:  # キューが詰まってたらスルー
@@ -1366,7 +1367,7 @@ def bottlemail_sending():
 
 def auto_tooter():
 # きりぼっとのつぶやき
-    seeds = toots_in_ltl[:5]
+    seeds = toots_in_ltl[-20:]
     if len(seeds) <= 2:
         return
     spoiler = None
@@ -1682,7 +1683,7 @@ def th_gettingnum(gtime=30):
                 continue
 
             #ゲーム開始ー！
-            fav_now(g_id)
+            # fav_now(g_id)
             gm = game.GettingNum(gamenum)
             GetNumVoteQ.clear()
             gameTM.reset()
@@ -1709,7 +1710,7 @@ def th_gettingnum(gtime=30):
                         #時間切れは例外で抜ける
                         acct, id, num = GetNumVoteQ.get(timeout=remaintm)
                         if gm.vote(acct, num):
-                            fav_now(id)
+                            # fav_now(id)
                             if acct == 'twotwo':
                                 toot(f'@{acct}\n{num}だねー！わかったー！',
                                     'direct', id, None)
@@ -1805,9 +1806,9 @@ def th_post():
     interval_time = 0
     while True:
         logger.debug(f"interval_time={interval_time}")
+        sleep(max(0.2, min(interval_time, 4)))
         try:
             func, args, kwargs = PostQ.get(timeout=2)
-            sleep(max(0.2,min(interval_time, 4)))
             func(*args, **kwargs)
             interval_time += 0.4
         except queue.Empty:

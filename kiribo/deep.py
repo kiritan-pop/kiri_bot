@@ -8,6 +8,7 @@ import json
 import re,os
 from PIL import Image
 import cv2
+import shutil
 
 # きりぼコンフィグ
 from kiribo.config import NICODIC_PATH, IPADIC_PATH
@@ -90,7 +91,11 @@ def takoramen(filepath):
 
     with open(os.path.join('log', 'image.log'), 'a') as f:
         f.write("*** image:" + filepath.split('/')[-1] +  "  *** result:%s\n"%str(rslt_dict))
-    if max(result[0]) > 0.8:
+    if max(result[0]) > 0.85:
+        savepath = os.path.join("media4ml", labels[np.argmax(result[0])], os.path.basename(filepath))
+        os.makedirs(os.path.dirname(savepath), exist_ok=True)
+        shutil.copy(filepath, savepath)
+
         return labels[np.argmax(result[0])]
     else:
         return 'other'
