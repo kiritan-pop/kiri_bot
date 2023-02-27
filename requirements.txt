@@ -15,5 +15,5 @@ cairosvg
 transformers
 fugashi
 ipadic
-tensorflow-addons
-more_itertools
+torch
+deepsparse

@@ -712,7 +712,7 @@ def worker(status):
             return
         # fav_now(id)
         toots_for_rep[acct].append((content.strip(), created_at))
-        seeds = toots_in_ltl[-20:]
+        seeds = [] #toots_in_ltl[-20:]
         seeds.extend(toots_for_rep[acct])
         #時系列ソート
         seeds.sort(key=lambda x: (x[1]))
@@ -1403,7 +1403,7 @@ def th_auto_tooter():
 
 
 def dnn_gen_text_wrapper(input_text):
-    return bert.generator.gen_text(input_text, temperature=random.uniform(0.5, 1.0), topk=random.randint(100,500))
+    return bert.gen_text(input_text) #, temperature=random.uniform(0.5, 1.0), topk=random.randint(100,500))
 
 
 def dnn_gen_toot_sub(acct: str, seeds: list, visibility: str, in_reply_to_id: int = None, toots_for_rep:list = None):

@@ -1,3 +1,3 @@
 # -*- coding: utf-8 -*-
 
-from . import generator
+from .predict import gen_text

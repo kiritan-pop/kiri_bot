@@ -2,7 +2,6 @@
 
 import logging
 import tensorflow as tf
-import MeCab
 import numpy as np
 import json
 import re,os
@@ -11,7 +10,6 @@ import cv2
 import shutil
 
 # きりぼコンフィグ
-from kiribo.config import NICODIC_PATH, IPADIC_PATH
 from kiribo import imaging
 
 logger = logging.getLogger(__name__)
@@ -26,8 +24,6 @@ for label,i in labels_index.items():
 STANDARD_SIZE = (480, 480)
 
 #いろいろなパラメータ
-tagger = MeCab.Tagger(f"-Owakati -u {NICODIC_PATH} -d {IPADIC_PATH}")
-
 pat3 = re.compile(r'^\n')
 pat4 = re.compile(r'\n')
 
@@ -91,14 +87,18 @@ def takoramen(filepath):
 
     with open(os.path.join('log', 'image.log'), 'a') as f:
         f.write("*** image:" + filepath.split('/')[-1] +  "  *** result:%s\n"%str(rslt_dict))
-    if max(result[0]) > 0.85:
+    if max(result[0]) > 0.65:
         savepath = os.path.join("media4ml", labels[np.argmax(result[0])], os.path.basename(filepath))
         os.makedirs(os.path.dirname(savepath), exist_ok=True)
         shutil.copy(filepath, savepath)
 
+    if max(result[0]) > 0.85:
         return labels[np.argmax(result[0])]
     else:
         return 'other'
+
+
+
 
 if __name__ == '__main__':
     pass

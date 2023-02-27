@@ -11,3 +11,4 @@ media/
 venv_dev/
 .vscode/*
 fonts/
+tmp/
