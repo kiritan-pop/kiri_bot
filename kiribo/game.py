@@ -1,14 +1,7 @@
 # coding: utf-8
 
-import random,json
-import os,sys,io,re
-from time import sleep
-import unicodedata
-import sqlite3
-import threading
-from pytz import timezone
-from dateutil import parser
-from datetime import datetime,timedelta
+import random
+from collections import OrderedDict
 
 # きりぼコンフィグ
 from kiribo.config import SIRITORI_DIC_PATH
@@ -21,7 +14,7 @@ class GettingNum():
         #数取りゲームの上限値
         self.maxval = maxval
         #投票データ
-        self.votedata = {}
+        self.votedata = OrderedDict()
 
     def vote(self,acct,num):
         if num < 1 or self.maxval < num:

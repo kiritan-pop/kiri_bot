@@ -10,7 +10,6 @@ from time import sleep
 from pytz import timezone
 import dateutil
 from datetime import datetime, timedelta
-from os.path import join
 from collections import defaultdict, Counter
 import wikipedia
 from PIL import Image
@@ -708,14 +707,20 @@ def worker(status):
         SM.update(acct, 'reply')
         if content.strip().isdigit():
             return
-        if len(content) == 0:
+        if len(content) <= 4:
+            return
+        if random.randint(0, 10+ct) > 9:
             return
         # fav_now(id)
         toots_for_rep[acct].append((content.strip(), created_at))
-        seeds = [] #toots_in_ltl[-20:]
-        seeds.extend(toots_for_rep[acct])
+        if len(toots_for_rep[acct]) > 50:
+            toots_for_rep[acct] = toots_for_rep[acct][-50:]
+
+        seeds = toots_in_ltl[-10:]
+        seeds.extend(toots_for_rep[acct][-10:])
         #時系列ソート
         seeds.sort(key=lambda x: (x[1]))
+        seeds = seeds[-10:]
         threading.Thread(target=dnn_gen_toot_sub, args=(
             acct, seeds, visibility, id, toots_for_rep)).start()
 
@@ -725,7 +730,7 @@ def worker(status):
         if random.randint(0, 10+ct) > 9:
             return
         # fav_now(id)
-        seeds = toots_in_ltl[-20:]
+        seeds = toots_in_ltl[-10:]
         threading.Thread(target=dnn_gen_toot_sub, args=(
             acct, seeds, visibility, id)).start()
         SM.update(acct, 'reply')
@@ -1367,7 +1372,7 @@ def bottlemail_sending():
 
 def auto_tooter():
 # きりぼっとのつぶやき
-    seeds = toots_in_ltl[-20:]
+    seeds = toots_in_ltl[-10:]
     if len(seeds) <= 2:
         return
     spoiler = None
@@ -1810,7 +1815,7 @@ def th_post():
         try:
             func, args, kwargs = PostQ.get(timeout=2)
             func(*args, **kwargs)
-            interval_time += 0.4
+            interval_time += 1.0
         except queue.Empty:
             interval_time -= 0.2
             if interval_time < 0:

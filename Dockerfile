@@ -1,45 +1,40 @@
-FROM ubuntu:20.04
-USER root
+FROM python:3.9-buster
 
 ENV DEBIAN_FRONTEND noninteractive
-ENV LANG ja_JP.UTF-8
-ENV LANGUAGE ja_JP:ja
-ENV LC_ALL ja_JP.UTF-8
-ENV TZ JST-9
-ENV TERM xterm
+ENV TZ=Asia/Tokyo 
 ENV MECABRC /etc/mecabrc
 
 RUN apt update
-RUN apt install -y python3-pip build-essential libssl-dev \
-    libffi-dev python3-dev libraqm-dev mecab libmecab-dev \
-    mecab-ipadic-utf8 python3-mecab \
-    vim less libhdf5-dev \
-    zlib1g-dev \
-    libjpeg-dev \
-    libwebp-dev \
-    libpng-dev \
-    libtiff5-dev \
-    libopenexr-dev \
-    libgdal-dev \
-    libgtk2.0-dev \
-    libdc1394-22-dev \
-    libavcodec-dev \
-    libavformat-dev \
-    libswscale-dev \
-    libtheora-dev \
-    libvorbis-dev \
-    libxvidcore-dev \
-    libx264-dev \
-    yasm \
-    libopencore-amrnb-dev \
-    libopencore-amrwb-dev \
-    libv4l-dev \
-    libxine2-dev \
-    libgstreamer1.0-dev \
-    libgstreamer-plugins-base1.0-dev \
-    libopencv-highgui-dev \
-    libnvidia-encode-465 \
-    ffmpeg \
+RUN apt install -y build-essential libssl-dev \
+    libffi-dev libraqm-dev mecab libmecab-dev \
+    mecab-ipadic-utf8 \
+    libgl1-mesa-dev \
+    # vim less \
+    # libhdf5-dev \
+    # zlib1g-dev \
+    # libjpeg-dev \
+    # libwebp-dev \
+    # libpng-dev \
+    # libtiff5-dev \
+    # libopenexr-dev \
+    # libgdal-dev \
+    # libgtk2.0-dev \
+    # libdc1394-22-dev \
+    # libavcodec-dev \
+    # libavformat-dev \
+    # libswscale-dev \
+    # libtheora-dev \
+    # libvorbis-dev \
+    # libxvidcore-dev \
+    # libx264-dev \
+    # yasm \
+    # libopencore-amrnb-dev \
+    # libopencore-amrwb-dev \
+    # libv4l-dev \
+    # libxine2-dev \
+    # libgstreamer1.0-dev \
+    # libgstreamer-plugins-base1.0-dev \
+    # ffmpeg \
     fonts-takao
 
 RUN apt -y install locales && \

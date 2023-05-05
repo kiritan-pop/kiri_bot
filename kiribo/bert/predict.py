@@ -1,25 +1,31 @@
 # -*- coding: utf-8 -*-
 
 import logging
+# import onnxruntime as ort
 from deepsparse import compile_model
-from .config import KiriConfig
+# import openvino.runtime as ov
+
+import logging
+
 import numpy as np
 from transformers import AutoTokenizer
-from .dataset import KiriDataLoader, STR, MU, UNK
+import sentencepiece as spm
+
+from .config import KiriConfig
 
 logging.basicConfig(level=logging.INFO)
 
 # deepsparse :体感onnxより速い
 engine = compile_model(KiriConfig.SAVE_PATH, batch_size=1)
 tokenizer = AutoTokenizer.from_pretrained(KiriConfig.MODEL_NAME)
-kdl = KiriDataLoader(tokenizer=tokenizer, config=KiriConfig)
+sp = spm.SentencePieceProcessor(model_file=KiriConfig.SPM_MODEL)
 
 
 def gen_text(
         input_text: str,
-        temperature=0.5,
-        topk=300,
-        topp=0.8,
+        temperature=0.75,
+        topk=500,
+        topp=0.9,
 ):
 
     input_token_dic = tokenizer(input_text,
@@ -36,25 +42,27 @@ def gen_text(
         input_token_dic = tokenizer(input_text, padding='max_length',
                                     truncation=True, max_length=KiriConfig.MAX_LENGTH, return_tensors='pt')
 
-    output_ids = np.full((1, KiriConfig.MAX_CHAR_LEN + 1), kdl.char_idx[MU])
-    output_ids[0, 0] = kdl.char_idx[STR]
-    generated_text = STR
+    output_ids = np.full((1, KiriConfig.MAX_CHAR_LEN + 1), sp.pad_id())
+    output_ids[0, 0] = sp.bos_id()
+    generated_text = ""
 
     for cur in range(1, KiriConfig.MAX_CHAR_LEN + 1):
-        # deepsparse
         preds = engine.run(
             [input_token_dic['input_ids'].numpy(), output_ids[:, :-1]])[0]
-
         preds = softmax(preds[0])
         next_id = int(
             sample(preds[cur - 1], temperature=temperature, topk=topk, topp=topp))
         output_ids[0, cur] = next_id
-        generated_text += kdl.idx_char[next_id]
+        tmp_char = sp.decode_ids([next_id])
+        tmp_char = tmp_char.replace("<br>", "\n")
+        generated_text += tmp_char
+        print(f"{tmp_char}", end="", flush=True)
 
-        if next_id == kdl.char_idx[MU]:
+        if next_id == sp.pad_id():
             break
 
-    return generated_text[1:-1]
+    print("")
+    return generated_text
 
 
 def sample(preds, temperature=1.0, topk=None, topp=1.0):
