@@ -44,7 +44,7 @@ def gen_text(
 
     output_ids = np.full((1, KiriConfig.MAX_CHAR_LEN + 1), sp.pad_id())
     output_ids[0, 0] = sp.bos_id()
-    generated_text = ""
+    output_ids_list = []
 
     for cur in range(1, KiriConfig.MAX_CHAR_LEN + 1):
         preds = engine.run(
@@ -53,15 +53,16 @@ def gen_text(
         next_id = int(
             sample(preds[cur - 1], temperature=temperature, topk=topk, topp=topp))
         output_ids[0, cur] = next_id
-        tmp_char = sp.decode_ids([next_id])
-        tmp_char = tmp_char.replace("<br>", "\n")
-        generated_text += tmp_char
-        print(f"{tmp_char}", end="", flush=True)
+        output_ids_list.append(next_id)
+        # tmp_char = sp.decode_ids([next_id])
+        # tmp_char = tmp_char.replace("<br>", "\n")
 
         if next_id == sp.pad_id():
             break
 
-    print("")
+    generated_text = sp.decode_ids(output_ids_list)
+    generated_text = generated_text.replace("<br>", "\n")
+    generated_text = generated_text.replace("⁇", "")
     return generated_text
 
 

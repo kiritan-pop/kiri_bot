@@ -166,6 +166,7 @@ class notification_listener(StreamListener):
 class ltl_listener(StreamListener):
 # マストドンＡＰＩ用部品を継承して、ローカルタイムライン受信時の処理を実装ー！
     def on_update(self, status):
+        StatusQ.put(status)
         #mentionはnotificationで受けるのでLTLのはスルー！(｢・ω・)｢ 二重レス防止！
         if re.search(r'[^:]@' + BOT_ID, status['content']):
             return
@@ -173,19 +174,28 @@ class ltl_listener(StreamListener):
         if acct != BOT_ID:
             WorkerQ.put(status)
 
-
-class public_listener(StreamListener):
-# タイムライン保存用（認証なし）
-    def on_update(self, status):
-        StatusQ.put(status)
-        CM.count(status['created_at'])
-        acct = status["account"]["acct"]
-        logger.info(
-            f"「{util.content_cleanser(status['content'])[:30]:<30}」by {acct}")
-
     def on_delete(self, status_id):
-        logger.info(f"===public_listener on_delete【{status_id}】===")
+        logger.info(f"===ltl_listener on_delete【{status_id}】===")
         DelQ.put(status_id)
+
+    # def on_status_update(self, status):
+    #     acct = status["account"]["acct"]
+    #     if acct != BOT_ID:
+    #         WorkerQ.put(status)
+
+
+# class public_listener(StreamListener):
+# # タイムライン保存用（認証なし）
+#     def on_update(self, status):
+#         StatusQ.put(status)
+#         CM.count(status['created_at'])
+#         acct = status["account"]["acct"]
+#         logger.info(
+#             f"「{util.content_cleanser(status['content'])[:30]:<30}」by {acct}")
+
+#     def on_delete(self, status_id):
+#         logger.info(f"===public_listener on_delete【{status_id}】===")
+#         DelQ.put(status_id)
 
 
 def toot(toot_content: str, visibility: str = "direct", in_reply_to_id=None, spoiler_text: str = None, media_ids: list = None, interval=0, **kwargs):
@@ -195,6 +205,9 @@ def toot(toot_content: str, visibility: str = "direct", in_reply_to_id=None, spo
 
 
 def exe_toot(toot_content:str, visibility:str="direct", in_reply_to_id=None, spoiler_text:str=None, media_ids:list=None, **kwargs):
+    if len(toot_content.strip()) == 0:
+        return
+
     if spoiler_text:
         spo_len = len(spoiler_text)
     else:
@@ -1408,7 +1421,7 @@ def th_auto_tooter():
 
 
 def dnn_gen_text_wrapper(input_text):
-    return bert.gen_text(input_text) #, temperature=random.uniform(0.5, 1.0), topk=random.randint(100,500))
+    return bert.gen_text(input_text, temperature=random.uniform(0.6, 0.9)) #, topk=random.randint(100,500))
 
 
 def dnn_gen_toot_sub(acct: str, seeds: list, visibility: str, in_reply_to_id: int = None, toots_for_rep:list = None):
@@ -1465,6 +1478,11 @@ def th_hint_de_pinto(gtime=5):
         try:
             tmp_list = HintPintoQ.get(timeout=60)
             g_acct, g_id, term = tmp_list[0], tmp_list[1], tmp_list[2]
+            if '@' in g_acct:
+                game_mode = 'unlisted'
+            else:
+                game_mode = 'public'
+
             logger.debug(f"ひんぴん開始:{tmp_list}")
 
             # 準備中確認
@@ -1505,7 +1523,7 @@ def th_hint_de_pinto(gtime=5):
             HintPinto_ansQ.clear()
 
             th_hint = threading.Thread(target=hinpin_hint,
-                                    args=(event, g_acct, term, path, hinpin_sts, loop_cnt))
+                                    args=(event, g_acct, term, path, hinpin_sts, loop_cnt, game_mode))
             th_hint.start()
 
             th_pinto = threading.Thread(target=hinpin_pinto,
@@ -1521,10 +1539,10 @@ def th_hint_de_pinto(gtime=5):
                 # 終了後アナウンス
                 if hinpin_sts["pinto_info"]["sts"] == "正解":
                     toot(f'((( :@{hinpin_sts["pinto_info"]["a_acct"]}: ))) 正解〜！',
-                            visibility='public', in_reply_to_id=None, spoiler_text=None)
+                            visibility=game_mode, in_reply_to_id=None, spoiler_text=None)
                 elif  hinpin_sts["pinto_info"]["sts"] == "ばらし":
                     toot(f'[[[ :@{hinpin_sts["pinto_info"]["q_acct"]}: ]]] こら〜！',
-                        visibility='public', in_reply_to_id=None, spoiler_text=None)
+                        visibility=game_mode, in_reply_to_id=None, spoiler_text=None)
 
                 sleep(4)
                 toot_now = f"正解は{term}でした〜！\n（出題 :@{g_acct}: ） #exp15m"
@@ -1541,24 +1559,24 @@ def th_hint_de_pinto(gtime=5):
                 
                 media_files = []
                 media_files.append(mastodon.media_post(filename, 'image/' + ex))
-                toot(toot_now, visibility='public', in_reply_to_id=None,
+                toot(toot_now, visibility=game_mode, in_reply_to_id=None,
                     spoiler_text=None, media_ids=media_files)
 
                 sleep(4)
                 if hinpin_sts["pinto_info"]["sts"] == "正解":
                     toot_now  = f'正解者 :@{hinpin_sts["pinto_info"]["a_acct"]}: には{hinpin_sts["pinto_info"]["a_score"]}点、'
                     toot_now += f'出題者 :@{hinpin_sts["pinto_info"]["q_acct"]}: には{hinpin_sts["pinto_info"]["q_score"]}点入るよー！'
-                    toot(toot_now, visibility='public', in_reply_to_id=None, spoiler_text=None)
+                    toot(toot_now, visibility=game_mode, in_reply_to_id=None, spoiler_text=None)
                 elif  hinpin_sts["pinto_info"]["sts"] == "ばらし":
                     toot_now = f'出題者 :@{hinpin_sts["pinto_info"]["q_acct"]}: が答えをばらしたので減点{hinpin_sts["pinto_info"]["q_score"]}点だよ〜'
-                    toot(toot_now, visibility='public', in_reply_to_id=None, spoiler_text=None)
+                    toot(toot_now, visibility=game_mode, in_reply_to_id=None, spoiler_text=None)
                 elif hinpin_sts["pinto_info"]["sts"] == "正解なし":
                     toot_now =  f'正解者なしのため出題者[[[ :@{hinpin_sts["pinto_info"]["q_acct"]}:]]] にペナルティ〜！' 
                     toot_now += f'\n減点{hinpin_sts["pinto_info"]["q_score"]}点だよ〜'
-                    toot(toot_now, visibility='public', in_reply_to_id=None, spoiler_text=None)
+                    toot(toot_now, visibility=game_mode, in_reply_to_id=None, spoiler_text=None)
                 elif hinpin_sts["pinto_info"]["sts"] == "無効":
                     toot_now = f'誰もいなかったので無効試合になったよ〜'
-                    toot(toot_now, visibility='public', in_reply_to_id=None, spoiler_text=None)
+                    toot(toot_now, visibility=game_mode, in_reply_to_id=None, spoiler_text=None)
 
                 HintPinto_flg.remove('ON')
                 junbiTM.reset()
@@ -1572,7 +1590,7 @@ def th_hint_de_pinto(gtime=5):
             toot(f'@{MASTER_ID} ヒントでピントで何かエラー出た！', visibility="public")
 
 
-def hinpin_hint(event, g_acct, term, path, hinpin_sts, loop_cnt):
+def hinpin_hint(event, g_acct, term, path, hinpin_sts, loop_cnt, game_mode):
     # 出題スレッド
     MAX_SIZE = 512
     img = Image.open(path).convert('RGB')
@@ -1581,6 +1599,8 @@ def hinpin_hint(event, g_acct, term, path, hinpin_sts, loop_cnt):
     
     mask_map = [i for i in range(len(term))]
     for loop, p in enumerate(range(3, 8, 1)):
+        logger.debug(f"ひんぴんデバッグ:{hinpin_sts}")
+
         if not hinpin_sts["pinto"]: # 正解者が出ていない
             loop_cnt.append(loop)
             if loop == 0:
@@ -1608,19 +1628,21 @@ def hinpin_hint(event, g_acct, term, path, hinpin_sts, loop_cnt):
             media_files.append(
                 mastodon.media_post(filename, 'image/png'))
             toot_now = f"さて、これは何/誰でしょうか？\nヒント：{hint_text}\n#きりたんのヒントでピント #exp15m"
-            toot(toot_now, visibility='public', in_reply_to_id=None,
+            toot(toot_now, visibility=game_mode, in_reply_to_id=None,
                     spoiler_text=None, media_ids=media_files)
             event.set()
+
             # タイマー
             for _ in range(90):
                 sleep(0.5)
                 if hinpin_sts["pinto"]: # 正解者が出た場合
                     break
         else:
+            # 正解者が出た場合
             break
-    # 終了フラグ
-    hinpin_sts["hint"] = True
-    logger.debug(f"ひんぴんデバッグ:{hinpin_sts}")
+    else:
+        # 最後のヒントも終わったら（正解者出ないまま）、終了フラグを立てる
+        hinpin_sts["hint"] = True
 
 
 def hinpin_pinto(event, g_acct, term, path, hinpin_sts, loop_cnt):
@@ -1634,25 +1656,31 @@ def hinpin_pinto(event, g_acct, term, path, hinpin_sts, loop_cnt):
     while True:
         try:
             logger.debug(f"ひんぴんデバッグ:{hinpin_sts}")
-            acct, _, ans, vis, *_ = HintPinto_ansQ.get(timeout=0.5)
+            acct, _, ans, vis, *_ = HintPinto_ansQ.get(timeout=0.1)
             ans_cnt += 1
             logger.debug(
                 f"ひんぴんデバッグ:acct={acct}  ans={ans}  vis={vis}  cnt={ans_cnt}")
-            if g_acct != acct and util.normalize_txt(term) in util.normalize_txt(ans):
-                # スコア計算
-                a_score = min(
-                    int(max_score//(2**(len(loop_cnt) - 1))), max_score)
-                q_score = a_score//2 + ans_cnt * 2
-                SM.update(acct, 'getnum', score=a_score)
-                SM.update(g_acct, 'getnum', score=q_score)
-                hinpin_sts["pinto_info"] = dict(sts="正解", a_acct=acct, a_score=a_score, q_acct=g_acct, q_score=q_score)
-                break
-            elif g_acct == acct and vis != 'direct' and term in ans:
-                score = max_score*2
-                SM.update(g_acct, 'getnum', score=score*-1)
-                hinpin_sts["pinto_info"] = dict(
-                    sts="ばらし", a_acct=acct, a_score=0, q_acct=g_acct, q_score=score)
-                break
+
+            if hinpin_sts["hint"] == False and util.normalize_txt(term) in util.normalize_txt(ans):
+                # 終了フラグ
+                hinpin_sts["pinto"] = True
+                # 正解の場合
+                if g_acct != acct:
+                    # スコア計算
+                    a_score = min(
+                        int(max_score//(2**(len(loop_cnt) - 1))), max_score)
+                    q_score = a_score//2 + ans_cnt * 2
+                    SM.update(acct, 'getnum', score=a_score)
+                    SM.update(g_acct, 'getnum', score=q_score)
+                    hinpin_sts["pinto_info"] = dict(sts="正解", a_acct=acct, a_score=a_score, q_acct=g_acct, q_score=q_score)
+                    break
+                elif g_acct == acct and vis != 'direct':
+                    # 出題者がばらした場合
+                    score = max_score*2
+                    SM.update(g_acct, 'getnum', score=score*-1)
+                    hinpin_sts["pinto_info"] = dict(
+                        sts="ばらし", a_acct=acct, a_score=0, q_acct=g_acct, q_score=score)
+                    break
         except queue.Empty:
             # 出題が終わってたら終了
             if hinpin_sts["hint"]: # 出題が終わった場合
@@ -1666,9 +1694,6 @@ def hinpin_pinto(event, g_acct, term, path, hinpin_sts, loop_cnt):
                     hinpin_sts["pinto_info"] = dict(
                         sts="無効", a_acct=None, a_score=0, q_acct=None, q_score=0)
                     break
-
-    # 終了フラグ
-    hinpin_sts["pinto"] = True
 
 
 def th_gettingnum(gtime=30):
@@ -1835,14 +1860,14 @@ def th_ltl():
             sleep(10)
 
 
-def th_ptl():
-    # ltl監視
-    while True:
-        try:
-            publicdon.stream_local(public_listener())
-        except Exception as e:
-            logger.error(e, exc_info=True)
-            sleep(10)
+# def th_ptl():
+#     # ltl監視
+#     while True:
+#         try:
+#             publicdon.stream_local(public_listener())
+#         except Exception as e:
+#             logger.error(e, exc_info=True)
+#             sleep(10)
 
 
 def th_htl():
@@ -1857,15 +1882,13 @@ def th_htl():
 
 def run():
     args = get_args()
+    logger.info(args)
     threads = []
     CM.run()
     #タイムライン受信系
     threads.append(threading.Thread(target=th_ltl))
-    threads.append(threading.Thread(target=th_ptl))
+    # threads.append(threading.Thread(target=th_ptl))
     threads.append(threading.Thread(target=th_htl))
-    # mastodon.stream_local(ltl_listener(), run_async=True)
-    # publicdon.stream_local(public_listener(), run_async=True)
-    # mastodon.stream_user(notification_listener(), run_async=True)
     #タイムライン応答系
     threads.append(threading.Thread(target=th_delete))
     threads.append(threading.Thread(target=th_saver))

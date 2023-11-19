@@ -3,7 +3,7 @@ services:
   main:
     build: .
     image: kiri_bot:latest
-    command: python3 run_kiribo.py
+    command: python3 run_kiribo.py --htime 2 --gtime 5
     volumes:
      - /home/kiritan/kiri_bot:/kiri_bot
      - /usr/lib/x86_64-linux-gnu/mecab/dic/mecab-ipadic-neologd:/usr/lib/x86_64-linux-gnu/mecab/dic/mecab-ipadic-neologd
