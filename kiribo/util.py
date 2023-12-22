@@ -12,6 +12,8 @@ from queue import Queue, Empty
 # きりぼコンフィグ
 from kiribo.config import TWOTWO_DIC_PATH, NG_WORDS_PATH, LOG_LEVEL, LOG_PATH, MEDIA_PATH
 
+from kiribo import deep
+
 
 log_level = getLevelName(LOG_LEVEL)
 sh = StreamHandler()
@@ -87,12 +89,22 @@ def content_cleanser(content):
 
 
 def replace_ng_word(text):
-    #NGワード
-    for ng_word in read_ng_words():
-        if re.search(ng_word, text):
+    # NGワード
+    ng_words = read_ng_words()
+    target_words = []
+    node = deep.tagger2.parseToNode(normalize_txt(text))
+    while node:
+        hinshi = node.feature.split(",", 1)[0]
+        if hinshi in ["名詞", "感動詞"]:
+            target_words.append(node.surface)
+        node = node.next
+
+    for ng_word in ng_words:
+        if any([re.search(f"^{ng_word}$", target) for target in target_words]) and re.search(ng_word, text):
+            logger.info(f"{ng_word=}")
             text = re.sub(
                 ng_word, '■'*len(re.search(ng_word, text).group(0)), text)
-    
+
     return text
 
 

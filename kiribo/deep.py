@@ -27,6 +27,7 @@ STANDARD_SIZE = (480, 480)
 
 #いろいろなパラメータ
 tagger = MeCab.Tagger(f"-Owakati -u {NICODIC_PATH} -d {IPADIC_PATH}")
+tagger2 = MeCab.Tagger(f"-u {NICODIC_PATH} -d {IPADIC_PATH}")
 
 pat3 = re.compile(r'^\n')
 pat4 = re.compile(r'\n')

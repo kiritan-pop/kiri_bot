@@ -23,7 +23,7 @@ from kiribo.config import MEDIA_PATH, GOOGLE_ENGINE_KEY, GOOGLE_KEY, MASTODON_UR
 # きりぼサブモジュール
 from kiribo import bottlemail, cooling_manager, dao, deep, game, generate_text,\
     get_images_ggl, imaging, romasaga, scheduler, score_manager, stat, tenki,\
-    timer, toot_summary, trans, util, haiku, tarot, bert
+    timer, toot_summary, trans, util, haiku, tarot, bert, get_kinro
 
 import logging
 logger = logging.getLogger(__name__)
@@ -736,6 +736,16 @@ def worker(status):
         seeds = seeds[-10:]
         threading.Thread(target=dnn_gen_toot_sub, args=(
             acct, seeds, visibility, id, toots_for_rep)).start()
+
+    elif re.search(r"きりぼ.*(金曜ロードショー|金ロー|キンロー).*[?？]", content):
+        movie_list = get_kinro.get_kinro(now_ymd)
+        if movie_list:
+            toot_now = ""
+            for date_txt, title_txt in movie_list:
+                toot_now += f"{date_txt}：「{title_txt}」\n"
+
+            toot(toot_now + "\n#金曜ロードショー", visibility=visibility, in_reply_to_id=None,
+                    spoiler_text='今週以降の金ロー情報は……')
 
     elif re.search(r"(きり|キリ).*(ぼっと|ボット|[bB][oO][tT])|[きキ][りリ][ぼボ]|[きキ][りリ][ぽポ][っッ][ぽポ]", content + spoiler_text) != None \
         and re.search(r"^[こコ][らラ][きキ][りリ][ぼボぽポ]", content + spoiler_text) == None:
