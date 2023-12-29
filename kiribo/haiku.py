@@ -1,6 +1,6 @@
 # coding: utf-8
 
-import MeCab
+from fugashi import Tagger
 import re, os
 import jaconv
 import itertools
@@ -31,7 +31,7 @@ def make_ikku_image(song, avatar_static):
     # 文字追加
     FONT_SIZE = 48
     font = ImageFont.truetype(
-        FONT_PATH_IKKU, size=FONT_SIZE, layout_engine=ImageFont.LAYOUT_RAQM)
+        FONT_PATH_IKKU, size=FONT_SIZE, layout_engine=ImageFont.Layout.RAQM)
     draw = ImageDraw.Draw(img_clear)
     for index, phrase in enumerate(song.phrases):
 
@@ -109,20 +109,12 @@ class SongWithSeasonWord(Song):
 
 class Parser():
     def __init__(self):
-        self.mecab = MeCab.Tagger(f"-d {IPADIC_PATH}")
+        self.tagger = Tagger()
+
 
     def parse(self, text):
-        mecab_node = self.mecab.parseToNode(text)
-        node_list = []
-        while mecab_node:
-            node = Node(mecab_node)
-            if node.is_analyzable():
-                node_list.append(node)
-            mecab_node = mecab_node.next
-        [logger.debug(f"{node.surface},{node.type},{node.subtype1},{node.subtype2},{node.subtype3},{node.subtype3},{node.conjugation1},{node.conjugation2},{node.root_form},{node.pronunciation_mora}")
-            for node in node_list]
-        return node_list
-
+        mecab_nodes = self.tagger.parseToNodeList(text)
+        return [Node(node) for node in mecab_nodes]
 
 class Node():
     STAT_ID_FOR_NORMAL = 0
@@ -130,19 +122,17 @@ class Node():
     STAT_ID_FOR_BOS = 2
     STAT_ID_FOR_EOS = 3
 
-    # @param node [Natto::MeCabNode]
     def __init__(self, node):
         self.stat = node.stat
         self.surface = node.surface
-        self.feature = node.feature.split(",")
-        self.type = self.feature[0]
-        self.subtype1 = self.feature[1]
-        self.subtype2 = self.feature[2]
-        self.subtype3 = self.feature[3]
-        self.conjugation1 = self.feature[4]
-        self.conjugation2 = self.feature[5]
-        self.root_form = self.feature[6]
-        self.pronunciation = self.feature[8] if len(self.feature) >= 9 else ""
+        self.type = node.feature.pos1
+        self.subtype1 = node.feature.pos2
+        self.subtype2 = node.feature.pos3
+        self.subtype3 = node.feature.pos4
+        self.conjugation1 = node.feature.cType
+        self.conjugation2 = node.feature.cForm
+        self.root_form = node.feature.orth
+        self.pronunciation = node.feature.pron
         self.pronunciation_mora = re.sub(
             r'[^アイウエオカ-モヤユヨラ-ロワヲンヴー]', '', jaconv.hira2kata(self.pronunciation))
         self.pronunciation_length = len(self.pronunciation_mora)
@@ -156,29 +146,23 @@ class Node():
     def is_first_of_ikku(self):
         if not self.is_first_of_phrase():
             return False
-        elif self.type == "記号" and self.subtype1 not in ["括弧開", "括弧閉"]:
+        elif self.type == "補助記号" and self.subtype1 not in ["括弧開", "括弧閉"]:
             return False
         else:
             return True
 
     def is_first_of_phrase(self):
-        if self.type in ["助詞", "助動詞"]:
-            return False
-        elif self.subtype1 in ["非自立", "接尾"]:
-            return False
-        elif self.subtype1 == "自立" and self.root_form in ["する", "できる"]:
+        if self.type in ["助詞", "助動詞", "接尾辞"]:
             return False
         else:
             return True
 
     def is_last_of_ikku(self):
-        if self.type in ["名詞接続", "格助詞", "係助詞", "連体化", "接続助詞", "並立助詞", "副詞化", "数接続", "連体詞"]:
+        if self.type in ["連体詞"]:
             return False
-        elif self.conjugation2 == "連用タ接続":
+        if self.subtype1 in ["名詞接続", "格助詞", "係助詞", "連体化", "接続助詞", "並立助詞", "副詞化", "数詞"]:
             return False
-        elif self.conjugation1 == "サ変・スル" and self.conjugation2 == "連用形":
-            return False
-        elif self.type == "動詞" and self.conjugation2 in ["仮定形", "未然形"]:
+        elif self.type == "動詞" and self.conjugation2[:3] in ["連用形", "仮定形", "未然形"]:
             return False
         elif self.type == "名詞" and self.subtype1 == "非自立" and self.pronunciation == "ン":
             return False
@@ -187,6 +171,7 @@ class Node():
 
     def is_last_of_phrase(self):
         return self.type != "接頭詞"
+
 
 
 class BracketState():

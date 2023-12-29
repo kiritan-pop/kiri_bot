@@ -2,7 +2,7 @@
 
 import logging
 import tensorflow as tf
-import MeCab
+from fugashi import Tagger
 import numpy as np
 import json
 import re,os
@@ -26,8 +26,8 @@ for label,i in labels_index.items():
 STANDARD_SIZE = (480, 480)
 
 #いろいろなパラメータ
-tagger = MeCab.Tagger(f"-Owakati -u {NICODIC_PATH} -d {IPADIC_PATH}")
-tagger2 = MeCab.Tagger(f"-u {NICODIC_PATH} -d {IPADIC_PATH}")
+tagger = Tagger(f"-Owakati")
+tagger2 = Tagger()
 
 pat3 = re.compile(r'^\n')
 pat4 = re.compile(r'\n')

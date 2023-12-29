@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import MeCab as mc
+from fugashi import Tagger
 import numpy as np
 import re
 import os
@@ -20,7 +20,7 @@ if os.path.exists(EMOJI_PATH):
 eos_list.extend(["!","♡","♪","。","？","?","！","\n","w","ｗ","＊","*",",","　",":",";","：","；","…","・・・","...","〜"])
 eos_list.extend(["♥","★","☆","■","□","◆","◇","▲","△","▼","▽","●","○","(_)"])
 
-m = mc.Tagger(f"-Owakati -d {IPADIC_PATH} -u {NAME_DIC_PATH},{ID_DIC_PATH},{NICODIC_PATH}")
+m = Tagger(f"-Owakati")
 
 def parser():
     usage = 'Usage:python3 b_summary.py [-t <FILE.txt>] [--help]'

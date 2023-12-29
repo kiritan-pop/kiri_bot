@@ -29,7 +29,7 @@ def gen_text(
 ):
 
     input_token_dic = tokenizer(input_text,
-                                truncation=True, max_length=512, return_tensors='pt')
+                                truncation=True, max_length=512, return_tensors='np')
 
     if input_token_dic['input_ids'].shape[1] > KiriConfig.MAX_LENGTH:
         input_token_dic['input_ids'] = input_token_dic['input_ids'][:, -
@@ -40,7 +40,7 @@ def gen_text(
                                                                               KiriConfig.MAX_LENGTH:]
     else:
         input_token_dic = tokenizer(input_text, padding='max_length',
-                                    truncation=True, max_length=KiriConfig.MAX_LENGTH, return_tensors='pt')
+                                    truncation=True, max_length=KiriConfig.MAX_LENGTH, return_tensors='np')
 
     output_ids = np.full((1, KiriConfig.MAX_CHAR_LEN + 1), sp.pad_id())
     output_ids[0, 0] = sp.bos_id()
@@ -48,7 +48,7 @@ def gen_text(
 
     for cur in range(1, KiriConfig.MAX_CHAR_LEN + 1):
         preds = engine.run(
-            [input_token_dic['input_ids'].numpy(), output_ids[:, :-1]])[0]
+            [input_token_dic['input_ids'], output_ids[:, :-1]])[0]
         preds = softmax(preds[0])
         next_id = int(
             sample(preds[cur - 1], temperature=temperature, topk=topk, topp=topp))

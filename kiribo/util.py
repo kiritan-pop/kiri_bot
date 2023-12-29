@@ -63,7 +63,7 @@ def content_cleanser(content):
     hashtag = ""
     rtext = ""
 
-    tmp = BeautifulSoup(content.replace("<br>", "___R___").strip(), 'lxml')
+    tmp = BeautifulSoup(content.replace("<br />", "___R___").strip(), 'lxml')
     for x in tmp.find_all("a", rel="tag"):
         hashtag = x.span.text.strip()
     for x in tmp.find_all("a"):
@@ -92,12 +92,10 @@ def replace_ng_word(text):
     # NGワード
     ng_words = read_ng_words()
     target_words = []
-    node = deep.tagger2.parseToNode(normalize_txt(text))
-    while node:
-        hinshi = node.feature.split(",", 1)[0]
-        if hinshi in ["名詞", "感動詞"]:
+    nodes = deep.tagger2.parseToNodeList(normalize_txt(text))
+    for node in nodes:
+        if node.feature.pos1 not in ["助詞", "助動詞"]:
             target_words.append(node.surface)
-        node = node.next
 
     for ng_word in ng_words:
         if any([re.search(f"^{ng_word}$", target) for target in target_words]) and re.search(ng_word, text):
@@ -210,5 +208,4 @@ class ClearableQueue(Queue):
 
 
 if __name__ == '__main__':
-    print(content_cleanser("<p>xxxx</p>"))
-    print(content_cleanser_light("<p>xxxxx</p>"))
+    print(replace_ng_word("テスト"))

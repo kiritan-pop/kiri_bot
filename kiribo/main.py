@@ -23,7 +23,7 @@ from kiribo.config import MEDIA_PATH, GOOGLE_ENGINE_KEY, GOOGLE_KEY, MASTODON_UR
 # きりぼサブモジュール
 from kiribo import bottlemail, cooling_manager, dao, deep, game, generate_text,\
     get_images_ggl, imaging, romasaga, scheduler, score_manager, stat, tenki,\
-    timer, toot_summary, trans, util, haiku, tarot, bert, get_kinro
+    timer, toot_summary, trans, util, tarot, bert, get_kinro, haiku
 
 import logging
 logger = logging.getLogger(__name__)
@@ -769,9 +769,9 @@ def worker(status):
                 toot(toot_now, visibility=visibility)
 
     else:
-        if re.search(r'[a-zA-Z0-9!-/:-@¥[-`{-~]', content) == None and len(tags) == 0 and len(content.replace('\n', '')) > 5:
+        if re.search(r'[a-zA-Z0-9!-/:-@¥[-`{-~]', content) == None and len(tags) == 0 and len(content) > 5:
             ikku = haiku.Reviewer()
-            song = ikku.find_just(content.replace('\n', ''))
+            song = ikku.find_just(content)
             if song:
                 media_files = []
                 media_files.append(
@@ -779,6 +779,7 @@ def worker(status):
                 toot(
                     f"{NN.join([''.join([node.surface for node in phrase]) for phrase in song.phrases])}{NN}{'　'*4}:@{acct}:{display_name} {'（季語：'+song.season_word+'）' if song.season_word else ''}",
                     spoiler_text=f"{'俳句' if song.season_word else '川柳'}を検出したよ〜", visibility=visibility, media_ids=media_files)
+
 
 def res_fixed_phrase(id, acct, username, visibility, content, statuses_count,
                     spoiler_text, ac_ymd, now_ymd, media_attachments,
