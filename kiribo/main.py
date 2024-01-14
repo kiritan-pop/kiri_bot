@@ -1057,71 +1057,95 @@ def ana_image(media_file, acct):
     logger.debug(media_file)
     for f in media_file:
         result = deep.takoramen(f)
-        logger.debug(result)
-        if result in ['風景', '夜景', 'other']:
-            tmp = imaging.face_search(f)
-            if tmp:
-                ex = tmp.rsplit('.')[-1]
-                if ex == 'jpg':
-                    ex = 'jpeg'
-                attach_files.append(mastodon.media_post(tmp, 'image/' + ex))
-        elif result == 'ねこ':
-            toot_now += 'にゃーん'
-        elif result == 'ダーツ':
-            toot_now += '🎯ダーツ！'
-        elif result == 'にじえろ':
-            toot_now += 'えっち！'
-        elif result == 'イラスト女の子':
-            toot_now += 'かわいい！'
-        elif result == 'イラスト男':
-            toot_now += 'かっこいい！'
-        elif result == 'イラスト線画':
-            toot_now += '色塗ってー！'
-        elif result == 'ろびすて':
-            toot_now += '🙏ろびすてとうとい！'
-        elif result == '漫画':
-            toot_now += 'それなんて漫画ー？'
-        elif result in ['汚部屋', '部屋', '自撮り', '太もも']:
-            toot_now += result + 'だー！'
-        elif result == 'ポプテピピック':
-            toot_now += 'それポプテピピックー？'
-        elif result == '電車':
-            toot_now += '🚃🚃がたんごとん！'
-        elif result == '真紅':
-            toot_now += 'めいめいなのだわ！'
-        elif result == '結月ゆかり':
-            toot_now += 'ゆかりさん！'
-        elif result == '真中らぁら':
-            toot_now += 'かしこま！'
-        elif result == '魂魄妖夢':
-            toot_now += 'みょん！'
-        elif result == '保登心愛':
-            toot_now += 'こころぴょんぴょん！'
-        elif result == '天々座理世':
-            toot_now += 'こころぴょんぴょん！'
-        elif result == '香風智乃':
-            toot_now += 'チノちゃん！'
-        elif result == '桐間紗路':
-            toot_now += 'こころぴょんぴょん！'
-        elif result == '宇治松千夜':
-            toot_now += 'こころぴょんぴょん！'
-        elif result == 'る':
-            toot_now += 'るの人だ！'
-        elif result == '東北ずん子':
-            toot_now += '{{{:zunda:}}}ずんだもち！'
-        elif result == '東北イタコ':
-            toot_now += 'タコ姉！'
-        elif result == '東北きりたん':
-            toot_now += '{{{:kiritampo:}}}きりたんぽ！'
-        elif result == 'スクショ':
-            if random.randint(0, 4) == 0:
-                toot_now += '📷スクショパシャパシャ！'
-        else:
-            if 'チョコ' in result or 'ショコラ' in result:
-                toot_now += f':@{acct}: 🚓🚓🚓＜う〜う〜！飯テロ警察 チョコレート係でーす！'
+        logger.info(result)
+        if '物' in result:
+            if 'ダーツ' in result:
+                toot_now += '🎯ダーツ！'
             else:
-                toot_now += f':@{acct}: 🚓🚓🚓＜う〜う〜！飯テロ警察 {result}係でーす！'
-            break
+                tmp = imaging.face_search(f)
+                if tmp:
+                    ex = tmp.rsplit('.')[-1]
+                    if ex == 'jpg':
+                        ex = 'jpeg'
+                    attach_files.append(mastodon.media_post(tmp, 'image/' + ex))
+                else:
+                    result.remove("物")
+                    if len(result) > 0:
+                        toot_now += f'{result[0]}だー！'
+
+        elif 'イラスト' in result:
+            if 'イラスト線画' in result:
+                toot_now += '色塗ってー！'
+            elif '真中らぁら' in result:
+                toot_now += 'かしこま！'
+            elif '魂魄妖夢' in result:
+                toot_now += 'みょん！'
+            elif '東北ずん子' in result or 'ずんだもん' in result :
+                toot_now += '{{{:zunda:}}}ずんだもち！'
+            elif '東北イタコ' in result:
+                toot_now += 'タコ姉！'
+            elif '東北きりたん' in result:
+                toot_now += '{{{:kiritampo:}}}きりたんぽ！'
+            elif '真紅' in result:
+                toot_now += 'めいめいなのだわ！'
+            elif '結月ゆかり' in result:
+                toot_now += 'ゆかりさん！'
+            elif '保登心愛' in result:
+                toot_now += 'こころぴょんぴょん！'
+            elif '天々座理世' in result:
+                toot_now += 'こころぴょんぴょん！'
+            elif '香風智乃' in result:
+                toot_now += 'チノちゃん！'
+            elif '桐間紗路' in result:
+                toot_now += 'こころぴょんぴょん！'
+            elif '宇治松千夜' in result:
+                toot_now += 'こころぴょんぴょん！'
+            elif 'イラスト男' in result:
+                toot_now += 'かっこいい！'
+            elif 'ポプテピピック' in result:
+                toot_now += 'それポプテピピックー？'
+            elif '漫画' in result:
+                toot_now += 'それなんて漫画ー？'
+            elif 'ガチャ' in result:
+                toot_now += 'SSR!'
+            else:
+                toot_now += 'かわいい！'
+
+        elif 'スイーツ' in result:
+            result.remove("スイーツ")
+            if len(result) > 0 and "その他スイーツ" not in result:
+                toot_now += f':@{acct}: 🚓🚓🚓＜う〜う〜！飯テロ警察 {result[0]}係でーす！'
+            else:
+                toot_now += f':@{acct}: 🚓🚓🚓＜う〜う〜！飯テロ警察 スイーツ係でーす！'
+
+        elif '食べ物' in result:
+            result.remove("食べ物")
+            if len(result) > 0 and "その他料理" not in result:
+                toot_now += f':@{acct}: 🚓🚓🚓＜う〜う〜！飯テロ警察 {result[0]}係でーす！'
+            else:
+                toot_now += f':@{acct}: 🚓🚓🚓＜う〜う〜！飯テロ警察でーす！'
+                
+        elif '乗り物' in result:
+            if '電車' in result:
+                toot_now += '🚃🚃がたんごとん！'
+            elif '飛行機' in result:
+                toot_now += '✈︎びゅーん！'
+            elif 'カー' in result:
+                toot_now += '🚙ぶーん！'
+            elif 'バイク' in result:
+                toot_now += '🏍️ぶーん！'
+            else:
+                toot_now += 'かっこいい！'
+
+        elif '動物' in result:
+            if 'ねこ' in result:
+                toot_now += 'にゃーん'
+            elif '犬' in result:
+                toot_now += 'わーん'
+            else:
+                result.remove("動物")
+                if len(result) > 0:
+                    toot_now += f'{result[0]}だ！'
 
     return toot_now.strip(), attach_files
 
