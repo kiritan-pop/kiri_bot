@@ -19,11 +19,11 @@ import argparse
 from kiribo.config import MEDIA_PATH, GOOGLE_ENGINE_KEY, GOOGLE_KEY, MASTODON_URL, MASTODON_ACCESS_TOKEN,\
     MASTER_ID, BOT_ID, BOT_LIST_PATH, KAOMOJI_PATH, KORA_PATH, HINPINED_WORDS_PATH,\
     WATCH_LIST_PATH, NADE_PATH, RECIPE_Z_PATH, RECIPE_A_PATH, NO_BOTTLE_PATH
-    
+
 # きりぼサブモジュール
 from kiribo import bottlemail, cooling_manager, dao, deep, game, generate_text,\
     get_images_ggl, imaging, romasaga, scheduler, score_manager, stat, tenki,\
-    timer, toot_summary, trans, util, tarot, bert, get_kinro, haiku
+    timer, trans, util, tarot, bert, get_kinro, haiku
 
 import logging
 logger = logging.getLogger(__name__)
@@ -642,17 +642,6 @@ def worker(status):
                 toot_now = f"@{acct}\n{toot_now}\n#きり翻訳 #きりぼっと"
                 toot(toot_now, 'public', id, f'翻訳したよ〜！ :@{acct}: ＜')
                 SM.update(acct, 'func')
-
-    elif len(content) > 140 and len(spoiler_text) == 0:
-        gen_txt = toot_summary.summarize(content, limit=10, lmtpcs=1, m=1, f=4)
-        if gen_txt[-1] == '#':
-            gen_txt = gen_txt[:-1]
-        logger.debug(f'★要約結果：{gen_txt}')
-        if util.is_japanese(gen_txt):
-            if len(gen_txt) > 5:
-                gen_txt += "\n#きり要約 #きりぼっと"
-                toot("@" + acct + " :@" + acct + ":\n" +
-                     gen_txt, visibility, id, "勝手に要約サービス")
 
     elif re.search(r"きりぼ.+:@(.+):.*の初", content):
         target = re.search(r"きりぼ.+:@(.+):.*の初", str(content)).group(1)

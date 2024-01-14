@@ -6,7 +6,7 @@ import jaconv
 import itertools
 from PIL import Image, ImageFont, ImageDraw
 
-from kiribo.config import IPADIC_PATH, KIGO_PATH, FONT_PATH_IKKU, MEDIA_PATH
+from kiribo.config import KIGO_PATH, FONT_PATH_IKKU, MEDIA_PATH
 from kiribo import  util
 import logging
 

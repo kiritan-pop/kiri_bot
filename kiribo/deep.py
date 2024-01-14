@@ -12,7 +12,6 @@ import cv2
 import shutil
 
 # きりぼコンフィグ
-from kiribo.config import NICODIC_PATH, IPADIC_PATH
 from kiribo import imaging
 
 logger = logging.getLogger(__name__)
