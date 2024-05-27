@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 
 import logging
-# import onnxruntime as ort
-from deepsparse import compile_model
-# import openvino.runtime as ov
+# from deepsparse import compile_model # quantizeしたら使えない
+from onnxruntime import InferenceSession
 
 import logging
 
@@ -15,8 +14,7 @@ from .config import KiriConfig
 
 logging.basicConfig(level=logging.INFO)
 
-# deepsparse :体感onnxより速い
-engine = compile_model(KiriConfig.SAVE_PATH, batch_size=1)
+session = InferenceSession(KiriConfig.SAVE_PATH)
 tokenizer = AutoTokenizer.from_pretrained(KiriConfig.MODEL_NAME)
 sp = spm.SentencePieceProcessor(model_file=KiriConfig.SPM_MODEL)
 
@@ -47,15 +45,12 @@ def gen_text(
     output_ids_list = []
 
     for cur in range(1, KiriConfig.MAX_CHAR_LEN + 1):
-        preds = engine.run(
-            [input_token_dic['input_ids'], output_ids[:, :-1]])[0]
+        preds = session.run(None, dict(enc_input=input_token_dic['input_ids'], dec_input=output_ids[:, :-1]))[0]
         preds = softmax(preds[0])
         next_id = int(
             sample(preds[cur - 1], temperature=temperature, topk=topk, topp=topp))
         output_ids[0, cur] = next_id
         output_ids_list.append(next_id)
-        # tmp_char = sp.decode_ids([next_id])
-        # tmp_char = tmp_char.replace("<br>", "\n")
 
         if next_id == sp.pad_id():
             break

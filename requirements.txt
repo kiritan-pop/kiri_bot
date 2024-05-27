@@ -14,5 +14,6 @@ transformers
 fugashi
 ipadic
 unidic-lite
-deepsparse
+# deepsparse
 sentencepiece
+onnxruntime

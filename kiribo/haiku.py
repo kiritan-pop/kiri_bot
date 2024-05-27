@@ -134,7 +134,7 @@ class Node():
         self.root_form = node.feature.orth
         self.pronunciation = node.feature.pron
         self.pronunciation_mora = re.sub(
-            r'[^アイウエオカ-モヤユヨラ-ロワヲンヴー]', '', jaconv.hira2kata(self.pronunciation))
+            r'[^アイウエオカ-モヤユヨラ-ロワヲンヴー]', '', jaconv.hira2kata(self.pronunciation)) if self.pronunciation else ""
         self.pronunciation_length = len(self.pronunciation_mora)
 
     def is_analyzable(self):

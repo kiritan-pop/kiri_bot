@@ -3,9 +3,12 @@
 import os
 import sqlite3
 import random
+import re
 from pytz import timezone
 from dateutil import parser
 from datetime import datetime,timedelta
+from contextlib import closing
+from collections import defaultdict
 
 # きりぼコンフィグ
 from kiribo.config import STATUSES_DB_PATH, DB_SCHEMA_PATH
@@ -245,6 +248,46 @@ class Dao():
             return parser.parse(ymdhms).astimezone(timezone('Asia/Tokyo'))
         else:
             return None
+
+
+    #######################################################
+    # ほくすんポイント
+    def hksn_point(self):
+        results = []
+        with closing(sqlite3.connect(STATUSES_DB_PATH, timeout=self.timeout, isolation_level='DEFERRED')) as conn:
+            c = conn.cursor()
+            query = r"select content from statuses WHERE acct= ? "
+            for row in c.execute(query, ("HKSN",)):
+                txt = row[0]
+                if "ほくずんポイント" in txt or "ほくさぎポイント" in txt:
+                    txt = util.content_cleanser(txt)
+                    results.append(txt)
+
+        # 正規表現パターン
+        pattern = r':@(\w+): ([+-]?\d+)'
+        usr_scores = defaultdict(int)
+        for txt in results:
+            matches = re.findall(pattern, txt)
+
+            # 結果の表示
+            for match in matches:
+                user, value = match
+                usr_scores[user] += int(value)
+        return usr_scores
+
+
+    def hksn_point_ranking(self):
+        usr_scores = self.hksn_point()
+        top10 = list(sorted(usr_scores.items(),
+                    key=lambda item: item[1], reverse=True))[:10]
+        bottom10 = list(sorted(usr_scores.items(),
+                            key=lambda item: item[1], reverse=False))[:10]
+        return top10, bottom10
+
+
+    def hksn_point_user(self, acct):
+        usr_scores = self.hksn_point()
+        return usr_scores[acct]
 
 
 if __name__ == '__main__':

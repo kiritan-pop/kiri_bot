@@ -12,3 +12,4 @@ venv_dev/
 .vscode/*
 fonts/
 tmp/
+*.gz

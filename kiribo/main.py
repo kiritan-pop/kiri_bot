@@ -23,7 +23,7 @@ from kiribo.config import MEDIA_PATH, GOOGLE_ENGINE_KEY, GOOGLE_KEY, MASTODON_UR
 # きりぼサブモジュール
 from kiribo import bottlemail, cooling_manager, dao, deep, game, generate_text,\
     get_images_ggl, imaging, romasaga, scheduler, score_manager, stat, tenki,\
-    timer, trans, util, tarot, bert, get_kinro, haiku
+    timer, trans, util, tarot, bert, get_kinro, haiku, tarot_april
 
 import logging
 logger = logging.getLogger(__name__)
@@ -119,6 +119,8 @@ jihou_dict = {
 }
 
 NN = '\n'
+
+HKSN = "HKSN"
 
 def get_args():
 # アーギュメントのやつ
@@ -594,6 +596,23 @@ def worker(status):
         toot_now = f"@{acct} できたよ〜 \n#exp15m"
         toot(toot_now, visibility=visibility, in_reply_to_id=id, media_ids=[media])
 
+    elif acct == HKSN and re.search(r"へいきりぼ.+:@(.+):.*のほく.+ポイント.*教", content):
+        target = re.search(r"へいきりぼ.+:@(.+):.*のほく.+ポイント.*教", str(content)).group(1)
+        target_point = DAO.hksn_point_user(target)
+        toot(f"@{HKSN}\n:@{target}: のポイントは {target_point:,} ポイントでした〜\n#ほくさぎポイント", visibility="direct", in_reply_to_id=id)
+
+    elif acct == HKSN and re.search(r"へいきりぼ.+ほく.+ポイント.*ランキング", content):
+        top10, bottom10 = DAO.hksn_point_ranking()
+        tmp_msg = ""
+        for u, p in top10:
+            tmp_msg += f":@{u}: {p:,} ポイント\n"
+        toot(f"@{HKSN}\n{tmp_msg} #ほくさぎポイント", spoiler_text="ほくさぎポイントランキング-Top10", visibility="direct", in_reply_to_id=id)
+
+        tmp_msg = ""
+        for u, p in bottom10:
+            tmp_msg += f":@{u}: {p:,} ポイント\n"
+        toot(f"@{HKSN}\n{tmp_msg} #ほくさぎポイント", spoiler_text="ほくさぎポイントランキング-Worst10", visibility="direct", in_reply_to_id=id)
+
     elif re.search(r"([わワ][てテ]|拙僧|小職|私|[わワ][たタ][しシ]|[わワ][たタ][くク][しシ]|自分|僕|[ぼボ][くク]|俺|[オお][レれ]|朕|ちん|余|[アあ][タた][シし]|ミー|あちき|あちし|あたち|[あア][たタ][いイ]|[わワ][いイ]|わっち|おいどん|[わワ][しシ]|[うウ][ちチ]|[おオ][らラ]|儂|[おオ][いイ][らラ]|あだす|某|麿|拙者|小生|あっし|手前|吾輩|我輩|わらわ|妾|ぅゅ|のどに|ちゃそ)の(ランク|ランキング|順位|スコア|成績|せいせき|らんく|らんきんぐ|すこあ)", content):
         show_rank(acct=acct, target=acct, id=id, visibility=visibility)
         SM.update(acct, 'func')
@@ -680,6 +699,7 @@ def worker(status):
     elif re.search(r"きりぼ(くん|君|さん|様|さま|ちゃん)?[!！、\s]?.+の天気.*(おしえて|教え|おせーて)?", content):
         tenki_area = re.search(
             r"きりぼ(くん|君|さん|様|さま|ちゃん)?[!！、\s]?(.+)の天気.*(おしえて|教え|おせーて)?", str(content)).group(2).strip()
+        tenki_area = [w for w in tenki_area.split("の") if w not in ["今日", "明日", "明後日", "今週", "来週"]][0]
 
         retcode, weather_image_path = tenki.make_forecast_image(quary=tenki_area)
         if retcode == 9:
@@ -695,15 +715,30 @@ def worker(status):
 
     elif re.search(r"!tarot|きりぼ(くん|君|さん|様|さま|ちゃん)?[!！、\s]?(占って|占い|占う|占え)", content):
         if tarot.tarot_check(acct):
-            text, tarot_result = tarot.tarot_main()
-            img_path = tarot.make_tarot_image(tarot_result, avatar_static)
+            if now_ymd[-4:] != "0401":
+                text, tarot_result = tarot.tarot_main()
+                img_path = tarot.make_tarot_image(tarot_result, avatar_static)
+            else:
+                text, tarot_result = tarot_april.tarot_main()
+                img_path = tarot_april.make_tarot_image(tarot_result, avatar_static)
+
             media_files = []
             media_files.append(
                 mastodon.media_post(img_path, 'image/png'))
             toot(f"@{acct}\n{text}", visibility=visibility, in_reply_to_id=id,
-                 spoiler_text=f":@{acct}: を占ったよ〜", media_ids=media_files)
+                spoiler_text=f":@{acct}: を占ったよ〜", media_ids=media_files)
         else:
             toot(f"@{acct} 前回占ったばっかりなので、もう少し舞っててね〜", visibility=visibility, in_reply_to_id=id)
+
+    elif re.search(r"きりぼ.*(金曜ロードショー|金ロー|キンロー)", content):
+        movie_list = get_kinro.get_kinro(now_ymd)
+        if movie_list:
+            toot_now = ""
+            for date_txt, title_txt in movie_list:
+                toot_now += f"{date_txt}：「{title_txt}」\n"
+
+            toot(toot_now + "\n#金曜ロードショー", visibility=visibility, in_reply_to_id=None,
+                    spoiler_text='今週以降の金ロー情報は……')
 
     elif re.search(r'[^:]@%s' % BOT_ID, status['content']):
         SM.update(acct, 'reply')
@@ -725,16 +760,6 @@ def worker(status):
         seeds = seeds[-10:]
         threading.Thread(target=dnn_gen_toot_sub, args=(
             acct, seeds, visibility, id, toots_for_rep)).start()
-
-    elif re.search(r"きりぼ.*(金曜ロードショー|金ロー|キンロー).*[?？]", content):
-        movie_list = get_kinro.get_kinro(now_ymd)
-        if movie_list:
-            toot_now = ""
-            for date_txt, title_txt in movie_list:
-                toot_now += f"{date_txt}：「{title_txt}」\n"
-
-            toot(toot_now + "\n#金曜ロードショー", visibility=visibility, in_reply_to_id=None,
-                    spoiler_text='今週以降の金ロー情報は……')
 
     elif re.search(r"(きり|キリ).*(ぼっと|ボット|[bB][oO][tT])|[きキ][りリ][ぼボ]|[きキ][りリ][ぽポ][っッ][ぽポ]", content + spoiler_text) != None \
         and re.search(r"^[こコ][らラ][きキ][りリ][ぼボぽポ]", content + spoiler_text) == None:
@@ -994,7 +1019,7 @@ def res_fixed_phrase(id, acct, username, visibility, content, statuses_count,
     elif re_search_rnd(r"^[こコ][らラ][きキ][りリ][ぼボぽポ]", content):
         toot_now = random.choice([tmp.strip() for tmp in open(KORA_PATH, 'r').readlines() if os.path.exists(KORA_PATH) and len(tmp.strip()) > 0])
 
-    elif re_search_rnd(r"[へヘはハ][くク].*[しシ][ょョ][んン].*[出でデ][たタ]", content, 3):
+    elif re_search_rnd(r"[へヘはハ][くク].*[しシ][ょョ][んン].*[出でデ][たタ]", content, 6):
         r = max([0, int(random.gauss(30, 30))])
         maoudict = {"大魔王": 100, "中魔王": 10, "小魔王": 1}
         result = {}
@@ -1012,8 +1037,8 @@ def res_fixed_phrase(id, acct, username, visibility, content, statuses_count,
         else:
             toot_now = f":@{acct}: 只今の記録、０魔王でした〜\n#魔王チャレンジ"
     
-    elif re_search_rnd(r"(.+)[出でデ][たタ].?$", content, 2):
-        r = max([0, int(random.gauss(30, 30))])
+    elif re_search_rnd(r"(.+)[出でデ][たタ].?$", content, 6):
+        r = max([0, int(random.gauss(0, 40))])
         maoudict = {"大魔王": 100, "中魔王": 10, "小魔王": 1}
         word = re.search(r"(.+)[出でデ][たタ].?$", str(content)).group(1).strip()
         wakati_list = deep.tagger.parse(word).strip().split()
@@ -1063,6 +1088,7 @@ def ana_image(media_file, acct):
                         toot_now += f'{result[0]}だー！'
 
         elif 'イラスト' in result:
+            result.remove('イラスト')
             if 'イラスト線画' in result:
                 toot_now += '色塗ってー！'
             elif '真中らぁら' in result:
@@ -1097,7 +1123,9 @@ def ana_image(media_file, acct):
                 toot_now += 'それなんて漫画ー？'
             elif 'ガチャ' in result:
                 toot_now += 'SSR!'
-            else:
+            elif 'スクショ' in result:
+                toot_now += '📷スクショパシャパシャ！'
+            elif len(result) > 0:
                 toot_now += 'かわいい！'
 
         elif 'スイーツ' in result:
@@ -1122,7 +1150,7 @@ def ana_image(media_file, acct):
             elif 'カー' in result:
                 toot_now += '🚙ぶーん！'
             elif 'バイク' in result:
-                toot_now += '🏍️ぶーん！'
+                toot_now += '🏍️ぶんぶーん！'
             else:
                 toot_now += 'かっこいい！'
 
