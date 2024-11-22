@@ -6,7 +6,7 @@ import jaconv
 import itertools
 from PIL import Image, ImageFont, ImageDraw
 
-from kiribo.config import KIGO_PATH, FONT_PATH_IKKU, MEDIA_PATH
+from kiribo.config import settings
 from kiribo import  util
 import logging
 
@@ -31,7 +31,7 @@ def make_ikku_image(song, avatar_static):
     # 文字追加
     FONT_SIZE = 48
     font = ImageFont.truetype(
-        FONT_PATH_IKKU, size=FONT_SIZE, layout_engine=ImageFont.Layout.RAQM)
+        settings.font_path_ikku, size=FONT_SIZE, layout_engine=ImageFont.Layout.RAQM)
     draw = ImageDraw.Draw(img_clear)
     for index, phrase in enumerate(song.phrases):
 
@@ -40,7 +40,7 @@ def make_ikku_image(song, avatar_static):
                   fill=(20, 20, 20), font=font, direction="ttb")
 
     frame_img = Image.alpha_composite(frame_img, img_clear)
-    save_path = os.path.join(MEDIA_PATH, "ikku_tmp.png")
+    save_path = os.path.join(settings.media_path, "ikku_tmp.png")
     frame_img.save(save_path)
     return save_path
 
@@ -94,7 +94,7 @@ class Song():
 class SongWithSeasonWord(Song):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.season_words = [l.strip() for l in open(KIGO_PATH).readlines()]
+        self.season_words = [l.strip() for l in open(settings.kigo_path).readlines()]
         self.season_word = None
         for surface in self.surfaces:
             if surface.strip() in self.season_words:

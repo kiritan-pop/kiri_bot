@@ -7,12 +7,12 @@ from datetime import datetime, timedelta
 from pprint import pprint as pp
 from PIL import Image, ImageFont, ImageDraw
 from kiribo import util
-from kiribo.config import TAROT_DATA_PATH, TAROT_IMG_PATH, TAROT_CHK_PATH, TAROT_IMGMAP_PATH, FONT_PATH, MEDIA_PATH
+from kiribo.config import settings
 
-with open(TAROT_DATA_PATH, 'r') as f:
+with open(settings.tarot_data_path, 'r') as f:
     tarot_data = json.load(f)
 
-with open(TAROT_IMGMAP_PATH, 'r') as f:
+with open(settings.tarot_imgmap_path, 'r') as f:
     imgmap = json.load(f)
 
 ORDER = ["総合", "金運", "恋愛", "健康", "仕事", "遊び"]
@@ -22,7 +22,7 @@ def tarot_reading():
 
 
 def get_tarot_image(tarot):
-    return os.path.join(TAROT_IMG_PATH, imgmap[tarot['name']])
+    return os.path.join(settings.tarot_img_path, imgmap[tarot['name']])
 
 
 def tarot_main():
@@ -36,8 +36,8 @@ def tarot_main():
 
 def tarot_check(acct):
     jst_now = datetime.now(timezone('Asia/Tokyo'))
-    if os.path.exists(TAROT_CHK_PATH):
-        with open(TAROT_CHK_PATH, 'r') as f:
+    if os.path.exists(settings.tarot_chk_path):
+        with open(settings.tarot_chk_path, 'r') as f:
             acct_chk_data = json.load(f)
     else:
         acct_chk_data = {}
@@ -46,7 +46,7 @@ def tarot_check(acct):
         return False
 
     acct_chk_data[acct] = jst_now.isoformat()
-    with open(TAROT_CHK_PATH, 'w') as f:
+    with open(settings.tarot_chk_path, 'w') as f:
         json.dump(acct_chk_data, f, ensure_ascii=False, indent=2)
     return True
 
@@ -73,12 +73,12 @@ def make_tarot_image(tarot, avatar_static):
     jst_now = datetime.now(timezone('Asia/Tokyo'))
     temp_txt = f"　　　{int(jst_now.strftime('%m'))}月{int(jst_now.strftime('%d'))}日の運勢"
 
-    font = ImageFont.truetype(FONT_PATH, 32)
+    font = ImageFont.truetype(settings.font_path, 32)
     draw = ImageDraw.Draw(image)
     draw.text((tarot_img.width + 32, 12), temp_txt,
               fill=(240, 240, 240), font=font)
 
-    font = ImageFont.truetype(FONT_PATH, 22)
+    font = ImageFont.truetype(settings.font_path, 22)
     order = ["総合", "金運", "恋愛", "健康", "仕事", "遊び"]
     tarot_txt = f"【{tarot['name']}】{'逆位置' if tarot['rev'] else '正位置'}\n"
 
@@ -99,8 +99,8 @@ def make_tarot_image(tarot, avatar_static):
     draw.text((tarot_img.width + 12, 56), tarot_txt,
               fill=(240, 240, 240), font=font)
 
-    image.save(os.path.join(MEDIA_PATH, "tarot_tmp.png"))
-    return os.path.join(MEDIA_PATH, "tarot_tmp.png")
+    image.save(os.path.join(settings.media_path, "tarot_tmp.png"))
+    return os.path.join(settings.media_path, "tarot_tmp.png")
 
 
 if __name__ == '__main__':

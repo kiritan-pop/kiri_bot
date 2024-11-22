@@ -17,3 +17,5 @@ unidic-lite
 # deepsparse
 sentencepiece
 onnxruntime
+openai
+pydantic-settings

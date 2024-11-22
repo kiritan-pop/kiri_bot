@@ -7,14 +7,12 @@ from datetime import datetime, timedelta
 from pprint import pprint as pp
 from PIL import Image, ImageFont, ImageDraw
 from kiribo import util
-from kiribo.config import FONT_PATH, MEDIA_PATH
-from kiribo.config import TAROT_APRIL_DATA_PATH as TAROT_DATA_PATH
-from kiribo.config import TAROT_APRIL_IMG_PATH as TAROT_IMG_PATH
+from kiribo.config import settings
 
 import requests
 
 
-with open(TAROT_DATA_PATH, 'r') as f:
+with open(settings.tarot_april_data_path, 'r') as f:
     tarot_data = json.load(f)
  
 def tarot_reading():
@@ -22,7 +20,7 @@ def tarot_reading():
 
 
 def get_tarot_image(tarot):
-    return os.path.join(TAROT_IMG_PATH, f"{tarot['name']}.jpg")
+    return os.path.join(settings.tarot_april_img_path, f"{tarot['name']}.jpg")
 
 
 def tarot_main():
@@ -67,12 +65,12 @@ def make_tarot_image(tarot, avatar_static):
     jst_now = datetime.now(timezone('Asia/Tokyo'))
     temp_txt = f"　　　{int(jst_now.strftime('%m'))}月{int(jst_now.strftime('%d'))}日の運勢"
 
-    font = ImageFont.truetype(FONT_PATH, 32)
+    font = ImageFont.truetype(settings.font_path, 32)
     draw = ImageDraw.Draw(image)
     draw.text((tarot_img.width + 32, 12), temp_txt,
               fill=(240, 240, 240), font=font)
 
-    font = ImageFont.truetype(FONT_PATH, 22)
+    font = ImageFont.truetype(settings.font_path, 22)
     tarot_txt = f"【{tarot['name']}】\n"
 
     MAXLENGTH = 19
@@ -87,7 +85,7 @@ def make_tarot_image(tarot, avatar_static):
     draw.text((tarot_img.width + 12, 56), tarot_txt,
               fill=(240, 240, 240), font=font)
 
-    image.save(os.path.join(MEDIA_PATH, "tarot_april_tmp.png"))
-    return os.path.join(MEDIA_PATH, "tarot_april_tmp.png")
+    image.save(os.path.join(settings.media_path, "tarot_april_tmp.png"))
+    return os.path.join(settings.media_path, "tarot_april_tmp.png")
 
 

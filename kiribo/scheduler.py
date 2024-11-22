@@ -6,7 +6,7 @@ import threading
 import random
 
 # きりぼコンフィグ
-from kiribo.config import TIMEZONE
+from kiribo.config import settings
 import logging
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ class Scheduler():
             sleep(10)
             try:
                 #時刻指定時の処理
-                jst_now = datetime.now(TIMEZONE)
+                jst_now = datetime.now(settings.timezone)
                 hh_now = jst_now.strftime("%H")
                 mm_now = jst_now.strftime("%M")
                 for hhmm in hhmm_list:

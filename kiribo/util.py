@@ -10,18 +10,18 @@ from logging import getLogger, StreamHandler, Formatter, FileHandler, getLevelNa
 from queue import Queue, Empty
 
 # きりぼコンフィグ
-from kiribo.config import TWOTWO_DIC_PATH, NG_WORDS_PATH, LOG_LEVEL, LOG_PATH, MEDIA_PATH
+from kiribo.config import settings
 
 from kiribo import deep
 
 
-log_level = getLevelName(LOG_LEVEL)
+log_level = getLevelName(settings.log_level)
 sh = StreamHandler()
 sh.setLevel(log_level)
 formatter = Formatter('%(levelname)s:%(asctime)s - %(message)s')
 sh.setFormatter(formatter)
 
-fh = FileHandler(LOG_PATH)  # fh = file handler
+fh = FileHandler(settings.log_path)  # fh = file handler
 fh.setLevel(log_level)
 fh_formatter = Formatter(
     '%(levelname)s:%(asctime)s - %(filename)s - %(name)s - %(lineno)d - %(message)s')
@@ -35,7 +35,7 @@ logger = getLogger(__name__)
 def two2jp(twotwo_text):
     twotwodic = {}
     twotwo_text = unicodedata.normalize("NFKC", twotwo_text)
-    for line in open(TWOTWO_DIC_PATH):
+    for line in open(settings.twotwo_dic_path):
         tmp = line.strip().split(',')
         twotwodic[tmp[1]] = tmp[0]
     text = ""
@@ -107,7 +107,7 @@ def replace_ng_word(text):
 
 
 def read_ng_words():
-    return set(word.strip() for word in open(NG_WORDS_PATH).readlines())
+    return set(word.strip() for word in open(settings.ng_words_path).readlines())
 
 
 def is_ng(text):
@@ -169,7 +169,7 @@ def get_file_name(url):
     return None
 
 
-def download_media(url, save_path=MEDIA_PATH, subdir=""):
+def download_media(url, save_path=settings.media_path, subdir=""):
     os.makedirs(os.path.join(save_path, subdir), exist_ok=True)
     filename = get_file_name(url)
     if filename:

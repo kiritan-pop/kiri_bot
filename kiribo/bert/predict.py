@@ -20,12 +20,13 @@ sp = spm.SentencePieceProcessor(model_file=KiriConfig.SPM_MODEL)
 
 
 def gen_text(
-        input_text: str,
+        input_text_list: list,
         temperature=0.75,
         topk=500,
-        topp=0.9,
+        topp=0.8,
 ):
 
+    input_text = tokenizer.sep_token.join(input_text_list)
     input_token_dic = tokenizer(input_text,
                                 truncation=True, max_length=512, return_tensors='np')
 
@@ -34,8 +35,8 @@ def gen_text(
                                                                     KiriConfig.MAX_LENGTH:]
         input_token_dic['attention_mask'] = input_token_dic['attention_mask'][:, -
                                                                               KiriConfig.MAX_LENGTH:]
-        input_token_dic['token_type_ids'] = input_token_dic['token_type_ids'][:, -
-                                                                              KiriConfig.MAX_LENGTH:]
+        # input_token_dic['token_type_ids'] = input_token_dic['token_type_ids'][:, -
+        #                                                                       KiriConfig.MAX_LENGTH:]
     else:
         input_token_dic = tokenizer(input_text, padding='max_length',
                                     truncation=True, max_length=KiriConfig.MAX_LENGTH, return_tensors='np')
@@ -49,11 +50,12 @@ def gen_text(
         preds = softmax(preds[0])
         next_id = int(
             sample(preds[cur - 1], temperature=temperature, topk=topk, topp=topp))
+
+        if next_id in [sp.pad_id(), sp.eos_id()]:
+            break
+
         output_ids[0, cur] = next_id
         output_ids_list.append(next_id)
-
-        if next_id == sp.pad_id():
-            break
 
     generated_text = sp.decode_ids(output_ids_list)
     generated_text = generated_text.replace("<br>", "\n")

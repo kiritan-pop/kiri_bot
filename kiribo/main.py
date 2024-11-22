@@ -16,19 +16,17 @@ from PIL import Image
 import argparse
 
 # きりぼコンフィグ
-from kiribo.config import MEDIA_PATH, GOOGLE_ENGINE_KEY, GOOGLE_KEY, MASTODON_URL, MASTODON_ACCESS_TOKEN,\
-    MASTER_ID, BOT_ID, BOT_LIST_PATH, KAOMOJI_PATH, KORA_PATH, HINPINED_WORDS_PATH,\
-    WATCH_LIST_PATH, NADE_PATH, RECIPE_Z_PATH, RECIPE_A_PATH, NO_BOTTLE_PATH
+from kiribo.config import settings
 
 # きりぼサブモジュール
 from kiribo import bottlemail, cooling_manager, dao, deep, game, generate_text,\
     get_images_ggl, imaging, romasaga, scheduler, score_manager, stat, tenki,\
-    timer, trans, util, tarot, bert, get_kinro, haiku, tarot_april
+    timer, trans, util, tarot, bert, get_kinro, haiku, tarot_april, recipe2, text_summary
 
 import logging
 logger = logging.getLogger(__name__)
 
-os.makedirs(MEDIA_PATH, exist_ok=True)
+os.makedirs(settings.media_path, exist_ok=True)
 
 abc = list(
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?.()+-=,")
@@ -38,21 +36,21 @@ wikipedia.set_lang("ja")
 wikipedia.set_user_agent("kiri_bot (https://github.com/kiritan-pop/kiri_bot/)")
 
 # Google画像検索設定
-gi = get_images_ggl.GetImagesGGL(GOOGLE_KEY, GOOGLE_ENGINE_KEY)
+gi = get_images_ggl.GetImagesGGL(settings.google_key, settings.google_engine_key)
 
 #得点管理、流速監視
 SM = score_manager.ScoreManager()
 CM = cooling_manager.CoolingManager(15)
 DAO = dao.Dao()
-TRANS = trans.Trans(GOOGLE_KEY)
+TRANS = trans.Trans(settings.google_key)
 #しりとり用
 StMG = game.Siritori_manager()
 
-publicdon = Mastodon(api_base_url=MASTODON_URL)  # インスタンス
+publicdon = Mastodon(api_base_url=settings.mastodon_url)  # インスタンス
 
 mastodon = Mastodon(
-    access_token=MASTODON_ACCESS_TOKEN,
-    api_base_url=MASTODON_URL)  # インスタンス
+    access_token=settings.mastodon_access_token,
+    api_base_url=settings.mastodon_url)  # インスタンス
 
 PostQ = queue.Queue()
 WorkerQ = queue.Queue()
@@ -89,7 +87,7 @@ for i in range(32):
 for i in range(16):
     hanalist.append('🐽')
     hanalist.append('👃')
-hanalist.append(f'🌷🌸🌹🌺🌻🌼大当たり！🌼🌻🌺🌹🌸🌷  @{MASTER_ID}')
+hanalist.append(f'🌷🌸🌹🌺🌻🌼大当たり！🌼🌻🌺🌹🌸🌷  @{settings.master_id}')
 
 jihou_dict = {
     "00": "🕛",
@@ -161,7 +159,7 @@ class notification_listener(StreamListener):
     def on_update(self, status):
         # 時限トゥート用（自分のトゥートのみ）
         acct = status["account"]["acct"]
-        if acct == BOT_ID:
+        if acct == settings.bot_id:
             TimerDelQ.put(status)
 
 
@@ -170,10 +168,10 @@ class ltl_listener(StreamListener):
     def on_update(self, status):
         StatusQ.put(status)
         #mentionはnotificationで受けるのでLTLのはスルー！(｢・ω・)｢ 二重レス防止！
-        if re.search(r'[^:]@' + BOT_ID, status['content']):
+        if re.search(r'[^:]@' + settings.bot_id, status['content']):
             return
         acct = status["account"]["acct"]
-        if acct != BOT_ID:
+        if acct != settings.bot_id:
             WorkerQ.put(status)
 
     def on_delete(self, status_id):
@@ -182,7 +180,7 @@ class ltl_listener(StreamListener):
 
     # def on_status_update(self, status):
     #     acct = status["account"]["acct"]
-    #     if acct != BOT_ID:
+    #     if acct != settings.bot_id:
     #         WorkerQ.put(status)
 
 
@@ -314,7 +312,7 @@ def vote_check(status):
 # 数取りゲーム 投票前処理
     acct = status["account"]["acct"]
     id = status["id"]
-    if re.search(r'[^:]@%s' % BOT_ID, status['content']):
+    if re.search(r'[^:]@%s' % settings.bot_id, status['content']):
         if len(util.hashtag(status['content'])) > 0:
             return
         content = util.content_cleanser(status['content'])
@@ -342,7 +340,7 @@ def HintPinto_ans_check(status):
     acct = status["account"]["acct"]
     id = status["id"]
     content = util.content_cleanser(status['content'])
-    if len(content) == 0 or acct == BOT_ID:
+    if len(content) == 0 or acct == settings.bot_id:
         return
     if len(HintPinto_flg) > 0:
         HintPinto_ansQ.put([acct, id, content.strip(), status["visibility"]])
@@ -377,9 +375,9 @@ def worker(status):
     if status["account"]["bot"]:
         return
 
-    botlist = set([tmp.strip() for tmp in open(BOT_LIST_PATH).readlines(
-    ) if os.path.exists(BOT_LIST_PATH) and len(tmp.strip()) > 0])
-    botlist.add(BOT_ID)
+    botlist = set([tmp.strip() for tmp in open(settings.bot_list_path).readlines(
+    ) if os.path.exists(settings.bot_list_path) and len(tmp.strip()) > 0])
+    botlist.add(settings.bot_id)
     if acct in botlist:
         return
 
@@ -394,11 +392,11 @@ def worker(status):
     ct = max([int(CM.get_coolingtime()),0])
 
     # なでなで
-    if acct in set([tmp.strip() for tmp in open(NADE_PATH).readlines() if os.path.exists(NADE_PATH) and len(tmp.strip()) > 0]):
+    if acct in set([tmp.strip() for tmp in open(settings.nade_path).readlines() if os.path.exists(settings.nade_path) and len(tmp.strip()) > 0]):
         fav_now(id)
 
     # 定期トゥート
-    if acct != BOT_ID and visibility == "public" and re.search(r'[^:]@%s' % BOT_ID, status['content']) is None:
+    if acct != settings.bot_id and visibility == "public" and re.search(r'[^:]@%s' % settings.bot_id, status['content']) is None:
         toots_in_ltl.append((content.strip(), created_at))
 
     # 高感度下げ
@@ -560,6 +558,7 @@ def worker(status):
             toot(f'@{acct} え？「{word}」しらなーい！', visibility, id, None)
         else:
             summary_text = page.summary
+            summary_text = text_summary.get_summary(summary_text)
             if len(acct) + len(summary_text) + len(page.url) > 450:
                 summary_text = summary_text[0:450 -
                                             len(acct)-len(page.url)] + '……'
@@ -583,7 +582,7 @@ def worker(status):
         ret = imaging.newyear_icon_maker(media_file[0], mode=mode)
         if ret:
             media = mastodon.media_post(ret, 'image/gif')
-            toot_now = f"@{acct} できたよ〜 \n ここでgifに変換するといいよ〜 https://www.aconvert.com/jp/video/mp4-to-gif/ \n#exp15m"
+            toot_now = f"@{acct} できたよ〜 \n ここでgifに変換するといいよ〜 https://www.aconvert.com/jp/video/mp4-to-gif/ \n\n#exp15m"
             toot(toot_now, visibility=visibility, in_reply_to_id=id, media_ids=[media])
         else:
             toot_now = f"@{acct} 透過画像じゃないとな〜"
@@ -593,13 +592,13 @@ def worker(status):
         SM.update(acct, 'func', score=1)
         alpha_image_path = imaging.auto_alpha(media_file[0], icon=False)
         media = mastodon.media_post(alpha_image_path, 'image/png')
-        toot_now = f"@{acct} できたよ〜 \n#exp15m"
+        toot_now = f"@{acct} できたよ〜 \n\n#exp15m"
         toot(toot_now, visibility=visibility, in_reply_to_id=id, media_ids=[media])
 
     elif acct == HKSN and re.search(r"へいきりぼ.+:@(.+):.*のほく.+ポイント.*教", content):
         target = re.search(r"へいきりぼ.+:@(.+):.*のほく.+ポイント.*教", str(content)).group(1)
         target_point = DAO.hksn_point_user(target)
-        toot(f"@{HKSN}\n:@{target}: のポイントは {target_point:,} ポイントでした〜\n#ほくさぎポイント", visibility="direct", in_reply_to_id=id)
+        toot(f"@{HKSN}\n:@{target}: のポイントは {target_point:,} ポイントでした〜\n\n#ほくさぎポイント", visibility="direct", in_reply_to_id=id)
 
     elif acct == HKSN and re.search(r"へいきりぼ.+ほく.+ポイント.*ランキング", content):
         top10, bottom10 = DAO.hksn_point_ranking()
@@ -647,9 +646,16 @@ def worker(status):
                 if re.search(r"[^:]@|^@", toot_now):
                     pass
                 else:
-                    toot_now = f"@{acct}\n{toot_now}\n#きり翻訳 #きりぼっと"
+                    toot_now = f"@{acct}\n{toot_now}\n\n#きり翻訳 #きりぼっと"
                     toot(toot_now, 'public', id, f'翻訳したよ〜！なになに……？ :@{acct}: ＜')
                     SM.update(acct, 'func')
+
+    elif len(content) > 200:
+        summary_text = text_summary.get_summary(content)
+        if len(content) * 0.75 > len(summary_text) and len(summary_text) > len(content) * 0.1:
+            toot_now = f"@{acct}\n{summary_text}\n\n#勝手に要約サービス #きりぼっと"
+            toot(toot_now, 'public', id, f'要約したよ〜！なになに……？ :@{acct}: ＜')
+            SM.update(acct, 'func')
 
     elif '翻訳して' in spoiler_text:
         # fav_now(id)
@@ -658,7 +664,7 @@ def worker(status):
             if re.search(r"[^:]@|^@", toot_now):
                 pass
             else:
-                toot_now = f"@{acct}\n{toot_now}\n#きり翻訳 #きりぼっと"
+                toot_now = f"@{acct}\n{toot_now}\n\n#きり翻訳 #きりぼっと"
                 toot(toot_now, 'public', id, f'翻訳したよ〜！ :@{acct}: ＜')
                 SM.update(acct, 'func')
 
@@ -683,7 +689,7 @@ def worker(status):
                 sptxt = f":@{target}: の初トゥートは……"
                 body = f"@{acct} \n"
                 body += f":@{target}: ＜{tcontent} \n {ymdhms} \n"
-                body += f"{MASTODON_URL}/@{target}/{tid}"
+                body += f"{settings.mastodon_url}/@{target}/{tid}"
                 toot(body, visibility=visibility, in_reply_to_id=id, spoiler_text=sptxt)
                 break
         if check_fg == False:
@@ -737,10 +743,10 @@ def worker(status):
             for date_txt, title_txt in movie_list:
                 toot_now += f"{date_txt}：「{title_txt}」\n"
 
-            toot(toot_now + "\n#金曜ロードショー", visibility=visibility, in_reply_to_id=None,
+            toot(toot_now + "\n\n#金曜ロードショー", visibility=visibility, in_reply_to_id=None,
                     spoiler_text='今週以降の金ロー情報は……')
 
-    elif re.search(r'[^:]@%s' % BOT_ID, status['content']):
+    elif re.search(r'[^:]@%s' % settings.bot_id, status['content']):
         SM.update(acct, 'reply')
         if content.strip().isdigit():
             return
@@ -753,11 +759,11 @@ def worker(status):
         if len(toots_for_rep[acct]) > 50:
             toots_for_rep[acct] = toots_for_rep[acct][-50:]
 
-        seeds = toots_in_ltl[-10:]
-        seeds.extend(toots_for_rep[acct][-10:])
+        seeds = toots_in_ltl[-5:]
+        seeds.extend(toots_for_rep[acct][-5:])
         #時系列ソート
         seeds.sort(key=lambda x: (x[1]))
-        seeds = seeds[-10:]
+        seeds = seeds[-5:]
         threading.Thread(target=dnn_gen_toot_sub, args=(
             acct, seeds, visibility, id, toots_for_rep)).start()
 
@@ -767,7 +773,7 @@ def worker(status):
         if random.randint(0, 10+ct) > 9:
             return
         # fav_now(id)
-        seeds = toots_in_ltl[-10:]
+        seeds = toots_in_ltl[-5:]
         threading.Thread(target=dnn_gen_toot_sub, args=(
             acct, seeds, visibility, id)).start()
         SM.update(acct, 'reply')
@@ -791,7 +797,7 @@ def worker(status):
                 media_files.append(
                     mastodon.media_post(haiku.make_ikku_image(song, avatar_static), 'image/png'))
                 toot(
-                    f"{NN.join([''.join([node.surface for node in phrase]) for phrase in song.phrases])}{NN}{'　'*4}:@{acct}:{display_name} {'（季語：'+song.season_word+'）' if song.season_word else ''}",
+                    f"{NN.join([''.join([node.surface for node in phrase]) for phrase in song.phrases])}{NN}{'　'*4}:@{acct}: {display_name} {'（季語：'+song.season_word+'）' if song.season_word else ''}",
                     spoiler_text=f"{'俳句' if song.season_word else '川柳'}を検出したよ〜", visibility=visibility, media_ids=media_files)
 
 
@@ -802,7 +808,7 @@ def res_fixed_phrase(id, acct, username, visibility, content, statuses_count,
 
     def re_search_rnd(re_txt, text, threshold=None, flags=0):
         rnd = random.randint(0, ct+6)
-        if acct == MASTER_ID:
+        if acct == settings.master_id:
             rnd = 0
         if re.search(re_txt, text, flags=flags) != None:
             if threshold == None:
@@ -814,7 +820,7 @@ def res_fixed_phrase(id, acct, username, visibility, content, statuses_count,
     toot_now = ''
     vis_now = visibility
     interval = 0
-    reply = f"@{acct} " if BOT_ID in reply_to_acct_list else ""
+    reply = f"@{acct} " if settings.bot_id in reply_to_acct_list else ""
     id_now = id if reply != "" else None
 
     if Toot1bQ.empty():
@@ -830,7 +836,7 @@ def res_fixed_phrase(id, acct, username, visibility, content, statuses_count,
                 toot_now = '　　三(  っ˃̵ᴗ˂̵) 通りまーす！'
 
     #ネイティオが半角スペース区切りで５つ以上あれば翻訳
-    if (acct == MASTER_ID or acct == 'twotwo') and len(content.split(' ')) > 4 and content.count('トゥ') > 4 and content.count('ー') > 0:
+    if (acct == settings.master_id or acct == 'twotwo') and len(content.split(' ')) > 4 and content.count('トゥ') > 4 and content.count('ー') > 0:
         toot_now = f':@{acct}: ＜「{util.two2jp(content)}」'
         SM.update(acct, 'func')
     if statuses_count != 0 and statuses_count % 10000 == 0:
@@ -992,11 +998,11 @@ def res_fixed_phrase(id, acct, username, visibility, content, statuses_count,
         SM.update(acct, 'func', score=2)
         toot_now = 'その心は？'
         interval = 1
-    elif re_search_rnd(r"^しばちゃんは.+[\?？]$", content) and acct in ['Ko4ba', MASTER_ID]:
+    elif re_search_rnd(r"^しばちゃんは.+[\?？]$", content) and acct in ['Ko4ba', settings.master_id]:
         SM.update(acct, 'func')
         toot_now = '＼絶好調に美少女ー！／'
         interval = 1
-    elif re_search_rnd(r"^きりたんは.+[\?？]$", content) and acct == MASTER_ID:
+    elif re_search_rnd(r"^きりたんは.+[\?？]$", content) and acct == settings.master_id:
         SM.update(acct, 'func')
         toot_now = '＼そこにいるー！／'
         interval = 1
@@ -1014,10 +1020,10 @@ def res_fixed_phrase(id, acct, username, visibility, content, statuses_count,
     elif re_search_rnd("寝(ます|る|マス)([よかぞね]?|[…。うぅー～！・]+)$|^寝(ます|る|よ)[…。うぅー～！・]*$|\
                     寝(ます|る|マス)(.*)[ぽお]や[ユすしー]|きりぼ(.*)[ぽお]や[ユすしー]", content):
         if not re_search_rnd("寝る(かた|方|人|ひと|民)", content):
-            toot_now = f":@{acct}: おやすみ〜 {random.choice([tmp.strip() for tmp in open(KAOMOJI_PATH,'r').readlines() if os.path.exists(KAOMOJI_PATH) and len(tmp.strip())>0])}\n#挨拶部"
+            toot_now = f":@{acct}: おやすみ〜 {random.choice([tmp.strip() for tmp in open(settings.kaomoji_path,'r').readlines() if os.path.exists(settings.kaomoji_path) and len(tmp.strip())>0])}\n\n#きりたん丼挨拶部"
             interval = 5
     elif re_search_rnd(r"^[こコ][らラ][きキ][りリ][ぼボぽポ]", content):
-        toot_now = random.choice([tmp.strip() for tmp in open(KORA_PATH, 'r').readlines() if os.path.exists(KORA_PATH) and len(tmp.strip()) > 0])
+        toot_now = random.choice([tmp.strip() for tmp in open(settings.kora_path, 'r').readlines() if os.path.exists(settings.kora_path) and len(tmp.strip()) > 0])
 
     elif re_search_rnd(r"[へヘはハ][くク].*[しシ][ょョ][んン].*[出でデ][たタ]", content, 6):
         r = max([0, int(random.gauss(30, 30))])
@@ -1031,11 +1037,11 @@ def res_fixed_phrase(id, acct, username, visibility, content, statuses_count,
             toot_now = f":@{acct}: 只今の記録"
             for k, v in result.items():
                 toot_now += f"、{k}:{v}"
-            toot_now += "、でした〜\n#魔王チャレンジ"
+            toot_now += "、でした〜\n\n#魔王チャレンジ"
             if "大魔王" in result.keys():
                 toot_now += " #大魔王"
         else:
-            toot_now = f":@{acct}: 只今の記録、０魔王でした〜\n#魔王チャレンジ"
+            toot_now = f":@{acct}: 只今の記録、０魔王でした〜\n\n#魔王チャレンジ"
     
     elif re_search_rnd(r"(.+)[出でデ][たタ].?$", content, 6):
         r = max([0, int(random.gauss(0, 40))])
@@ -1055,11 +1061,11 @@ def res_fixed_phrase(id, acct, username, visibility, content, statuses_count,
                 toot_now = f":@{acct}: 只今の記録"
                 for k, v in result.items():
                     toot_now += f"、{word}{k}:{v}"
-                toot_now += f"、でした〜\n#{word}魔王チャレンジ"
+                toot_now += f"、でした〜\n\n#{word}魔王チャレンジ"
                 if "大魔王" in result.keys():
                     toot_now += " #大魔王"
             else:
-                toot_now = f":@{acct}: 只今の記録、０{word}魔王でした〜\n#{word}魔王チャレンジ"
+                toot_now = f":@{acct}: 只今の記録、０{word}魔王でした〜\n\n#{word}魔王チャレンジ"
 
     return toot_now, id_now, vis_now, interval, reply
 
@@ -1178,9 +1184,9 @@ def business_contact(status):
     ac_created_at = status["account"]["created_at"]
     ac_created_at = ac_created_at.astimezone(timezone('Asia/Tokyo'))
 
-    if re.search(r"^(緊急|強制)(停止|終了|再起動)$", content) and acct == MASTER_ID:
+    if re.search(r"^(緊急|強制)(停止|終了|再起動)$", content) and acct == settings.master_id:
         logger.warn("＊＊＊＊＊＊＊＊＊＊＊緊急停止したよー！＊＊＊＊＊＊＊＊＊＊＊")
-        toot(f"@{MASTER_ID} 緊急停止しまーす！", 'direct', id, None)
+        toot(f"@{settings.master_id} 緊急停止しまーす！", 'direct', id, None)
         sleep(10)
         os.kill(os.getpid(), signal.SIGKILL)
 
@@ -1198,9 +1204,9 @@ def business_contact(status):
     jst_now = datetime.now(timezone('Asia/Tokyo'))
     jst_now_hh = int(jst_now.strftime("%H"))
 
-    kaomoji = random.choice([tmp.strip() for tmp in open(KAOMOJI_PATH, 'r').readlines() if os.path.exists(KAOMOJI_PATH) and len(tmp.strip()) > 0])
+    kaomoji = random.choice([tmp.strip() for tmp in open(settings.kaomoji_path, 'r').readlines() if os.path.exists(settings.kaomoji_path) and len(tmp.strip()) > 0])
     if statuses_count == 1:
-        toot_now = f':@{acct}: （{display_name}）ご新規さんかもー！{kaomoji}\n #挨拶部'
+        toot_now = f':@{acct}: （{display_name}）ご新規さんかもー！{kaomoji}\n\n #きりたん丼挨拶部'
         toot(toot_now, visibility='public', interval=3)
     elif ymdhms == None or ymdhms + diff < created_at:
         logger.info(f"ymdhms={ymdhms}, created={created_at}, acct_least_created_at[acct]={acct_least_created_at[acct]}, dao={DAO.get_least_created_at(acct)}")
@@ -1215,55 +1221,64 @@ def business_contact(status):
         elif 19 <= jst_now_hh <= 24:
             aisatsu = "こんばんは〜！"
 
-        toot_now = f':@{acct}: {display_name}\n{aisatsu} {kaomoji}\n #挨拶部'
+        toot_now = f':@{acct}: {display_name}\n{aisatsu} {kaomoji}\n\n #きりたん丼挨拶部'
         toot(toot_now, visibility='public', interval=3)
 
-    watch_list = set([tmp.strip() for tmp in open(WATCH_LIST_PATH).readlines(
-    ) if os.path.exists(WATCH_LIST_PATH) and len(tmp.strip()) > 0])
+    watch_list = set([tmp.strip() for tmp in open(settings.watch_list_path).readlines(
+    ) if os.path.exists(settings.watch_list_path) and len(tmp.strip()) > 0])
     if acct in watch_list:
-        toot_now = f'@{MASTER_ID}\n:@{acct}: {display_name}\n「{content}」\n#exp10m'
+        toot_now = f'@{settings.master_id}\n:@{acct}: {display_name}\n「{content}」\n\n#exp10m'
         toot(toot_now, visibility='direct')
 
 
-def recipe_service(content=None, acct=MASTER_ID, id=None, visibility='unlisted'):
-# レシピ提案
-    # fav_now(id)
-    generator = generate_text.GenerateText(1)
-    #料理名を取得ー！
+def recipe_service(content=None, acct=settings.master_id, id=None, visibility='unlisted'):
+    # レシピ提案
     gen_txt = ''
-    spoiler = generator.generate("recipe")
 
-    #材料と分量を取得ー！
+    #ベースとなる材料と分量を取得
     zairyos = []
     amounts = []
-    for line in open(RECIPE_Z_PATH, 'r'):
+    for line in open(settings.recipe_z_path, 'r'):
         zairyos.append(line.strip())
-    for line in open(RECIPE_A_PATH, 'r'):
+    for line in open(settings.recipe_a_path, 'r'):
         amounts.append(line.strip())
     zairyos = random.sample(zairyos, 4)
     amounts = random.sample(amounts, 4)
-    gen_txt += '＜材料＞\n'
-    for z, a in zip(zairyos, amounts):
-        gen_txt += ' ・' + z + '\t' + a + '\n'
 
-    #作り方を取得ー！途中の手順と終了手順を分けて取得するよー！
-    text_chu = []
-    text_end = []
-    generator = generate_text.GenerateText(50)
-    while len(text_chu) <= 3 or len(text_end) < 1:
-        tmp_texts = generator.generate("recipe_text").split('\n')
-        for tmp_text in tmp_texts:
-            if re.search(r'完成|出来上|召し上が|できあがり|最後|終わり', tmp_text):
-                if len(text_end) <= 0:
-                    text_end.append(tmp_text)
-            else:
-                if len(text_chu) <= 3:
-                    text_chu.append(tmp_text)
-    text_chu.extend(text_end)
-    gen_txt += '＜作り方＞\n'
-    for i, text in enumerate(text_chu):
-        gen_txt += f' {i+1}. {text}\n'
-    gen_txt = f"@{acct}\n{gen_txt}\n#きり料理提案サービス #きりぼっと"
+    response = recipe2.get_recipe(zairyos)
+    if response:
+        spoiler = response.get("料理名")
+        gen_txt += '＜材料＞\n'
+        gen_txt += "\n".join([f"{k}： {v}" for k, v in response.get("材料・調味料", dict()).items()])
+        gen_txt += '\n＜作り方＞\n'
+        gen_txt += "\n".join([f"{k}： {v}" for k, v in response.get("料理手順", dict()).items()])
+    else:
+        generator = generate_text.GenerateText(1)
+        #料理名を取得
+        spoiler = generator.generate("recipe")
+        gen_txt += '＜材料＞\n'
+        for z, a in zip(zairyos, amounts):
+            gen_txt += ' ・' + z + '\t' + a + '\n'
+
+        #作り方を取得ー！途中の手順と終了手順を分けて取得するよー！
+        text_chu = []
+        text_end = []
+        generator = generate_text.GenerateText(50)
+        while len(text_chu) <= 3 or len(text_end) < 1:
+            tmp_texts = generator.generate("recipe_text").split('\n')
+            for tmp_text in tmp_texts:
+                if re.search(r'完成|出来上|召し上が|できあがり|最後|終わり', tmp_text):
+                    if len(text_end) <= 0:
+                        text_end.append(tmp_text)
+                else:
+                    if len(text_chu) <= 3:
+                        text_chu.append(tmp_text)
+        text_chu.extend(text_end)
+        gen_txt += '\n＜作り方＞\n'
+        for i, text in enumerate(text_chu):
+            gen_txt += f' {i+1}. {text}\n'
+
+    gen_txt = f"@{acct}\n{gen_txt[:min(len(gen_txt), 470)]}\n\n#きり料理提案サービス #きりぼっと"
     toot(gen_txt, visibility, id, f":@{acct}: {spoiler}")
 
 
@@ -1376,7 +1391,7 @@ def th_timerDel():
             acct = status["account"]["acct"]
             hashtags = util.hashtag(status['content'])
 
-            if acct == BOT_ID:
+            if acct == settings.bot_id:
                 sec = 0
                 for hashtag in hashtags:
                     if hashtag[:3] == "exp" and hashtag[3:-1].isdigit():
@@ -1411,9 +1426,7 @@ def jinkei_tooter():
 def bottlemail_sending():
 # ボトルメールサービス　配信処理
     bm = bottlemail.Bottlemail()
-    sendlist = bm.drifting()
-    no_bottle_list = set([tmp.strip() for tmp in open(NO_BOTTLE_PATH).readlines(
-    ) if os.path.exists(NO_BOTTLE_PATH) and len(tmp.strip()) > 0])
+    sendlist = bm.driftin
 
     for id, acct, msg,reply_id in sendlist:
 
@@ -1424,30 +1437,30 @@ def bottlemail_sending():
         #お届け！
         toots = "@" + random_acct + "\n:@" + acct + ": ＜「" + msg + "」"
         toots += "\n※ボトルメールサービス：＜メッセージ＞　であなたも送れるよー！試してみてね！"
-        toots += "\n#ボトルメールサービス #きりぼっと"
+        toots += "\n\n#ボトルメールサービス #きりぼっと"
         toot(toots, "direct", reply_id if reply_id != 0 else None, spoiler)
         bm.sended(id, random_acct)
 
         #到着通知
         spoiler = ":@" + random_acct + ": が🍾ボトルメール💌受け取ったよー！"
         toots = "@" + acct + " 届けたメッセージは……\n:@" + acct + ": ＜「" + msg + "」"
-        toots += "\n#ボトルメールサービス #きりぼっと"
+        toots += "\n\n#ボトルメールサービス #きりぼっと"
         toot(toots, "direct", reply_id if reply_id != 0 else None, spoiler)
 
 
 def auto_tooter():
 # きりぼっとのつぶやき
-    seeds = toots_in_ltl[-10:]
+    seeds = toots_in_ltl[-5:]
     if len(seeds) <= 2:
         return
     spoiler = None
 
-    gen_txt = dnn_gen_text_wrapper("[SEP]".join([toot for toot, _ in seeds]))
+    gen_txt = dnn_gen_text_wrapper([toot for toot, _ in seeds])
     gen_txt = util.content_cleanser_light(gen_txt)
     if gen_txt[0:1] == '。':
         gen_txt = gen_txt[1:]
     if len(gen_txt) > 60:
-        spoiler = f':@{BOT_ID}: 💭'
+        spoiler = f':@{settings.bot_id}: 💭'
 
     toot(gen_txt, "public", None, spoiler)
 
@@ -1472,13 +1485,13 @@ def th_auto_tooter():
             logger.error(e, exc_info=True)
 
 
-def dnn_gen_text_wrapper(input_text):
-    return bert.gen_text(input_text, temperature=random.uniform(0.6, 0.9)) #, topk=random.randint(100,500))
+def dnn_gen_text_wrapper(input_text_list):
+    return bert.gen_text(input_text_list, temperature=random.uniform(0.4, 0.7)) #, topk=100) #, topk=random.randint(100,500))
 
 
 def dnn_gen_toot_sub(acct: str, seeds: list, visibility: str, in_reply_to_id: int = None, toots_for_rep:list = None):
     toot_now = f"@{acct}\n"
-    tmp = dnn_gen_text_wrapper("[SEP]".join([toot for toot, _ in seeds]))
+    tmp = dnn_gen_text_wrapper([toot for toot, _ in seeds])
     tmp = util.content_cleanser_light(tmp)
     if toots_for_rep:
         toots_for_rep[acct].append([tmp, datetime.now(timezone('Asia/Tokyo'))])
@@ -1491,7 +1504,7 @@ def th_delete():
     del_accts = []
     while True:
         try:
-            toot_now = f'@{MASTER_ID} \n'
+            toot_now = f'@{settings.master_id} \n'
             row = DAO.pickup_1toot(DelQ.get())
             # 垢消し時は大量のトゥー消しが来るので、キューが溜まってる場合はスキップするよ〜
             if DelQ.qsize() >= 3:
@@ -1499,14 +1512,14 @@ def th_delete():
             logger.info(f'th_delete:{row}')
             if row:
                 acct = row[0]
-                if acct not in del_accts and acct != BOT_ID:
+                if acct not in del_accts and acct != settings.bot_id:
                     date = f'{row[2]:08d}'
                     time = f'{row[3]:06d}'
                     ymdhms = '%s %s' %(date, time)
                     ymdhms = dateutil.parser.parse(
                         ymdhms).astimezone(timezone('Asia/Tokyo'))
                     toot_now += f':@{row[0]}: 🚓🚓🚓＜う〜う〜！トゥー消し警察でーす！\n'
-                    toot_now += f':@{row[0]}: ＜「{util.content_cleanser(row[1])}」 at {ymdhms.strftime("%Y.%m.%d %H:%M:%S")}\n#exp10m'
+                    toot_now += f':@{row[0]}: ＜「{util.content_cleanser(row[1])}」 at {ymdhms.strftime("%Y.%m.%d %H:%M:%S")}\n\n#exp10m'
                     toot(toot_now, 'direct', in_reply_to_id=None,
                             spoiler_text=f':@{row[0]}: がトゥー消ししたよー……', media_ids=None, interval=0)
                     SM.update(row[0], 'func', score=-1)
@@ -1547,8 +1560,8 @@ def th_hint_de_pinto(gtime=5):
                 continue
 
             # 使用済みワード確認
-            hintPinto_words = [tmp.strip() for tmp in open(HINPINED_WORDS_PATH, 'r').readlines(
-            ) if os.path.exists(HINPINED_WORDS_PATH) and len(tmp.strip()) > 0]
+            hintPinto_words = [tmp.strip() for tmp in open(settings.hinpined_words_path, 'r').readlines(
+            ) if os.path.exists(settings.hinpined_words_path) and len(tmp.strip()) > 0]
             if util.normalize_txt(term) in hintPinto_words:
                 toot(f'@{g_acct} この前やったお題なので別のにして〜！', 'direct', in_reply_to_id=g_id)
                 continue
@@ -1565,7 +1578,7 @@ def th_hint_de_pinto(gtime=5):
             hintPinto_words.append(util.normalize_txt(term))
             if len(hintPinto_words) > 30:
                 hintPinto_words.pop(0)
-            with open(HINPINED_WORDS_PATH, 'w') as f:
+            with open(settings.hinpined_words_path, 'w') as f:
                 f.write("\n".join(hintPinto_words))
 
             event = threading.Event()
@@ -1639,7 +1652,7 @@ def th_hint_de_pinto(gtime=5):
         except Exception as e:
             logger.error(e, exc_info=True)
             sleep(5)
-            toot(f'@{MASTER_ID} ヒントでピントで何かエラー出た！', visibility="public")
+            toot(f'@{settings.master_id} ヒントでピントで何かエラー出た！', visibility="public")
 
 
 def hinpin_hint(event, g_acct, term, path, hinpin_sts, loop_cnt, game_mode):
@@ -1679,7 +1692,7 @@ def hinpin_hint(event, g_acct, term, path, hinpin_sts, loop_cnt, game_mode):
             media_files = []
             media_files.append(
                 mastodon.media_post(filename, 'image/png'))
-            toot_now = f"さて、これは何/誰でしょうか？\nヒント：{hint_text}\n#きりたんのヒントでピント #exp15m"
+            toot_now = f"さて、これは何/誰でしょうか？\nヒント：{hint_text}\n\n#きりたんのヒントでピント #exp15m"
             toot(toot_now, visibility=game_mode, in_reply_to_id=None,
                     spoiler_text=None, media_ids=media_files)
             event.set()
@@ -1774,7 +1787,7 @@ def th_gettingnum(gtime=30):
                     \n🔸きりぼっとにメンション（ＤＭ可）で投票してね！\
                     \n🔸参加者が２人に満たない場合は無効になるよ〜\
                     \n🔸得点は、取った数×参加人数×5点だよ〜\
-                    \n🔸制限時間は{int(gameTM.check()/60)}分だよー！はじめ！！\n#数取りゲーム #きりぼっと', 'public', None, '💸数取りゲームＲ３始まるよー！🎮')
+                    \n🔸制限時間は{int(gameTM.check()/60)}分だよー！はじめ！！\n\n#数取りゲーム #きりぼっと', 'public', None, '💸数取りゲームＲ３始まるよー！🎮')
             GetNum_flg.append('ON')
             try:
                 #残り１分処理
@@ -1782,7 +1795,7 @@ def th_gettingnum(gtime=30):
 
                 def rm_1m_func():
                     toot(
-                        f'数取りゲームＲ３残り１分だよー！(1〜{gamenum})\n※現在の参加人数は{sum(list(map(len,gm.get_results().values() )))}人だよ〜\n#数取りゲーム #きりぼっと', 'public')
+                        f'数取りゲームＲ３残り１分だよー！(1〜{gamenum})\n※現在の参加人数は{sum(list(map(len,gm.get_results().values() )))}人だよ〜\n\n#数取りゲーム #きりぼっと', 'public')
                 threading.Timer(interval=remaintm - 60,
                                 function=rm_1m_func).start()
 
@@ -1811,7 +1824,7 @@ def th_gettingnum(gtime=30):
             results = gm.get_results()
             sanka_ninzu = sum(list(map(len, results.values())) )
             if sanka_ninzu <= 1:
-                toot('(ง •̀ω•́)ง✧参加者２人未満だったので無効試合になりましたー！\n#数取りゲーム #きりぼっと',
+                toot('(ง •̀ω•́)ง✧参加者２人未満だったので無効試合になりましたー！\n\n#数取りゲーム #きりぼっと',
                     'public', None, None)
             else:
                 toot_now = ''
@@ -1838,10 +1851,10 @@ def th_gettingnum(gtime=30):
                             toot_now += f':@{acct1}: '
                         toot_now += '\n'
                 if score > 0:
-                    toot(f'{toot_now}\n得点は{score}点（取った数:{hanaval}×参加人数:{sanka_ninzu}×5点）だよー\n#数取りゲーム #きりぼっと',
+                    toot(f'{toot_now}\n得点は{score}点（取った数:{hanaval}×参加人数:{sanka_ninzu}×5点）だよー\n\n#数取りゲーム #きりぼっと',
                             'public', None, '数取りゲーム、結果発表ーー！！')
                 else:
-                    toot(f'{toot_now}\n勝者はいなかったよ〜😢\n#数取りゲーム #きりぼっと',
+                    toot(f'{toot_now}\n勝者はいなかったよ〜😢\n\n#数取りゲーム #きりぼっと',
                             'public', None, '数取りゲーム、結果発表ーー！！')
 
         except Exception as e:
@@ -1907,6 +1920,8 @@ def th_ltl():
     while True:
         try:
             mastodon.stream_local(ltl_listener())
+        except mastodon.errors.MastodonNetworkError as e:
+            logger.error(f"Network error occurred: {e}")            
         except Exception as e:
             logger.error(e, exc_info=True)
             sleep(10)

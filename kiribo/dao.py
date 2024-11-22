@@ -11,7 +11,7 @@ from contextlib import closing
 from collections import defaultdict
 
 # きりぼコンフィグ
-from kiribo.config import STATUSES_DB_PATH, DB_SCHEMA_PATH
+from kiribo.config import settings
 
 from kiribo import util
 
@@ -25,10 +25,10 @@ class Dao():
         self.ng_user_set = set()
 
         # DBがない場合、作る！
-        if not os.path.exists(STATUSES_DB_PATH):
+        if not os.path.exists(settings.statuses_db_path):
             con = sqlite3.connect(
-                STATUSES_DB_PATH, timeout=self.timeout, isolation_level='EXCLUSIVE')
-            with open(DB_SCHEMA_PATH, "r") as f:
+                settings.statuses_db_path, timeout=self.timeout, isolation_level='EXCLUSIVE')
+            with open(settings.db_schema_path, "r") as f:
                 schema = f.read()
 
             con.execute(schema)
@@ -39,7 +39,7 @@ class Dao():
     # 指定された時間内から一人ユーザを選ぶ
     def sample_acct(self):
         acct_list = set([])
-        con = sqlite3.connect(STATUSES_DB_PATH, timeout=self.timeout, isolation_level='DEFERRED')
+        con = sqlite3.connect(settings.statuses_db_path, timeout=self.timeout, isolation_level='DEFERRED')
         c = con.cursor()
         sql = r"select distinct acct from statuses where acct <> ? order by id desc limit 30"
         for row in c.execute(sql , [self.bot_id,] ) :
@@ -57,7 +57,7 @@ class Dao():
         if acct == None:
             return
         ids = []
-        con = sqlite3.connect(STATUSES_DB_PATH, timeout=self.timeout, isolation_level='DEFERRED')
+        con = sqlite3.connect(settings.statuses_db_path, timeout=self.timeout, isolation_level='DEFERRED')
         c = con.cursor()
         sql = r"select id from statuses where acct = ?  order by id asc"
         for row in c.execute( sql, (acct,)):
@@ -69,7 +69,7 @@ class Dao():
     # 直近１０トゥートを返す
     def get_least_10toots(self,acct=None,limit=15, time=False):
         seeds = []
-        con = sqlite3.connect(STATUSES_DB_PATH, timeout=self.timeout, isolation_level='DEFERRED')
+        con = sqlite3.connect(settings.statuses_db_path, timeout=self.timeout, isolation_level='DEFERRED')
         c = con.cursor()
         if time:
             sql = r"select content,date,time from statuses order by id desc limit ?"
@@ -102,7 +102,7 @@ class Dao():
     #######################################################
     # ｉｄ指定でトゥート内容を返す
     def pickup_1toot(self,status_id):
-        con = sqlite3.connect(STATUSES_DB_PATH, timeout=self.timeout, isolation_level='DEFERRED')
+        con = sqlite3.connect(settings.statuses_db_path, timeout=self.timeout, isolation_level='DEFERRED')
         c = con.cursor()
         c.execute( r"select acct, content, date, time  from statuses where id = ?",
                         (status_id,))
@@ -121,7 +121,7 @@ class Dao():
         ymd2 = int(jst_now.strftime("%Y%m%d"))
         hms2 = int(jst_now.strftime("%H%M%S"))
 
-        con = sqlite3.connect(STATUSES_DB_PATH, timeout=self.timeout, isolation_level='DEFERRED')
+        con = sqlite3.connect(settings.statuses_db_path, timeout=self.timeout, isolation_level='DEFERRED')
         c = con.cursor()
         if ymd == ymd2 and int(hms) <= int(hms2):
             c.execute( r"select distinct acct from statuses where (date = ? and time >= ? and time <= ? )",
@@ -141,7 +141,7 @@ class Dao():
     # 陣形用５人ピックアップ
     def get_five(self, num=5,minutes=30):
         #アクティブユーザ数ピックアップ
-        con = sqlite3.connect(STATUSES_DB_PATH, timeout=self.timeout, isolation_level='DEFERRED')
+        con = sqlite3.connect(settings.statuses_db_path, timeout=self.timeout, isolation_level='DEFERRED')
         c = con.cursor()
         c.execute( r"select distinct acct from statuses order by id desc limit 20")
         acct_list = set([])
@@ -154,7 +154,7 @@ class Dao():
     #######################################################
     # モノマネ用
     def get_user_toots(self, acct, limit=10):
-        con = sqlite3.connect(STATUSES_DB_PATH, timeout=self.timeout, isolation_level='DEFERRED')
+        con = sqlite3.connect(settings.statuses_db_path, timeout=self.timeout, isolation_level='DEFERRED')
         c = con.cursor()
         c.execute( r"select id, content, date, time from statuses where acct = ? order by id asc limit ?", (acct,limit) )
         rows = c.fetchall()
@@ -170,7 +170,7 @@ class Dao():
         hms = int((jst_now - timedelta(hours=hours)).strftime("%H%M%S"))
         ymd2 = int(jst_now.strftime("%Y%m%d"))
         hms2 = int(jst_now.strftime("%H%M%S"))
-        con = sqlite3.connect(STATUSES_DB_PATH, timeout=self.timeout, isolation_level='DEFERRED')
+        con = sqlite3.connect(settings.statuses_db_path, timeout=self.timeout, isolation_level='DEFERRED')
         c = con.cursor()
         if ymd == ymd2 and int(hms) <= int(hms2):
             c.execute( r"select acct,count(content) from statuses where (date = ? and time >= ? and time <= ? ) group by acct",
@@ -204,7 +204,7 @@ class Dao():
                     status['account']['display_name'],
                     mediatext
                     )
-        con = sqlite3.connect(STATUSES_DB_PATH, timeout=self.timeout, isolation_level='EXCLUSIVE')
+        con = sqlite3.connect(settings.statuses_db_path, timeout=self.timeout, isolation_level='EXCLUSIVE')
         c = con.cursor()
         insert_sql = u"insert into statuses (id, date, time, content, acct,\
                 display_name, media_attachments) values (?, ?, ?, ?, ?, ?, ?)"
@@ -230,7 +230,7 @@ class Dao():
         ymd2 = int(jst_now.strftime("%Y%m%d"))
         hms2 = int(jst_now.strftime("%H%M%S"))
 
-        con = sqlite3.connect(STATUSES_DB_PATH, timeout=self.timeout, isolation_level='DEFERRED')
+        con = sqlite3.connect(settings.statuses_db_path, timeout=self.timeout, isolation_level='DEFERRED')
         c = con.cursor()
         if ymd == ymd2 and int(hms) <= int(hms2):
             c.execute(r"select date, time from statuses where acct = ? and (date = ? and time >= ? and time <= ? ) order by id desc limit 1",
@@ -254,7 +254,7 @@ class Dao():
     # ほくすんポイント
     def hksn_point(self):
         results = []
-        with closing(sqlite3.connect(STATUSES_DB_PATH, timeout=self.timeout, isolation_level='DEFERRED')) as conn:
+        with closing(sqlite3.connect(settings.statuses_db_path, timeout=self.timeout, isolation_level='DEFERRED')) as conn:
             c = conn.cursor()
             query = r"select content from statuses WHERE acct= ? "
             for row in c.execute(query, ("HKSN",)):

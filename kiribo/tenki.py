@@ -12,13 +12,13 @@ import locale
 locale.setlocale(locale.LC_TIME, 'ja_JP.UTF-8')
 
 # きりぼコンフィグ
-from kiribo.config import MEDIA_PATH, WEATHER_IMAGES, FONT_PATH, WEATHER_AREA, UA
+from kiribo.config import settings
 from kiribo.util import logger
 
 
 def search_area(word):
     # 市区町村名からコード値を取得するやつ
-    with open(WEATHER_AREA, "r") as f:
+    with open(settings.weather_area, "r") as f:
         area = json.load(f)
 
     class20s = [v for v in area['class20s'].values(
@@ -48,7 +48,7 @@ def get_forecast_data(quary):
 
     url = f"https://weather.tsukumijima.net/api/forecast"
     forecast = requests.get(
-        url, headers={'User-Agent': UA}, params=dict(city=class10_code)).json()
+        url, headers={'User-Agent': settings.ua}, params=dict(city=class10_code)).json()
     sleep(1)
 
     return 0, forecast
@@ -62,8 +62,8 @@ def format_text(text):
 
 
 def svg2png2image(url):
-    os.makedirs(WEATHER_IMAGES, exist_ok=True)
-    savepath = os.path.join(WEATHER_IMAGES, url.split(
+    os.makedirs(settings.weather_images, exist_ok=True)
+    savepath = os.path.join(settings.weather_images, url.split(
         "/")[-1].split(".")[0] + ".png")
     if not os.path.exists(savepath):
         svg2png(url=url, write_to=savepath, scale=2)
@@ -81,7 +81,7 @@ def make_forecast_image(quary):
 
 
     # ヘッダー
-    default_font = ImageFont.truetype(FONT_PATH, 24)
+    default_font = ImageFont.truetype(settings.font_path, 24)
     default_color = (240, 240, 240)
     column_header = ["日付", "天気", "風", "波の高さ", "最低気温", "最高気温", "降水確率", "概況"]
     column_header_size = [2, 4, 1, 1, 1, 1, 1, 5]
@@ -98,7 +98,7 @@ def make_forecast_image(quary):
     color_list = [default_color] * 6 + \
         [(80, 80, 240), (240, 80, 80)] + [default_color] * 2
     font_list = [default_font] * 4 + \
-        [ImageFont.truetype(FONT_PATH, 16)] * 2 + [default_font] * 4
+        [ImageFont.truetype(settings.font_path, 16)] * 2 + [default_font] * 4
 
     for i, fc in enumerate(forecast['forecasts']):
         column_image = draw_table(
@@ -125,7 +125,7 @@ def make_forecast_image(quary):
     overview_image = Image.new(
         "RGBA", (BASE_COLUMN_SIZE*len(forecast['forecasts']), BASE_ROW_SIZE*5), (0, 0, 0, 255))
     overview_draw = ImageDraw.Draw(overview_image)
-    font = ImageFont.truetype(FONT_PATH, 18)
+    font = ImageFont.truetype(settings.font_path, 18)
     MAXLEN = 55
     wrap_list = text_wrap(overview_text, 48)
     for i, wrap_text in enumerate(wrap_list):
@@ -151,7 +151,7 @@ def make_forecast_image(quary):
                     font=default_font, fill=default_color)
     bg_image.paste(image, (0, 32))
 
-    file_path = os.path.join(MEDIA_PATH, "tmp_weather.png")
+    file_path = os.path.join(settings.media_path, "tmp_weather.png")
     bg_image.save(file_path)
     return 0, file_path
 

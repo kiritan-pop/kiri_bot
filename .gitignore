@@ -13,3 +13,4 @@ venv_dev/
 fonts/
 tmp/
 *.gz
+.env

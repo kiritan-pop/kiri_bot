@@ -4,7 +4,7 @@ import random
 from collections import OrderedDict
 
 # きりぼコンフィグ
-from kiribo.config import SIRITORI_DIC_PATH
+from kiribo.config import settings
 import logging
 
 logger = logging.getLogger(__name__)
@@ -132,7 +132,7 @@ class Siritori_game():
 class Siritori_manager():
 #しりとり用
     def __init__(self):
-        self.wdict = { tmp.strip().split(',')[0]:tmp.strip().split(',')[1] for tmp in open(SIRITORI_DIC_PATH).readlines() }
+        self.wdict = { tmp.strip().split(',')[0]:tmp.strip().split(',')[1] for tmp in open(settings.siritori_dic_path).readlines() }
         self.games = {}
         self.yure = {'ァ':'ア','ィ':'イ','ゥ':'ウ','ェ':'エ','ォ':'オ','ャ':'ヤ','ュ':'ユ','ョ':'ヨ','ッ':'ツ','ヮ':'ワ','ヶ':'ケ'}
 

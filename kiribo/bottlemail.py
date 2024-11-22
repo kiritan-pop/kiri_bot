@@ -7,11 +7,11 @@ import unicodedata
 import sqlite3
 
 # きりぼコンフィグ
-from kiribo.config import BOTTLEMAIL_DB_PATH, BOTTLEMAIL_SCHEMA_PATH
+from kiribo.config import settings
 
 class Bottlemail():
-    DB_PATH = BOTTLEMAIL_DB_PATH
-    DB_SCHEMA_PATH = BOTTLEMAIL_SCHEMA_PATH
+    DB_PATH = settings.bottlemail_db_path
+    DB_SCHEMA_PATH = settings.bottlemail_schema_path
     def __init__(self, db=None):
         if db is not None:
             self.DB_PATH = db
