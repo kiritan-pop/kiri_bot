@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 
-import re, os, json, random, unicodedata, signal, sys
-from time import sleep
-import kiribo.dao
+import random
+from kiribo import status_dao
 
 jinkeis = [
 {'name':'フリーファイト',
@@ -98,7 +97,7 @@ bl = ':blank: '
 #######################################################
 # メイン
 def gen_jinkei():
-    DAO = kiribo.dao.Dao()
+    DAO = status_dao.StatusDao()
     accts = DAO.get_five()
     if len(accts) != 5:
         return

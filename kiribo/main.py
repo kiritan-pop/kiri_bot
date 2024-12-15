@@ -11,7 +11,6 @@ from pytz import timezone
 import dateutil
 from datetime import datetime, timedelta
 from collections import defaultdict, Counter
-import wikipedia
 from PIL import Image
 import argparse
 
@@ -19,9 +18,9 @@ import argparse
 from kiribo.config import settings
 
 # きりぼサブモジュール
-from kiribo import bottlemail, cooling_manager, dao, deep, game, generate_text,\
+from kiribo import bottlemail, cooling_manager, status_dao, deep, game, generate_text,\
     get_images_ggl, imaging, romasaga, scheduler, score_manager, stat, tenki,\
-    timer, trans, util, tarot, bert, get_kinro, haiku, tarot_april, recipe2, text_summary
+    timer, trans, util, tarot, bert, get_kinro, haiku, tarot_april, recipe2, text_summary, sensesearch
 
 import logging
 logger = logging.getLogger(__name__)
@@ -32,8 +31,6 @@ abc = list(
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?.()+-=,")
 keisho = r"(くん|君|さん|様|さま|ちゃん|氏)"
 
-wikipedia.set_lang("ja")
-wikipedia.set_user_agent("kiri_bot (https://github.com/kiritan-pop/kiri_bot/)")
 
 # Google画像検索設定
 gi = get_images_ggl.GetImagesGGL(settings.google_key, settings.google_engine_key)
@@ -41,7 +38,7 @@ gi = get_images_ggl.GetImagesGGL(settings.google_key, settings.google_engine_key
 #得点管理、流速監視
 SM = score_manager.ScoreManager()
 CM = cooling_manager.CoolingManager(15)
-DAO = dao.Dao()
+DAO = status_dao.StatusDao()
 TRANS = trans.Trans(settings.google_key)
 #しりとり用
 StMG = game.Siritori_manager()
@@ -544,26 +541,11 @@ def worker(status):
         word = re.search(r"(.+)って(何|なに|ナニ|誰|だれ|ダレ|いつ|どこ)\?$",
                          str(content)).group(1).strip()
         SM.update(acct, 'func')
-        try:
-            word = re.sub(
-                r".*(へい)?きりぼ(っと)?(くん|君|さん|様|さま|ちゃん)?[!,.]?", "", word).strip()
-            if len(word) == 0:
-                return
-            page = wikipedia.page(word)
-        except wikipedia.exceptions.DisambiguationError as e:
-            nl = "\n"
-            toot(f'@{acct} 「{word}」にはいくつか意味があるみたいだよ〜{nl}次のいずれかのキーワードでもう一度調べてね〜{nl}{",".join(e.options)}', visibility, id, None)
-        except Exception as e:
-            logger.error(e, exc_info=True)
-            toot(f'@{acct} え？「{word}」しらなーい！', visibility, id, None)
-        else:
-            summary_text = page.summary
-            summary_text = text_summary.get_summary(summary_text)
-            if len(acct) + len(summary_text) + len(page.url) > 450:
-                summary_text = summary_text[0:450 -
-                                            len(acct)-len(page.url)] + '……'
-            toot(f'@{acct} {summary_text}\n{page.url}',
-                 visibility, id, f'なになに？「{word}」とは……')
+        text = sensesearch.sensesearch(word)
+        if len(text) > 300:
+            text = text_summary.get_summary(text)
+        toot(f'@{acct} {text}',
+                visibility, id, f'なになに？「{word}」とは……')
 
     elif len(media_attachments) > 0 and re.search(r"色[ぬ塗]って", content + spoiler_text):
         # fav_now(id)
@@ -1426,13 +1408,13 @@ def jinkei_tooter():
 def bottlemail_sending():
 # ボトルメールサービス　配信処理
     bm = bottlemail.Bottlemail()
-    sendlist = bm.driftin
+    sendlist = bm.drifting
 
     for id, acct, msg,reply_id in sendlist:
 
         spoiler = ":@" + acct + ": から🍾ボトルメール💌届いたよー！"
         random_acct = DAO.sample_acct()
-        if random_acct in no_bottle_list:
+        if random_acct in settings.no_bottle_list:
             continue
         #お届け！
         toots = "@" + random_acct + "\n:@" + acct + ": ＜「" + msg + "」"
@@ -1920,8 +1902,8 @@ def th_ltl():
     while True:
         try:
             mastodon.stream_local(ltl_listener())
-        except mastodon.errors.MastodonNetworkError as e:
-            logger.error(f"Network error occurred: {e}")            
+        # except mastodon.errors.MastodonNetworkError as e:
+        #     logger.error(f"Network error occurred: {e}")            
         except Exception as e:
             logger.error(e, exc_info=True)
             sleep(10)

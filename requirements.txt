@@ -8,6 +8,7 @@ psutil>=5.7.2
 socketIO-client-nexus>=0.7.6
 wikipedia>=1.4.0
 xmltodict>=0.12.0
+torch
 jaconv
 cairosvg
 transformers
@@ -19,3 +20,6 @@ sentencepiece
 onnxruntime
 openai
 pydantic-settings
+optimum[exporters]
+evaluate
+accelerate
