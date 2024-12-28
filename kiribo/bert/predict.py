@@ -24,6 +24,7 @@ def gen_text(
         temperature=0.75,
         topk=500,
         topp=0.8,
+        repetition_penalty=1.2  # 新しいパラメータ
 ):
 
     input_text = tokenizer.sep_token.join(input_text_list)
@@ -48,6 +49,13 @@ def gen_text(
     for cur in range(1, KiriConfig.MAX_CHAR_LEN + 1):
         preds = session.run(None, dict(enc_input=input_token_dic['input_ids'], dec_input=output_ids[:, :-1]))[0]
         preds = softmax(preds[0])
+
+        # 繰り返しペナルティの適用
+        for prev_id in output_ids_list:
+            if preds[cur - 1, prev_id] > 0:  # 確率が正の場合のみ調整
+                preds[cur - 1, prev_id] /= repetition_penalty
+
+        # 次のトークンをサンプリング
         next_id = int(
             sample(preds[cur - 1], temperature=temperature, topk=topk, topp=topp))
 

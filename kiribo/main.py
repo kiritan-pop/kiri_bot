@@ -540,8 +540,14 @@ def worker(status):
     elif re.search(r"(.+)って(何|なに|ナニ|誰|だれ|ダレ|いつ|どこ)\?$", content):
         word = re.search(r"(.+)って(何|なに|ナニ|誰|だれ|ダレ|いつ|どこ)\?$",
                          str(content)).group(1).strip()
-        SM.update(acct, 'func')
+        word = re.sub(
+            r".*(へい)?きりぼ(っと)?(くん|君|さん|様|さま|ちゃん)?[!,.]?", "", word).strip()
+        if len(word) == 0:
+            return
         text = sensesearch.sensesearch(word)
+        if not text:
+            return
+        SM.update(acct, 'func')
         if len(text) > 300:
             text = text_summary.get_summary(text)
         toot(f'@{acct} {text}',
@@ -745,7 +751,7 @@ def worker(status):
         seeds.extend(toots_for_rep[acct][-5:])
         #時系列ソート
         seeds.sort(key=lambda x: (x[1]))
-        seeds = seeds[-5:]
+        seeds = seeds[-15:]
         threading.Thread(target=dnn_gen_toot_sub, args=(
             acct, seeds, visibility, id, toots_for_rep)).start()
 
@@ -1408,7 +1414,7 @@ def jinkei_tooter():
 def bottlemail_sending():
 # ボトルメールサービス　配信処理
     bm = bottlemail.Bottlemail()
-    sendlist = bm.drifting
+    sendlist = bm.drifting()
 
     for id, acct, msg,reply_id in sendlist:
 
@@ -1432,7 +1438,7 @@ def bottlemail_sending():
 
 def auto_tooter():
 # きりぼっとのつぶやき
-    seeds = toots_in_ltl[-5:]
+    seeds = toots_in_ltl[-15:]
     if len(seeds) <= 2:
         return
     spoiler = None

@@ -40,8 +40,6 @@ def llm_predict(word: str):
 
 
 def sensesearch(word: str):
-    word = re.sub(
-        r".*(へい)?きりぼ(っと)?(くん|君|さん|様|さま|ちゃん)?[!,.]?", "", word).strip()
     if len(word) == 0:
         return ""
     
@@ -57,7 +55,7 @@ def sensesearch(word: str):
     except Exception as e:
         return f'え？「{word}」しらなーい！'
     else:
-        return page.summary
+        return page.url + "\n\n" + page.summary
 
 
 
