@@ -39,10 +39,14 @@ def takoramen(filepath):
         return []
 
     pred_labels = image_classify_predict(image)
+
     if pred_labels:
         savepath = os.path.join("media4ml", pred_labels[0], os.path.basename(filepath))
-        os.makedirs(os.path.dirname(savepath), exist_ok=True)
-        shutil.copy(filepath, savepath)
+    else:
+        savepath = os.path.join("media4ml", "no_category", os.path.basename(filepath))
+
+    os.makedirs(os.path.dirname(savepath), exist_ok=True)
+    shutil.copy(filepath, savepath)
 
     return pred_labels
 

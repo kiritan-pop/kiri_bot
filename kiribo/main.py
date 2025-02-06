@@ -20,7 +20,7 @@ from kiribo.config import settings
 # きりぼサブモジュール
 from kiribo import bottlemail, cooling_manager, status_dao, deep, game, generate_text,\
     get_images_ggl, imaging, romasaga, scheduler, score_manager, stat, tenki,\
-    timer, trans, util, tarot, bert, get_kinro, haiku, tarot_april, recipe2, text_summary, sensesearch
+    timer, trans, util, tarot, t5, get_kinro, haiku, tarot_april, recipe2, text_summary, sensesearch
 
 import logging
 logger = logging.getLogger(__name__)
@@ -538,15 +538,20 @@ def worker(status):
         SM.update(acct, 'func')
 
     elif re.search(r"(.+)って(何|なに|ナニ|誰|だれ|ダレ|いつ|どこ)\?$", content):
-        word = re.search(r"(.+)って(何|なに|ナニ|誰|だれ|ダレ|いつ|どこ)\?$",
-                         str(content)).group(1).strip()
-        word = re.sub(
-            r".*(へい)?きりぼ(っと)?(くん|君|さん|様|さま|ちゃん)?[!,.]?", "", word).strip()
+        result = re.search(r".*(へい)?きりぼ(っと)?(くん|君|さん|様|さま|ちゃん)?[!,.、。]?(?P<target_word>.+)って(何|なに|ナニ|誰|だれ|ダレ|いつ|どこ)\?$",
+                        content, flags=re.DOTALL)
+        if result and result.groupdict().get('target_word'):
+            word = result.groupdict().get('target_word')
+        else:
+            return 
+
         if len(word) == 0:
             return
+
         text = sensesearch.sensesearch(word)
         if not text:
             return
+
         SM.update(acct, 'func')
         if len(text) > 300:
             text = text_summary.get_summary(text)
@@ -1474,7 +1479,7 @@ def th_auto_tooter():
 
 
 def dnn_gen_text_wrapper(input_text_list):
-    return bert.gen_text(input_text_list, temperature=random.uniform(0.4, 0.7)) #, topk=100) #, topk=random.randint(100,500))
+    return t5.gen_text(input_text_list, temperature=random.uniform(0.7, 1.0)) #, topk=100) #, topk=random.randint(100,500))
 
 
 def dnn_gen_toot_sub(acct: str, seeds: list, visibility: str, in_reply_to_id: int = None, toots_for_rep:list = None):

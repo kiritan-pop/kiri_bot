@@ -1,48 +1,70 @@
 # -*- coding: utf-8 -*-
 
+import os
 import logging
-# from deepsparse import compile_model # quantizeしたら使えない
 from onnxruntime import InferenceSession
-
+import logging
 import numpy as np
-from transformers import AutoTokenizer
-import sentencepiece as spm
-
+from transformers import T5Tokenizer
 from .config import KiriConfig
 
 logging.basicConfig(level=logging.INFO)
 
-session = InferenceSession(KiriConfig.SAVE_PATH)
-tokenizer = AutoTokenizer.from_pretrained(KiriConfig.MODEL_NAME)
-sp = spm.SentencePieceProcessor(model_file=KiriConfig.SPM_MODEL)
-
+# 
+session = InferenceSession(KiriConfig.QUANTIZED_MODEL_PATH)
+tokenizer = T5Tokenizer.from_pretrained(os.path.dirname(KiriConfig.QUANTIZED_MODEL_PATH), use_fast=True)
 
 black_words = ["きりぼ占って", "こらきりぼ"]
 # ブラックワードをトークン化（順序を保持）
-black_word_sequences = [sp.encode(word, out_type=int) for word in black_words]
+black_word_sequences = [tokenizer.encode(word) for word in black_words]
 
 
 def gen_text(
         input_text_list: list,
-        temperature=0.75,
+        temperature=0.75, 
         topk=500,
         topp=0.8,
         repetition_penalty=1.2,  # 繰り返しペナルティ
         black_word_penalty=1.5,  # ブラックワードのペナルティ係数
-):
+        ):
 
-    input_text = tokenizer.sep_token.join(input_text_list)
+    # input_text_list= "なんで俺がウンコ漏らさなきゃいけないんだ|ぶりゅに名前変えようぜ|ふざけんな|(๑˃́ꇴ˂̀๑)ｷｬｯｷｬｯ!|:blobcatsip:".split("|")
+    # temperature=0.75 
+    # topk=500
+    # topp=0.8
+    # repetition_penalty=1.2  # 新しいパラメータ
+    
+    
+    input_text = "|".join(input_text_list)
     input_token_dic = tokenizer(input_text,
-                                truncation=True, return_tensors='np')
-
-    output_ids = np.full((1, KiriConfig.MAX_CHAR_LEN + 1), sp.pad_id())
-    output_ids[0, 0] = sp.bos_id()
+                                truncation=True, max_length=KiriConfig.MAX_INPUT_LENGTH, return_tensors='np')
+    
+    # T5 の場合、生成開始時には decoder_start_token_id を用います
+    # 多くの場合、T5では pad_token_id が decoder_start_token_id として利用されるか、明示的に設定する必要があります
+    decoder_start_token_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else tokenizer.eos_token_id
+    
+    output_ids = np.full((1, KiriConfig.MAX_OUTPUT_LENGTH + 1), tokenizer.pad_token_type_id)
+    output_ids[0, 0] = decoder_start_token_id
     output_ids_list = []
-
-    for cur in range(1, KiriConfig.MAX_CHAR_LEN + 1):
-        preds = session.run(None, dict(enc_input=input_token_dic['input_ids'], dec_input=output_ids[:, :-1]))[0]
+    
+    for cur in range(1, KiriConfig.MAX_OUTPUT_LENGTH + 1):
+        # ort_inputs = {
+        #     "input_ids": input_ids,                   # エンコーダーへの入力
+        #     "decoder_input_ids": decoder_input_ids      # 現在のデコーダー入力
+        # }
+        
+        # # 推論実行
+        # # エクスポート時に指定した出力名は "output" としており、
+        # # 出力は (batch_size, decoder_seq_length, vocab_size) の logits と仮定します。
+        # logits = session.run(["output"], ort_inputs)[0]
+      
+        preds = session.run(["output"], dict(
+            input_ids=input_token_dic['input_ids'],
+            attention_mask=input_token_dic['attention_mask'],
+            decoder_input_ids=output_ids[:, :-1]
+        ))[0]
         preds = softmax(preds[0])
-
+    
         # 繰り返しペナルティの適用
         for prev_id in output_ids_list:
             if preds[cur - 1, prev_id] > 0:  # 確率が正の場合のみ調整
@@ -67,20 +89,20 @@ def gen_text(
                 penalty_factor = black_word_penalty ** match_len
                 if preds[cur - 1, next_token] > 0:
                     preds[cur - 1, next_token] /= penalty_factor
-
+        
         # 次のトークンをサンプリング
-        next_id = int(
-            sample(preds[cur - 1], temperature=temperature, topk=topk, topp=topp))
-
-        if next_id in [sp.pad_id(), sp.eos_id()]:
+        next_id = int(sample(preds[cur - 1], temperature=temperature, topk=topk, topp=topp))
+        if next_id in [tokenizer.eos_token_id]:
+            print("\n")
             break
-
         output_ids[0, cur] = next_id
         output_ids_list.append(next_id)
+        # tmp_char = tokenizer.decode(next_id)
+        # tmp_char = tmp_char.replace("<br>", "\n")
+        # print(f"{tmp_char}", end="", flush=True)
 
-    generated_text = sp.decode_ids(output_ids_list)
+    generated_text = tokenizer.decode(output_ids_list)
     generated_text = generated_text.replace("<br>", "\n")
-    generated_text = generated_text.replace("⁇", "")
     return generated_text
 
 
@@ -120,5 +142,5 @@ def sample(preds, temperature=1.0, topk=None, topp=1.0):
 
 
 def softmax(x):
-    f = np.exp(x)/np.sum(np.exp(x), axis=1, keepdims=True)
+    f = np.exp(x)/np.sum(np.exp(x), axis = 1, keepdims = True)
     return f
