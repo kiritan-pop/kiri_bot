@@ -3,7 +3,6 @@
 import os
 import logging
 from onnxruntime import InferenceSession
-import logging
 import numpy as np
 from transformers import T5Tokenizer
 from .config import KiriConfig
@@ -27,15 +26,8 @@ def gen_text(
         repetition_penalty=1.2,  # 繰り返しペナルティ
         black_word_penalty=1.5,  # ブラックワードのペナルティ係数
         ):
-
-    # input_text_list= "なんで俺がウンコ漏らさなきゃいけないんだ|ぶりゅに名前変えようぜ|ふざけんな|(๑˃́ꇴ˂̀๑)ｷｬｯｷｬｯ!|:blobcatsip:".split("|")
-    # temperature=0.75 
-    # topk=500
-    # topp=0.8
-    # repetition_penalty=1.2  # 新しいパラメータ
     
-    
-    input_text = "|".join(input_text_list)
+    input_text = KiriConfig.SEP.join(input_text_list)
     input_token_dic = tokenizer(input_text,
                                 truncation=True, max_length=KiriConfig.MAX_INPUT_LENGTH, return_tensors='np')
     
@@ -48,16 +40,6 @@ def gen_text(
     output_ids_list = []
     
     for cur in range(1, KiriConfig.MAX_OUTPUT_LENGTH + 1):
-        # ort_inputs = {
-        #     "input_ids": input_ids,                   # エンコーダーへの入力
-        #     "decoder_input_ids": decoder_input_ids      # 現在のデコーダー入力
-        # }
-        
-        # # 推論実行
-        # # エクスポート時に指定した出力名は "output" としており、
-        # # 出力は (batch_size, decoder_seq_length, vocab_size) の logits と仮定します。
-        # logits = session.run(["output"], ort_inputs)[0]
-      
         preds = session.run(["output"], dict(
             input_ids=input_token_dic['input_ids'],
             attention_mask=input_token_dic['attention_mask'],

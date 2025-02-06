@@ -510,10 +510,10 @@ def worker(status):
             toot(
                 f'@{acct}\n{sl_txt}ハズレ〜〜（{int(slot_rate*3)}点消費／合計{acct_score}点）', 'direct', in_reply_to_id=id)
 
-    elif re.search(r"(ヒントでピント)[：:](.+)", content):
+    elif word := re.search(r"(ヒントでピント)[：:](.+)",
+                             str(content)):
         if visibility == 'direct':
-            word = re.search(r"(ヒントでピント)[：:](.+)",
-                             str(content)).group(2).strip()
+            word = word.group(2).strip()
             if len(word) < 3:
                 toot(f'@{acct} お題は３文字以上にしてね〜', 'direct', in_reply_to_id=id)
                 return
@@ -537,26 +537,16 @@ def worker(status):
         recipe_service(content=content, acct=acct, id=id, visibility=visibility)
         SM.update(acct, 'func')
 
-    elif re.search(r"(.+)って(何|なに|ナニ|誰|だれ|ダレ|いつ|どこ)\?$", content):
-        result = re.search(r".*(へい)?きりぼ(っと)?(くん|君|さん|様|さま|ちゃん)?[!,.、。]?(?P<target_word>.+)って(何|なに|ナニ|誰|だれ|ダレ|いつ|どこ)\?$",
-                        content, flags=re.DOTALL)
-        if result and result.groupdict().get('target_word'):
-            word = result.groupdict().get('target_word')
-        else:
-            return 
+    elif result := re.search(r".*(へい)?きりぼ(っと)?(くん|君|さん|様|さま|ちゃん)?[!,.、。]?(?P<target_word>.+)って(何|なに|ナニ|誰|だれ|ダレ|いつ|どこ)\?$",
+                        content, flags=re.DOTALL):
+        if word := result.groupdict().get('target_word'):
+            if text := sensesearch.sensesearch(word):
+                SM.update(acct, 'func')
+                if len(text) > 300:
+                    text = text_summary.get_summary(text)
 
-        if len(word) == 0:
-            return
-
-        text = sensesearch.sensesearch(word)
-        if not text:
-            return
-
-        SM.update(acct, 'func')
-        if len(text) > 300:
-            text = text_summary.get_summary(text)
-        toot(f'@{acct} {text}',
-                visibility, id, f'なになに？「{word}」とは……')
+                toot(f'@{acct} {text}',
+                        visibility, id, f'なになに？「{word}」とは……')
 
     elif len(media_attachments) > 0 and re.search(r"色[ぬ塗]って", content + spoiler_text):
         # fav_now(id)
@@ -609,9 +599,9 @@ def worker(status):
         show_rank(acct=acct, target=acct, id=id, visibility=visibility)
         SM.update(acct, 'func')
 
-    elif re.search(r":@(.+):.*の(ランク|ランキング|順位|スコア|成績|せいせき|らんく|らんきんぐ|すこあ)", content):
-        word = re.search(
-            r":@(.+):.*の(ランク|ランキング|順位|スコア|成績|せいせき|らんく|らんきんぐ|すこあ)", str(content)).group(1)
+    elif word := re.search(
+            r":@(.+):.*の(ランク|ランキング|順位|スコア|成績|せいせき|らんく|らんきんぐ|すこあ)", str(content)):
+        word = word.group(1)
         show_rank(acct=acct, target=word, id=id, visibility=visibility)
         SM.update(acct, 'func')
     elif re.search(r"(数取りゲーム|かずとりげぇむ).*(おねがい|お願い)", content):
@@ -661,8 +651,8 @@ def worker(status):
                 toot(toot_now, 'public', id, f'翻訳したよ〜！ :@{acct}: ＜')
                 SM.update(acct, 'func')
 
-    elif re.search(r"きりぼ.+:@(.+):.*の初", content):
-        target = re.search(r"きりぼ.+:@(.+):.*の初", str(content)).group(1)
+    elif target := re.search(r"きりぼ.+:@(.+):.*の初", str(content)):
+        target = target.group(1)
         toots = DAO.get_user_toots(target)
         # トゥートの存在チェック
         check_fg = False
@@ -695,9 +685,9 @@ def worker(status):
         toot(
             f"@{acct} \nただいまの気温{stats['cpu_temp']}℃、忙しさ{stats['cpu']:.1f}％、気持ちの余裕{stats['mem_available']/(10**9):.1f}GB、懐の広さ{stats['disk_usage']/(10**9):.1f}GB", visibility=visibility, in_reply_to_id=id)
 
-    elif re.search(r"きりぼ(くん|君|さん|様|さま|ちゃん)?[!！、\s]?.+の天気.*(おしえて|教え|おせーて)?", content):
-        tenki_area = re.search(
-            r"きりぼ(くん|君|さん|様|さま|ちゃん)?[!！、\s]?(.+)の天気.*(おしえて|教え|おせーて)?", str(content)).group(2).strip()
+    elif tenki_area := re.search(
+            r"きりぼ(くん|君|さん|様|さま|ちゃん)?[!！、\s]?(.+)の天気.*(おしえて|教え|おせーて)?", str(content)):
+        tenki_area = tenki_area.group(2).strip()
         tenki_area = [w for w in tenki_area.split("の") if w not in ["今日", "明日", "明後日", "今週", "来週"]][0]
 
         retcode, weather_image_path = tenki.make_forecast_image(quary=tenki_area)
@@ -752,11 +742,11 @@ def worker(status):
         if len(toots_for_rep[acct]) > 50:
             toots_for_rep[acct] = toots_for_rep[acct][-50:]
 
-        seeds = toots_in_ltl[-5:]
-        seeds.extend(toots_for_rep[acct][-5:])
+        seeds = toots_in_ltl[-t5.T5Config.CONTEXT_WINDOW_SIZE:]
+        seeds.extend(toots_for_rep[acct][-t5.T5Config.CONTEXT_WINDOW_SIZE:])
         #時系列ソート
         seeds.sort(key=lambda x: (x[1]))
-        seeds = seeds[-15:]
+        seeds = seeds[-t5.T5Config.CONTEXT_WINDOW_SIZE:]
         threading.Thread(target=dnn_gen_toot_sub, args=(
             acct, seeds, visibility, id, toots_for_rep)).start()
 
@@ -766,7 +756,7 @@ def worker(status):
         if random.randint(0, 10+ct) > 9:
             return
         # fav_now(id)
-        seeds = toots_in_ltl[-5:]
+        seeds = toots_in_ltl[-t5.T5Config.CONTEXT_WINDOW_SIZE:]
         threading.Thread(target=dnn_gen_toot_sub, args=(
             acct, seeds, visibility, id)).start()
         SM.update(acct, 'reply')
@@ -801,13 +791,8 @@ def res_fixed_phrase(id, acct, username, visibility, content, statuses_count,
 
     def re_search_rnd(re_txt, text, threshold=None, flags=0):
         rnd = random.randint(0, ct+6)
-        if acct == settings.master_id:
-            rnd = 0
-        if re.search(re_txt, text, flags=flags) != None:
-            if threshold == None:
-                return True
-            elif rnd <= threshold:
-                return True
+        if acct == settings.master_id or not threshold or rnd <= threshold:
+            return  re.search(re_txt, text, flags=flags)
         return False
 
     toot_now = ''
@@ -1443,7 +1428,7 @@ def bottlemail_sending():
 
 def auto_tooter():
 # きりぼっとのつぶやき
-    seeds = toots_in_ltl[-15:]
+    seeds = toots_in_ltl[-t5.T5Config.CONTEXT_WINDOW_SIZE:]
     if len(seeds) <= 2:
         return
     spoiler = None
