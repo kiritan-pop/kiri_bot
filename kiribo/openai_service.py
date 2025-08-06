@@ -58,3 +58,7 @@ def predict(system_prompt, user_prompt, parameters=chatgpt_parameters):
     except Exception as e:
         logger.error(str(e))
         return dict()        
+
+
+if __name__ == '__main__':
+    print(f"{is_alive()=}")

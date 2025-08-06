@@ -44,7 +44,7 @@ class Siritori_game():
         self.lv = random.randint(1,50)
         if self.lv >= 45:
             self.lv = random.randint(45,60)
-        for k,v in random.sample(self.MG.wdict.items(),len(self.MG.wdict)//(21-self.lv//5)):
+        for k,v in random.sample(list(self.MG.wdict.items()),len(self.MG.wdict)//(21-self.lv//5)):
             self.sdict[k] = v
         del_key = []
         for k,v in self.sdict.items():
@@ -108,7 +108,7 @@ class Siritori_game():
                 kouho[k] = v
 
         if len(kouho) > 0:
-            k,v = random.sample(kouho.items(),1)[0]
+            k,v = random.sample(list(kouho.items()),1)[0]
             tail = v[-1]
             if tail in ['ー','−']:
                 tail = v[-2]
@@ -120,7 +120,7 @@ class Siritori_game():
             return None,None,None
 
     def random_choice(self):
-        for a,b in random.sample(self.sdict.items(),100):
+        for a,b in random.sample(list(self.sdict.items()),100):
             tail = b[-1]
             if tail != 'ン':
                 if tail in ['ー','−']:

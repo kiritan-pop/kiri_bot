@@ -393,7 +393,7 @@ def worker(status):
         fav_now(id)
 
     # 定期トゥート
-    if acct != settings.bot_id and visibility == "public" and re.search(r'[^:]@%s' % settings.bot_id, status['content']) is None:
+    if visibility == "public" and re.search(r'[^:]@%s' % settings.bot_id, status['content']) is None: # acct != settings.bot_id and 
         toots_in_ltl.append((content.strip(), created_at))
 
     # 高感度下げ
@@ -491,7 +491,7 @@ def worker(status):
         #得点消費
         SM.update(acct, 'getnum', score=- int(slot_rate*3))
         #スロット回転
-        slot_accts = DAO.get_five(num=reel_num, minutes=120)
+        slot_accts = DAO.get_five(num=reel_num)
         slotgame = game.Friends_nico_slot(
             acct, slot_accts, slot_rate, reelsize)
         slot_rows, slot_score = slotgame.start()
@@ -537,7 +537,7 @@ def worker(status):
         recipe_service(content=content, acct=acct, id=id, visibility=visibility)
         SM.update(acct, 'func')
 
-    elif result := re.search(r".*(へい)?きりぼ(っと)?(くん|君|さん|様|さま|ちゃん)?[!,.、。]?(?P<target_word>.+)って(何|なに|ナニ|誰|だれ|ダレ|いつ|どこ)\?$",
+    elif result := re.search(r"(へい)?(きりぼ)?(っと)?(くん|君|さん|様|さま|ちゃん)?[!,.、。]?(?P<target_word>.+)って(何|なに|ナニ|誰|だれ|ダレ|いつ|どこ)\?$",
                         content, flags=re.DOTALL):
         if word := result.groupdict().get('target_word'):
             if text := sensesearch.sensesearch(word):
@@ -733,7 +733,7 @@ def worker(status):
         SM.update(acct, 'reply')
         if content.strip().isdigit():
             return
-        if len(content) <= 4:
+        if len(content) <= 2:
             return
         if random.randint(0, 10+ct) > 9:
             return
@@ -1109,6 +1109,8 @@ def ana_image(media_file, acct):
                 toot_now += 'SSR!'
             elif 'スクショ' in result:
                 toot_now += '📷スクショパシャパシャ！'
+            elif 'ちいかわ' in result:
+                toot_now += ':chiikama:'
             elif len(result) > 0:
                 toot_now += 'かわいい！'
 
@@ -1444,15 +1446,16 @@ def auto_tooter():
 
 
 def th_auto_tooter():
-    TT_INT = 1800
+    TT_INT = 3600
     tt_cnt = TT_INT
     pre_toots_len = len(toots_in_ltl)
     while True:
         try:
             sleep(1)
+            logger.debug(f"{tt_cnt=}")
             tt_cnt -= 1
             if len(toots_in_ltl) != pre_toots_len:
-                tt_cnt -= random.randint(1,3) * 60
+                tt_cnt -= random.randint(5,20) * 60
             if len(toots_in_ltl) > 50:
                 toots_in_ltl.pop(0)
             pre_toots_len = len(toots_in_ltl)

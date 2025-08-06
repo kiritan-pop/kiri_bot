@@ -112,7 +112,24 @@ class ScoreManager():
 if __name__ == '__main__':
     from pprint import pprint as pp
     cm = ScoreManager()
-    acct = "mio_KiKi"
-    pp(cm.show(acct=acct))
-    cm.update(acct=acct, key='getnum', score=168)
-    pp(cm.show(acct=acct))
+    # acct = "sinonome@meisskey.one"
+    # pp(cm.show(acct="sinonome@meisskey.one"))
+    # pp(cm.show(acct="kohaku_shinonome@misskey.gg"))
+    # cm.update(acct="kohaku_shinonome@misskey.gg", key='getnum', score=3212)
+    # cm.update(acct="kohaku_shinonome@misskey.gg", key='fav', score=5)
+    # cm.update(acct="kohaku_shinonome@misskey.gg", key='boost', score=132+4)
+    # cm.update(acct="kohaku_shinonome@misskey.gg", key='reply', score=101+1)
+    # cm.update(acct="kohaku_shinonome@misskey.gg", key='func', score=243+1)
+    # jst_now = datetime.now(timezone('Asia/Tokyo'))
+    # ymdhms = jst_now.strftime("%Y%m%d %H%M%S")
+
+    # cm.update(acct="sinonome@meisskey.one", key='getnum', score=-3212)
+    # cm.update(acct="sinonome@meisskey.one", key='fav', i_datetime=ymdhms, score=-5)
+    # cm.update(acct="sinonome@meisskey.one", key='boost', i_datetime=ymdhms, score=-132)
+    # cm.update(acct="sinonome@meisskey.one", key='reply', score=-101)
+    # cm.update(acct="sinonome@meisskey.one", key='func', score=-243)
+    # pp(cm.show(acct="sinonome@meisskey.one"))
+    # pp(cm.show(acct="kohaku_shinonome@misskey.gg"))
+
+    # cm.update(acct=acct, key='getnum', score=168)
+    # pp(cm.show(acct=acct))

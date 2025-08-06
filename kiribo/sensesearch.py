@@ -60,3 +60,9 @@ def sensesearch(word: str):
         return result
     else:
         return summary
+
+
+if __name__ == '__main__':
+    # text = llm_predict("潮騒", "")
+    # print(text)
+    print(is_alive())

@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.INFO)
 session = InferenceSession(KiriConfig.QUANTIZED_MODEL_PATH)
 tokenizer = T5Tokenizer.from_pretrained(os.path.dirname(KiriConfig.QUANTIZED_MODEL_PATH), use_fast=True)
 
-black_words = ["きりぼ占って", "こらきりぼ"]
+black_words = ["きりぼ占って", "こらきりぼ", "!tarot"]
 # ブラックワードをトークン化（順序を保持）
 black_word_sequences = [tokenizer.encode(word) for word in black_words]
 
@@ -23,7 +23,7 @@ def gen_text(
         temperature=0.75, 
         topk=500,
         topp=0.8,
-        repetition_penalty=1.2,  # 繰り返しペナルティ
+        repetition_penalty=1.5,  # 繰り返しペナルティ
         black_word_penalty=1.5,  # ブラックワードのペナルティ係数
         ):
     
