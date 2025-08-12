@@ -1214,7 +1214,7 @@ def business_contact(status):
 def recipe_service(content=None, acct=settings.master_id, id=None, visibility='unlisted'):
     # レシピ提案
     gen_txt = ''
-
+    media_ids = []
     #ベースとなる材料と分量を取得
     zairyos = []
     amounts = []
@@ -1225,13 +1225,11 @@ def recipe_service(content=None, acct=settings.master_id, id=None, visibility='u
     zairyos = random.sample(zairyos, 4)
     amounts = random.sample(amounts, 4)
 
-    response = recipe2.get_recipe(zairyos)
+    response = recipe2.get_recipe_with_image(zairyos)
     if response:
-        spoiler = response.get("料理名")
-        gen_txt += '＜材料＞\n'
-        gen_txt += "\n".join([f"{k}： {v}" for k, v in response.get("材料・調味料", dict()).items()])
-        gen_txt += '\n＜作り方＞\n'
-        gen_txt += "\n".join([f"{k}： {v}" for k, v in response.get("料理手順", dict()).items()])
+        spoiler = response.get("full_text").get("料理名")
+        gen_txt += response.get("post_text")
+        media_ids = [mastodon.media_post(response.get("image_path"), 'image/png')]
     else:
         generator = generate_text.GenerateText(1)
         #料理名を取得
@@ -1259,7 +1257,8 @@ def recipe_service(content=None, acct=settings.master_id, id=None, visibility='u
             gen_txt += f' {i+1}. {text}\n'
 
     gen_txt = f"@{acct}\n{gen_txt[:min(len(gen_txt), 470)]}\n\n#きり料理提案サービス #きりぼっと"
-    toot(gen_txt, visibility, id, f":@{acct}: {spoiler}")
+    toot(gen_txt, visibility, id,
+         spoiler_text=f":@{acct}: {spoiler}", media_ids=media_ids)
 
 
 def show_rank(acct=None, target=None, id=None, visibility=None):
