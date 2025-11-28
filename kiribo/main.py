@@ -537,7 +537,7 @@ def worker(status):
         recipe_service(content=content, acct=acct, id=id, visibility=visibility)
         SM.update(acct, 'func')
 
-    elif result := re.search(r"(へい)?(きりぼ)?(っと)?(くん|君|さん|様|さま|ちゃん)?[!,.、。]?(?P<target_word>.+)って(何|なに|ナニ|誰|だれ|ダレ|いつ|どこ)\?$",
+    elif result := re.search(r".*(へい)?きりぼ(っと)?(くん|君|さん|様|さま|ちゃん)?[!,.、。]?(?P<target_word>.+)って(何|なに|ナニ|誰|だれ|ダレ|いつ|どこ)\?$",
                         content, flags=re.DOTALL):
         if word := result.groupdict().get('target_word'):
             if text := sensesearch.sensesearch(word):
@@ -683,7 +683,7 @@ def worker(status):
         stats = stat.sys_stat()
         logger.debug(f"stats={stats}")
         toot(
-            f"@{acct} \nただいまの気温{stats['cpu_temp']}℃、忙しさ{stats['cpu']:.1f}％、気持ちの余裕{stats['mem_available']/(10**9):.1f}GB、懐の広さ{stats['disk_usage']/(10**9):.1f}GB", visibility=visibility, in_reply_to_id=id)
+            f"@{acct} \nただいまの気温{stats['cpu_temp']:.1f}℃、忙しさ{stats['cpu']:.1f}％、気持ちの余裕{stats['mem_available']/(1024**3):.1f}GB、懐の広さ{stats['disk_usage']/(1024**3):.1f}GB", visibility=visibility, in_reply_to_id=id)
 
     elif tenki_area := re.search(
             r"きりぼ(くん|君|さん|様|さま|ちゃん)?[!！、\s]?(.+)の天気.*(おしえて|教え|おせーて)?", str(content)):

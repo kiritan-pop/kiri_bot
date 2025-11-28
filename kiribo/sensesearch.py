@@ -11,11 +11,12 @@ wikipedia.set_user_agent("kiri_bot (https://github.com/kiritan-pop/kiri_bot/)")
 SYSTEM_PROMPT = """与えられた単語について、wikipediaの要約を取得しました。
 wikipediaの情報を参考にして、意味と内容の解説をしてください。
 - wikipediaの情報がない場合、もしくは明らかに間違っている場合は、あなたの知識を使って解説してください
+- 全く無意味な単語の場合は、語感から想像して解説してください
 
 出力フォーマット
 ```json
 {
-    "answer": "回答内容（通常版ですます口調）" or null
+    "answer": "回答内容（簡潔な「だ・である」口調）" or null
 }
 ```
 
@@ -47,6 +48,7 @@ def llm_predict(word: str, wikipedia_summary: str):
 
 
 def sensesearch(word: str):
+    word = word.strip()
     if len(word) == 0:
         return ""
     

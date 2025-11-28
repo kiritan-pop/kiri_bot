@@ -7,9 +7,18 @@ services:
      - /home/kiritan/kiri_bot:/kiri_bot
      - /usr/lib/x86_64-linux-gnu/mecab/dic/mecab-ipadic-neologd:/usr/lib/x86_64-linux-gnu/mecab/dic/mecab-ipadic-neologd
     working_dir: /kiri_bot
+    environment:
+      - TZ=Asia/Tokyo
     restart: always
     logging:
       driver: json-file
       options:
         max-file: '5'
         max-size: 1m
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "kiritan.work:host-gateway"
+      - "streaming.kiritan.work:host-gateway"
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4

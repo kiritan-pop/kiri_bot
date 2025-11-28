@@ -84,7 +84,7 @@ def gen_text(
         # print(f"{tmp_char}", end="", flush=True)
 
     generated_text = tokenizer.decode(output_ids_list)
-    generated_text = generated_text.replace("<br>", "\n")
+    generated_text = generated_text.replace("|", "\n")
     return generated_text
 
 

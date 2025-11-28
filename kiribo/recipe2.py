@@ -279,7 +279,6 @@ def create_recipe_post_text(recipe_data):
         post_text += f"📝 材料: {ingredients_count}種類\n"
         post_text += f"👨‍🍳 手順: {steps_count}ステップ\n\n"
         post_text += "詳細なレシピは画像をご確認ください！\n"
-        post_text += "#料理 #レシピ #自炊"
 
         return post_text
 

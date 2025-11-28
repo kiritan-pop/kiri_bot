@@ -19,10 +19,15 @@ def get_kinro(date_str: str):
         res = requests.get(url=KINRO_URL,
                         headers=headers,
                         timeout=5)
-        soup = BeautifulSoup(res.content)
+        res.raise_for_status()  # HTTPエラーをチェック
+        soup = BeautifulSoup(res.content, 'html.parser')
         
+    except requests.exceptions.RequestException as e:
+        logger.warning(f"金ロー情報の取得に失敗しました: {e}")
+        return movie_info  # エラー時は空のリストを返す
     except Exception as e:
-        logger.error(e, exc_info=True)
+        logger.warning(f"予期しないエラーが発生しました: {e}")
+        return movie_info  # エラー時は空のリストを返す
 
     for i in range(6):
         try:
@@ -34,7 +39,7 @@ def get_kinro(date_str: str):
             break
 
         except Exception as e:
-            logger.error(e, exc_info=True)
+            logger.debug(f"要素の取得に失敗しました (i={i+1}): {e}")
 
     return movie_info
 
