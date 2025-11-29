@@ -1,27 +1,35 @@
-lxml>=4.5.2
-Mastodon.py>=1.5.1
-opencv-python>=4.4.0.42
-pandas>=1.1.0
-Pillow>=7.2.0
-plotly>=4.9.0
-psutil>=5.7.2
-socketIO-client-nexus>=0.7.6
-wikipedia>=1.4.0
-xmltodict>=0.12.0
-# transformers
+# --- 画像処理・GUI関連 (軽量化) ---
+# OpenCVはGUI機能なしのheadless版を指定 (libgl1-mesa-dev等のapt依存を排除)
+opencv-python-headless>=4.12
+Pillow>=12
+cairosvg
+
+# --- 機械学習・推論 (PyTorch排除構成) ---
+# 推論エンジン
 onnx
 onnxruntime
-optimum
-tokenizers
-# torch
-jaconv
-cairosvg
-fugashi
-ipadic
-unidic-lite
-# deepsparse
+
+# 自然言語処理・画像処理の前処理
+# transformersを入れるとtokenizerも自動で入ります
+transformers
 sentencepiece
+
+# --- その他 ユーティリティ ---
+lxml>=4.5.2
+Mastodon.py>=2
+pandas>=2
+plotly>=6
+psutil>=7
+wikipedia>=1.4
+jaconv
+fugashi[unidic-lite]
 openai
 pydantic-settings
-evaluate
-accelerate
+
+# --- 削除済みリスト (今回の軽量化対象) ---
+# optimum       -> コード修正により不要化
+# accelerate    -> optimum/torch依存のため削除
+# evaluate      -> torch依存のため削除
+# opencv-python -> headless版に変更
+# ipadic
+# unidic-lite
