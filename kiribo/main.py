@@ -43,8 +43,6 @@ TRANS = trans.Trans(settings.google_key)
 #しりとり用
 StMG = game.Siritori_manager()
 
-publicdon = Mastodon(api_base_url=settings.mastodon_url)  # インスタンス
-
 mastodon = Mastodon(
     access_token=settings.mastodon_access_token,
     api_base_url=settings.mastodon_url)  # インスタンス
@@ -67,7 +65,6 @@ toot_cnt = 0
 TCNT_RESET = 15
 acct_least_created_at = dict()
 
-toots_for_rep = defaultdict(list)
 toots_in_ltl = []
 
 # 花宅配サービス用の花リスト
@@ -174,25 +171,6 @@ class ltl_listener(StreamListener):
     def on_delete(self, status_id):
         logger.info(f"===ltl_listener on_delete【{status_id}】===")
         DelQ.put(status_id)
-
-    # def on_status_update(self, status):
-    #     acct = status["account"]["acct"]
-    #     if acct != settings.bot_id:
-    #         WorkerQ.put(status)
-
-
-# class public_listener(StreamListener):
-# # タイムライン保存用（認証なし）
-#     def on_update(self, status):
-#         StatusQ.put(status)
-#         CM.count(status['created_at'])
-#         acct = status["account"]["acct"]
-#         logger.info(
-#             f"「{util.content_cleanser(status['content'])[:30]:<30}」by {acct}")
-
-#     def on_delete(self, status_id):
-#         logger.info(f"===public_listener on_delete【{status_id}】===")
-#         DelQ.put(status_id)
 
 
 def toot(toot_content: str, visibility: str = "direct", in_reply_to_id=None, spoiler_text: str = None, media_ids: list = None, interval=0, **kwargs):
@@ -731,6 +709,7 @@ def worker(status):
 
     elif re.search(r'[^:]@%s' % settings.bot_id, status['content']):
         SM.update(acct, 'reply')
+        logger.info(f"mention_toots={content}")
         if content.strip().isdigit():
             return
         if len(content) <= 2:
@@ -738,17 +717,10 @@ def worker(status):
         if random.randint(0, 10+ct) > 9:
             return
         # fav_now(id)
-        toots_for_rep[acct].append((content.strip(), created_at))
-        if len(toots_for_rep[acct]) > 50:
-            toots_for_rep[acct] = toots_for_rep[acct][-50:]
-
-        seeds = toots_in_ltl[-t5.T5Config.CONTEXT_WINDOW_SIZE:]
-        seeds.extend(toots_for_rep[acct][-t5.T5Config.CONTEXT_WINDOW_SIZE:])
-        #時系列ソート
-        seeds.sort(key=lambda x: (x[1]))
-        seeds = seeds[-t5.T5Config.CONTEXT_WINDOW_SIZE:]
-        threading.Thread(target=dnn_gen_toot_sub, args=(
-            acct, seeds, visibility, id, toots_for_rep)).start()
+        if recent_toots := get_recent_toots(acct, t5.T5Config.CONTEXT_WINDOW_SIZE):
+            logger.info(f"recent_toots={recent_toots}")
+            threading.Thread(target=dnn_gen_toot_sub, args=(
+                acct, recent_toots, visibility, id)).start()
 
     elif re.search(r"(きり|キリ).*(ぼっと|ボット|[bB][oO][tT])|[きキ][りリ][ぼボ]|[きキ][りリ][ぽポ][っッ][ぽポ]", content + spoiler_text) != None \
         and re.search(r"^[こコ][らラ][きキ][りリ][ぼボぽポ]", content + spoiler_text) == None:
@@ -1469,12 +1441,10 @@ def dnn_gen_text_wrapper(input_text_list):
     return t5.gen_text(input_text_list, temperature=random.uniform(0.7, 1.0)) #, topk=100) #, topk=random.randint(100,500))
 
 
-def dnn_gen_toot_sub(acct: str, seeds: list, visibility: str, in_reply_to_id: int = None, toots_for_rep:list = None):
+def dnn_gen_toot_sub(acct: str, seeds: list, visibility: str, in_reply_to_id: int = None):
     toot_now = f"@{acct}\n"
     tmp = dnn_gen_text_wrapper([toot for toot, _ in seeds])
     tmp = util.content_cleanser_light(tmp)
-    if toots_for_rep:
-        toots_for_rep[acct].append([tmp, datetime.now(timezone('Asia/Tokyo'))])
     toot_now += tmp
     toot(toot_now, visibility, in_reply_to_id)
 
@@ -1895,6 +1865,29 @@ def th_post():
             sleep(3)
 
 
+def get_recent_toots(acct: str, limit: int = 10) -> list[(str, datetime)]:
+    try:
+        account = mastodon.account_lookup(acct)
+        account_id = account['id']
+
+        # そのアカウントの直近の投稿を取得
+        statuses = mastodon.account_statuses(
+            account_id,
+            limit=limit,  # 取得する投稿数
+            exclude_replies=False,  # 返信を除外するか
+            exclude_reblogs=False   # ブーストを除外するか
+        )
+
+        # 投稿を処理（created_atで昇順にソート）
+        result = [(util.content_cleanser(status['content']), status['created_at']) for status in statuses]
+        result.sort(key=lambda x: x[1])  # created_atで昇順ソート
+        return result
+
+    except Exception as e:
+        logger.error(e, exc_info=True)
+        return []
+
+
 def th_ltl():
     # ltl監視
     while True:
@@ -1905,16 +1898,6 @@ def th_ltl():
         except Exception as e:
             logger.error(e, exc_info=True)
             sleep(10)
-
-
-# def th_ptl():
-#     # ltl監視
-#     while True:
-#         try:
-#             publicdon.stream_local(public_listener())
-#         except Exception as e:
-#             logger.error(e, exc_info=True)
-#             sleep(10)
 
 
 def th_htl():

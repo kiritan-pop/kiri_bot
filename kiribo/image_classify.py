@@ -13,7 +13,7 @@ MODEL_DIR = "data/imgclsfy_r2/"
 ONNX_MODEL_PATH = os.path.join(MODEL_DIR, "model.onnx")
 
 # プロセッサは transformers のままでOK (Torch不要で動きます)
-processor = AutoImageProcessor.from_pretrained(MODEL_DIR)
+processor = AutoImageProcessor.from_pretrained(MODEL_DIR, use_fast=False)
 
 # ONNX Runtime セッションの作成
 session = ort.InferenceSession(ONNX_MODEL_PATH, providers=['CPUExecutionProvider'])

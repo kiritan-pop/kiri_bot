@@ -19,6 +19,3 @@ services:
       - "host.docker.internal:host-gateway"
       - "kiritan.work:host-gateway"
       - "streaming.kiritan.work:host-gateway"
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
