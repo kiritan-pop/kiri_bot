@@ -8,18 +8,62 @@ wikipedia.set_lang("ja")
 wikipedia.set_user_agent("kiri_bot (https://github.com/kiritan-pop/kiri_bot/)")
 
 
-SYSTEM_PROMPT = """与えられた単語について、wikipediaの要約を取得しました。
+SYSTEM_PROMPT = """
+# instruction
+与えられた単語・文章について、wikipediaの要約を取得しました。
 wikipediaの情報を参考にして、意味と内容の解説をしてください。
-- wikipediaの情報がない場合、もしくは明らかに間違っている場合は、あなたの知識を使って解説してください
-- 全く無意味な単語の場合は、語感から想像して解説してください
+- 以下のような場合は、文脈や語感から想像して、それっぽい解説を作成してください。
+  - wikipediaから情報が取得できなかった場合
+  - wikipediaの要約が明らかに間違っている場合
+  - 全く無意味な単語の場合
 
-出力フォーマット
+# 入力フォーマット(JSON)
 ```json
 {
-    "answer": "回答内容（簡潔な「だ・である」口調）" or null
+    "word": "単語・文章",
+    "wikipedia_summary": "wikipediaの要約"
 }
 ```
 
+# 出力フォーマット(JSONコードブロックのみ出力してください)
+```json
+{
+    "answer": "回答内容（簡潔な「だ・である」口調）"
+}
+```
+
+# 出力例1
+input:
+```json
+{
+    "word": "富士山",
+    "wikipedia_summary": 富士山は、日本の活火山である。標高は3775.56 m、山体の最高地点は3776.12 mで、日本最高峰の独立峰で、その優美な風貌は日本国外でも日本の象徴として広く知られている。山梨県と静岡県に跨る。 数多くの芸術作品の題材とされ芸術面のみならず、気候や地層など地質学的にも社会に大きな影響を与えている。"
+}
+```
+
+output:
+```json
+{
+    "answer": "富士山は、日本の活火山である。標高は3775.56 m、山体の最高地点は3776.12 mで、日本最高峰の独立峰で、その優美な風貌は日本国外でも日本の象徴として広く知られている。山梨県と静岡県に跨る。 数多くの芸術作品の題材とされ芸術面のみならず、気候や地層など地質学的にも社会に大きな影響を与えている。"
+}
+```
+
+# 出力例2
+input:
+```json
+{
+    "word": "クメ菜",
+    "wikipedia_summary": "（wikipediaから情報取得できませんでした）"
+}
+```
+output:
+```json
+{
+    "answer": "美味しくなく、栄養価も低い野菜である。"
+}
+`
+
+# 実際のデータは以下の通り
 input:
 """
 
@@ -41,7 +85,7 @@ def llm_predict(word: str, wikipedia_summary: str):
             word=word,
             wikipedia_summary=wikipedia_summary if wikipedia_summary else "（wikipediaから情報取得できませんでした）",
         )
-        response = predict(SYSTEM_PROMPT, json.dumps(prompt, ensure_ascii=False, indent=2))
+        response = predict(SYSTEM_PROMPT, json.dumps(prompt, ensure_ascii=False, indent=2) + "\noutput:\n")
         return response.get("answer")
     else:
         return None

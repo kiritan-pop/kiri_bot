@@ -75,13 +75,10 @@ def gen_text(
         # 次のトークンをサンプリング
         next_id = int(sample(preds[cur - 1], temperature=temperature, topk=topk, topp=topp))
         if next_id in [tokenizer.eos_token_id]:
-            print("\n")
             break
+
         output_ids[0, cur] = next_id
         output_ids_list.append(next_id)
-        # tmp_char = tokenizer.decode(next_id)
-        # tmp_char = tmp_char.replace("<br>", "\n")
-        # print(f"{tmp_char}", end="", flush=True)
 
     generated_text = tokenizer.decode(output_ids_list)
     generated_text = generated_text.replace("|", "\n")

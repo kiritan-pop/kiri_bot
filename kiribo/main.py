@@ -515,7 +515,7 @@ def worker(status):
         recipe_service(content=content, acct=acct, id=id, visibility=visibility)
         SM.update(acct, 'func')
 
-    elif result := re.search(r".*(へい)?きりぼ(っと)?(くん|君|さん|様|さま|ちゃん)?[!,.、。]?(?P<target_word>.+)って(何|なに|ナニ|誰|だれ|ダレ|いつ|どこ)\?$",
+    elif result := re.search(r"^(へい)?[!,.、]?きりぼ(っと)?(くん|君|さん|様|さま|ちゃん)?[!,.、。]?(?P<target_word>.+)って(何|なに|ナニ|誰|だれ|ダレ|いつ|どこ)\?$",
                         content, flags=re.DOTALL):
         if word := result.groupdict().get('target_word'):
             if text := sensesearch.sensesearch(word):
