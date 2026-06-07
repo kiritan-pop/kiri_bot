@@ -14,6 +14,7 @@ from kiribo.config import settings
 
 from kiribo import deep
 
+os.makedirs(os.path.dirname(settings.log_path), exist_ok=True)
 
 log_level = getLevelName(settings.log_level)
 sh = StreamHandler()

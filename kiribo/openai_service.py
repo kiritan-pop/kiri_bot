@@ -44,6 +44,7 @@ def predict(system_prompt, user_prompt, parameters=chatgpt_parameters):
     try:
         completion = openai_client.chat.completions.create(
             messages=messages,
+            reasoning_effort="none",
             **parameters
         )
         res_raw = completion.choices[0].message.content
