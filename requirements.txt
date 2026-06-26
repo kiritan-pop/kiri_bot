@@ -11,12 +11,13 @@ onnxruntime
 
 # 自然言語処理・画像処理の前処理
 # transformersを入れるとtokenizerも自動で入ります
-transformers
+transformers>=4.40,<5
 sentencepiece
 
 # --- その他 ユーティリティ ---
 lxml>=4.5.2
-Mastodon.py>=2
+Mastodon.py>=2.2.0,<3
+pytz
 pandas>=2
 plotly>=6
 psutil>=7
