@@ -20,7 +20,7 @@ from kiribo.config import settings
 # きりぼサブモジュール
 from kiribo import bottlemail, cooling_manager, status_dao, deep, game, generate_text,\
     get_images_ggl, imaging, romasaga, scheduler, score_manager, stat, tenki,\
-    timer, trans, util, tarot, t5, get_kinro, haiku, tarot_april, recipe2, text_summary, sensesearch
+    timer, trans, util, tarot, t5, get_kinro, haiku, tarot_april, recipe2, text_summary, sensesearch, llm_chat
 
 import logging
 logger = logging.getLogger(__name__)
@@ -46,6 +46,14 @@ StMG = game.Siritori_manager()
 mastodon = Mastodon(
     access_token=settings.mastodon_access_token,
     api_base_url=settings.mastodon_url)  # インスタンス
+
+try:
+    BOT_ACCOUNT_ID = mastodon.account_lookup(settings.bot_id)["id"]
+except Exception as e:
+    logger.error(e, exc_info=True)
+    BOT_ACCOUNT_ID = None
+
+LLM_PROMPT_MAX_LEN = 500
 
 PostQ = queue.Queue()
 WorkerQ = queue.Queue()
@@ -525,6 +533,31 @@ def worker(status):
 
                 toot(f'@{acct} {text}',
                         visibility, id, f'なになに？「{word}」とは……')
+
+    elif (
+        '@' not in acct
+        and (
+            settings.bot_id in reply_to_acct_list
+            or (BOT_ACCOUNT_ID is not None and status.get("in_reply_to_account_id") == BOT_ACCOUNT_ID)
+        )
+        and re.search(r"^!llm", content)
+    ):
+        if result := re.search(r"^!llm\s+(?P<prompt>.+)$", content, flags=re.DOTALL):
+            prompt = result.groupdict().get('prompt', '').strip()
+            if util.is_ng(prompt):
+                toot(f'@{acct} 気が向かないので別の質問にしてね〜', visibility, id)
+                return
+            if len(prompt) > LLM_PROMPT_MAX_LEN:
+                toot(f'@{acct} 質問は{LLM_PROMPT_MAX_LEN}文字以下にしてね〜', visibility, id)
+                return
+            threading.Thread(
+                target=llm_chat_service,
+                args=(acct, prompt, visibility, id),
+            ).start()
+            return
+        else:
+            toot(f'@{acct} 使い方: !llm 質問内容', visibility, id)
+            return
 
     elif len(media_attachments) > 0 and re.search(r"色[ぬ塗]って", content + spoiler_text):
         # fav_now(id)
@@ -1181,6 +1214,19 @@ def business_contact(status):
     if acct in watch_list:
         toot_now = f'@{settings.master_id}\n:@{acct}: {display_name}\n「{content}」\n\n#exp10m'
         toot(toot_now, visibility='direct')
+
+
+def llm_chat_service(acct, prompt, visibility, id):
+    text = llm_chat.chat(prompt)
+    if text:
+        SM.update(acct, 'func')
+        footer = "\n\n#きりLLM #きりぼっと"
+        max_body = 470 - len(footer)
+        toot(
+            f"@{acct} {text[:max_body]}{footer}",
+            visibility, id, spoiler_text='なになに……？')
+    else:
+        toot(f'@{acct} 今は返事できないよ〜', visibility, id)
 
 
 def recipe_service(content=None, acct=settings.master_id, id=None, visibility='unlisted'):

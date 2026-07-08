@@ -34,20 +34,22 @@ def is_alive():
         return False
 
 
-def predict(system_prompt, user_prompt, parameters=chatgpt_parameters):
-
+def _chat_completion(system_prompt, user_prompt, parameters=chatgpt_parameters):
     messages = [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_prompt},
     ]
+    completion = openai_client.chat.completions.create(
+        messages=messages,
+        reasoning_effort="none",
+        **parameters
+    )
+    return completion.choices[0].message.content or ""
 
+
+def predict(system_prompt, user_prompt, parameters=chatgpt_parameters):
     try:
-        completion = openai_client.chat.completions.create(
-            messages=messages,
-            reasoning_effort="none",
-            **parameters
-        )
-        res_raw = completion.choices[0].message.content
+        res_raw = _chat_completion(system_prompt, user_prompt, parameters)
         result = re.search(r"```json(?P<json_content>.+)```",
                             res_raw, flags=re.DOTALL)
         if result:
@@ -58,7 +60,16 @@ def predict(system_prompt, user_prompt, parameters=chatgpt_parameters):
 
     except Exception as e:
         logger.error(str(e))
-        return dict()        
+        return dict()
+
+
+def predict_text(system_prompt, user_prompt, parameters=chatgpt_parameters):
+    """プレーンテキスト応答を返す（JSONパースなし）"""
+    try:
+        return _chat_completion(system_prompt, user_prompt, parameters).strip()
+    except Exception as e:
+        logger.error(str(e))
+        return ""
 
 
 if __name__ == '__main__':
