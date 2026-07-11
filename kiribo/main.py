@@ -550,9 +550,10 @@ def worker(status):
             if len(prompt) > LLM_PROMPT_MAX_LEN:
                 toot(f'@{acct} 質問は{LLM_PROMPT_MAX_LEN}文字以下にしてね〜', visibility, id)
                 return
+            image_paths = llm_chat.filter_image_paths(media_file)
             threading.Thread(
                 target=llm_chat_service,
-                args=(acct, prompt, visibility, id),
+                args=(acct, prompt, visibility, id, image_paths),
             ).start()
             return
         else:
@@ -1216,8 +1217,8 @@ def business_contact(status):
         toot(toot_now, visibility='direct')
 
 
-def llm_chat_service(acct, prompt, visibility, id):
-    text = llm_chat.chat(prompt)
+def llm_chat_service(acct, prompt, visibility, id, image_paths=None):
+    text = llm_chat.chat(prompt, image_paths=image_paths or None)
     if text:
         SM.update(acct, 'func')
         footer = "\n\n#きりLLM #きりぼっと"
