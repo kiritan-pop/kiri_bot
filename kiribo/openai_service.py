@@ -66,15 +66,17 @@ def _build_user_content(user_prompt: str, image_paths=None):
     return content
 
 
-def _chat_completion(system_prompt, user_prompt, parameters=chatgpt_parameters, image_paths=None):
+def _chat_completion(system_prompt, user_prompt, parameters=chatgpt_parameters, image_paths=None, reasoning_effort="none"):
     user_content = _build_user_content(user_prompt, image_paths)
     messages = [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_content},
     ]
+
+    # ReasoningEffort: TypeAlias = Optional[Literal["none", "minimal", "low", "medium", "high", "xhigh"]]
     completion = openai_client.chat.completions.create(
         messages=messages,
-        reasoning_effort="none",
+        reasoning_effort=reasoning_effort,
         **parameters
     )
     return completion.choices[0].message.content or ""
@@ -96,11 +98,12 @@ def predict(system_prompt, user_prompt, parameters=chatgpt_parameters):
         return dict()
 
 
-def predict_text(system_prompt, user_prompt, parameters=chatgpt_parameters, image_paths=None):
+def predict_text(system_prompt, user_prompt, parameters=chatgpt_parameters, image_paths=None, reasoning_effort="none"):
     """プレーンテキスト応答を返す（JSONパースなし）"""
     try:
         return _chat_completion(
-            system_prompt, user_prompt, parameters, image_paths=image_paths
+            system_prompt, user_prompt, parameters,
+            image_paths=image_paths, reasoning_effort=reasoning_effort
         ).strip()
     except Exception as e:
         logger.error(str(e))

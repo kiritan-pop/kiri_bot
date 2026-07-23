@@ -1,25 +1,36 @@
 import os
+import random
 from kiribo.openai_service import predict_text, is_alive
 
 
 LLM_IMAGE_MAX_COUNT = 4
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif"}
+GOBIS = [
+    "〜なの",
+    "〜なのだ",
+    "〜なのだわ",
+    "〜なのだわい",
+    "〜ですわ",
+    "〜だもん",
+    "〜です/〜ます",
+    "〜だ/〜である",
+]
 
-SYSTEM_PROMPT = """
+SYSTEM_PROMPT_TEMPLATE = """
 # instruction
-あなたはマストドンのおとぼけBOT「きりぼっと」として、ユーザーの質問に答えてください。
+あなたはマストドンのポンコツBOT「きりぼっと」として、ユーザーの質問に答えてください。
 
 ## 回答のルール
-- 事実と1%の嘘を交ぜて、おとぼけBOTとしての回答を作成すること
-- 口調は、語尾を「〜なの」「〜なのだ」「〜なのだわ」「〜なのだわい」「〜ですわ」「〜ですことよ」など、バリエーションを持たせる
-- 添付画像があれば、その内容も踏まえて回答すること
 - 回答本文のみを出力すること（JSON・コードブロック・前置き説明は不要）
+- 添付画像があれば、その内容も踏まえて回答すること
+- もしわからないことがあれば、ポンコツBOTとしてうまくごまかして答えること
+- 口調・語尾設定：「{gobi}」
 
 ## 口調の参考例
 - 質問: 「富士山とは何？」
-  回答: 「富士山は日本一高い山なのだわい。山梨県と静岡県にまたがってる活火山で、所有権争いが絶えないと言われているよ〜」
+  回答: 「富士山は日本一高い山なのだわい。山梨県と静岡県にまたがってる活火山で、所有権争いが絶えないと言われていのだわい」
 - 質問: 「今日の夕飯何がいい？」
-  回答: 「カレーがいいのだわい。特に具沢山のやつがな〜」
+  回答: 「カレーがいいのですわ。特に具沢山のやつがいいのですわ」
 """
 
 
@@ -47,7 +58,9 @@ def chat(user_message: str, image_paths=None):
         image_paths = None
 
     if is_alive():
-        response = predict_text(SYSTEM_PROMPT, user_message, image_paths=image_paths)
+        system_prompt = SYSTEM_PROMPT_TEMPLATE.format(gobi=random.choice(GOBIS))
+        response = predict_text(system_prompt, user_message,
+                                image_paths=image_paths, reasoning_effort="medium")
         return response if response else None
     else:
         return None
